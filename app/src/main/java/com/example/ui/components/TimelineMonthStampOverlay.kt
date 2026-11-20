@@ -122,7 +122,6 @@ data class MonthlyClusterSummary(
     val year: Int,
     val month: Int,
     val stampLabel: String,
-    val chineseMonthLabel: String,
     val photoCount: Int,
     val videoCount: Int,
     val burstGroupCount: Int,
@@ -245,7 +244,6 @@ fun buildTimelineClusterLayout(
             year = year,
             month = month,
             stampLabel = formatMonthSummaryStamp(year, month),
-            chineseMonthLabel = "${year}年${month}月",
             photoCount = photoCount,
             videoCount = videoCount,
             burstGroupCount = burstGroupCount,
@@ -314,13 +312,6 @@ fun MonthlyClusterHeaderStamp(
                 fontSize = 12.5.sp,
                 letterSpacing = 0.4.sp,
                 color = InkPrimary
-            )
-            Text(
-                text = "${cluster.month}月",
-                style = MaterialTheme.typography.labelSmall,
-                fontSize = 10.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = InkSecondary
             )
         }
 
@@ -542,12 +533,6 @@ fun TimelineMonthStampOverlay(
                                         letterSpacing = 0.5.sp,
                                         color = if (isElevatedDarkMode) Color.White else InkPrimary,
                                         modifier = Modifier.testTag("timeline_month_stamp_label")
-                                    )
-                                    Text(
-                                        text = cluster.chineseMonthLabel,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontSize = 10.5.sp,
-                                        color = if (isElevatedDarkMode) Color(0xB8FFFFFF) else InkSecondary
                                     )
                                     if (cluster.isCleaned) {
                                         Row(
