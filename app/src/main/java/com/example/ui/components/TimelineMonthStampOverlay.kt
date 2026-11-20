@@ -35,7 +35,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -44,8 +44,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BurstMode
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
@@ -56,6 +54,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -71,6 +70,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -109,9 +110,6 @@ private val ScrollFlagShape = RoundedCornerShape(topStart = 14.dp, bottomStart =
 
 private val StampActiveFillBrush = Brush.verticalGradient(
     colors = listOf(Color(0xEB151822), Color(0xE00E1017))
-)
-private val StampIdleFillBrush = Brush.verticalGradient(
-    colors = listOf(Color(0xF5FFFFFF), Color(0xECF7F5EE))
 )
 private val JumpRibbonFillBrush = Brush.verticalGradient(
     colors = listOf(Color(0xF5141720), Color(0xEB0E1016))
@@ -396,11 +394,6 @@ fun TimelineMonthStampOverlay(
     val isScrolling by remember(gridState) {
         derivedStateOf { gridState.isScrollInProgress }
     }
-    val hasScrolledPastTop by remember(gridState) {
-        derivedStateOf {
-            gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 48
-        }
-    }
     val scrollProgressFraction by remember(gridState, clusterLayout) {
         derivedStateOf {
             val maxIndex = (clusterLayout.gridItems.size - 1).coerceAtLeast(1)
@@ -423,10 +416,11 @@ fun TimelineMonthStampOverlay(
     }
 
     val currentCluster = activeCluster ?: return
-    val showFloatingStamp = isScrolling || lingerVisible || hasScrolledPastTop || isJumpRibbonOpen
-    val isElevatedDarkMode = isScrolling || lingerVisible || isJumpRibbonOpen
-    val stampAccessibilityDesc = stringResource(R.string.cd_timeline_month_stamp) +
-        "：${currentCluster.stampLabel}，${currentCluster.compactSummaryText}"
+    // Stamp visibility follows the scroll-rail flag: while scrolling + a short
+    // post-fling linger (or while the jump ribbon is open) — never parked at top.
+    val showFloatingStamp = isScrolling || lingerVisible || isJumpRibbonOpen
+    val isElevatedDarkMode = showFloatingStamp
+    val stampAccessibilityDesc = "${currentCluster.stampLabel}，${currentCluster.compactSummaryText}"
 
     Box(modifier = modifier.fillMaxSize()) {
         // Top-Center Floating Archival Monthly Summary Stamp + Tap-to-Jump Month Ribbon
@@ -461,8 +455,6 @@ fun TimelineMonthStampOverlay(
                     label = "timeline_stamp_scale"
                 )
 
-                val multipleMonths = clusterLayout.clusters.size > 1
-
                 Box(
                     modifier = Modifier
                         .graphicsLayer {
@@ -481,12 +473,12 @@ fun TimelineMonthStampOverlay(
                             )
                         }
                         .clip(StampOverlayShape)
-                        .background(if (isElevatedDarkMode) StampActiveFillBrush else StampIdleFillBrush)
+                        .background(StampActiveFillBrush)
                         .drawBehind {
                             // Archival perforated collector stamp inner dashed frame + corner ticks
                             val inset = 3.5.dp.toPx()
                             drawRoundRect(
-                                color = if (isElevatedDarkMode) StampInnerDarkRim else StampInnerLightRim,
+                                color = StampInnerDarkRim,
                                 topLeft = Offset(inset, inset),
                                 size = Size(size.width - inset * 2f, size.height - inset * 2f),
                                 cornerRadius = CornerRadius(14.5.dp.toPx(), 14.5.dp.toPx()),
@@ -499,15 +491,6 @@ fun TimelineMonthStampOverlay(
                             shape = StampOverlayShape
                         )
                         .semantics { contentDescription = stampAccessibilityDesc }
-                        .then(
-                            if (multipleMonths) {
-                                Modifier.clickable(role = Role.Button) {
-                                    isJumpRibbonOpen = !isJumpRibbonOpen
-                                }
-                            } else {
-                                Modifier
-                            }
-                        )
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                         .testTag("timeline_month_stamp_overlay")
                 ) {
@@ -636,110 +619,17 @@ fun TimelineMonthStampOverlay(
                                 }
                             }
 
-                            if (multipleMonths) {
-                                Icon(
-                                    imageVector = if (isJumpRibbonOpen) Icons.Filled.KeyboardArrowUp else Icons.Filled.ExpandMore,
-                                    contentDescription = null,
-                                    tint = if (isElevatedDarkMode) Color(0xCCFFFFFF) else InkSecondary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
                         }
                     }
                 }
             }
 
-            // Expandable Quick Month-Jump Ribbon when the user taps the monthly stamp overlay
-            AnimatedVisibility(
-                visible = isJumpRibbonOpen && clusterLayout.clusters.size > 1,
-                enter = fadeIn(tween(150)) + slideInVertically(tween(180)) { -it / 3 },
-                exit = fadeOut(tween(120)) + slideOutVertically(tween(140)) { -it / 3 }
-            ) {
-                Column(
-                    modifier = Modifier
-                        .widthIn(max = 420.dp)
-                        .fillMaxWidth()
-                        .clip(JumpRibbonShape)
-                        .background(JumpRibbonFillBrush)
-                        .border(1.dp, Color(0x3DFFFFFF), JumpRibbonShape)
-                        .padding(vertical = 10.dp)
-                        .testTag("timeline_month_jump_ribbon"),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = stringResource(R.string.timeline_jump_ribbon_title),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xCCFFFFFF)
-                        )
-                        Text(
-                            text = "${clusterLayout.clusters.size} 个月份簇",
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 10.sp,
-                            color = SolarAmber
-                        )
-                    }
-
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(
-                            items = clusterLayout.clusters,
-                            key = { it.yearMonthKey }
-                        ) { cluster ->
-                            val isCurrent = cluster.yearMonthKey == currentCluster.yearMonthKey
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                modifier = Modifier
-                                    .heightIn(min = 40.dp)
-                                    .clip(JumpChipShape)
-                                    .background(
-                                        if (isCurrent) CobaltPrimary else Color(0x1FFFFFFF)
-                                    )
-                                    .border(
-                                        width = 1.dp,
-                                        color = if (isCurrent) Color(0x80FFFFFF) else Color(0x2BFFFFFF),
-                                        shape = JumpChipShape
-                                    )
-                                    .clickable {
-                                        isJumpRibbonOpen = false
-                                        onJumpToCluster(cluster)
-                                    }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                                    .testTag("timeline_month_jump_${cluster.yearMonthKey}")
-                            ) {
-                                Text(
-                                    text = cluster.stampLabel,
-                                    fontFamily = OutfitFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = "${cluster.totalMediaCount}",
-                                    fontFamily = JetBrainsMonoFontFamily,
-                                    fontSize = 10.sp,
-                                    color = if (isCurrent) Color(0xE6FFFFFF) else Color(0xA6FFFFFF)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
         }
 
-        // Right-Edge Scroll Progress Stamp Flag (glides vertically during active multi-month scrolling)
+        // Right-Edge Scroll Progress Stamp Flag (glides vertically during active multi-month
+        // scrolling) — tap it to pop the Quick Month-Jump panel anchored at the flag's position.
         AnimatedVisibility(
-            visible = (isScrolling || lingerVisible) && clusterLayout.clusters.size >= 2,
+            visible = (isScrolling || lingerVisible || isJumpRibbonOpen) && clusterLayout.clusters.size >= 2,
             enter = fadeIn(tween(150)) + slideInHorizontally(tween(180)) { it / 2 },
             exit = fadeOut(tween(240)) + slideOutHorizontally(tween(200)) { it / 2 },
             modifier = Modifier
@@ -767,7 +657,106 @@ fun TimelineMonthStampOverlay(
                         .background(ScrollRailTrackBg)
                 )
 
-                // Gliding micro stamp flag ("Jan 2026") pinned to scroll position
+                // Quick Month-Jump panel anchored at the flag's vertical position
+                var ribbonHeightPx by remember { mutableIntStateOf(0) }
+                val flagCenterYPx = indicatorOffsetY + with(LocalDensity.current) { flagHeightPx.toPx() } / 2f
+                val ribbonOffsetY = (flagCenterYPx - ribbonHeightPx / 2f)
+                    .roundToInt()
+                    .coerceIn(0, (trackHeightPx - ribbonHeightPx).toInt().coerceAtLeast(0))
+
+                AnimatedVisibility(
+                    visible = isJumpRibbonOpen,
+                    enter = fadeIn(tween(140)) + slideInHorizontally(tween(200)) { it / 3 },
+                    exit = fadeOut(tween(120)) + slideOutHorizontally(tween(160)) { it / 3 },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset { IntOffset(x = 0, y = ribbonOffsetY) }
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .onSizeChanged { ribbonHeightPx = it.height }
+                            .width(208.dp)
+                            .clip(JumpRibbonShape)
+                            .background(JumpRibbonFillBrush)
+                            .border(1.dp, Color(0x3DFFFFFF), JumpRibbonShape)
+                            .padding(vertical = 10.dp)
+                            .testTag("timeline_month_jump_ribbon"),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(R.string.timeline_jump_ribbon_title),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.5.sp,
+                                color = Color(0xCCFFFFFF)
+                            )
+                            Text(
+                                text = "${clusterLayout.clusters.size}簇",
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = 10.sp,
+                                color = SolarAmber
+                            )
+                        }
+
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(5.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.heightIn(max = 300.dp)
+                        ) {
+                            items(
+                                items = clusterLayout.clusters,
+                                key = { it.yearMonthKey }
+                            ) { cluster ->
+                                val isCurrent = cluster.yearMonthKey == currentCluster.yearMonthKey
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 36.dp)
+                                        .clip(JumpChipShape)
+                                        .background(
+                                            if (isCurrent) CobaltPrimary else Color(0x1FFFFFFF)
+                                        )
+                                        .border(
+                                            width = 1.dp,
+                                            color = if (isCurrent) Color(0x80FFFFFF) else Color(0x2BFFFFFF),
+                                            shape = JumpChipShape
+                                        )
+                                        .clickable {
+                                            isJumpRibbonOpen = false
+                                            onJumpToCluster(cluster)
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                        .testTag("timeline_month_jump_${cluster.yearMonthKey}")
+                                ) {
+                                    Text(
+                                        text = cluster.stampLabel,
+                                        fontFamily = OutfitFontFamily,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = Color.White
+                                    )
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Text(
+                                        text = "${cluster.totalMediaCount}",
+                                        fontFamily = JetBrainsMonoFontFamily,
+                                        fontSize = 10.sp,
+                                        color = if (isCurrent) Color(0xE6FFFFFF) else Color(0xA6FFFFFF)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Gliding micro stamp flag ("Jan 2026") pinned to scroll position — tap to toggle ribbon
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -777,6 +766,9 @@ fun TimelineMonthStampOverlay(
                         .clip(ScrollFlagShape)
                         .background(Color(0xDE12141C))
                         .border(0.9.dp, Color(0x45FFFFFF), ScrollFlagShape)
+                        .clickable(role = Role.Button) {
+                            isJumpRibbonOpen = !isJumpRibbonOpen
+                        }
                         .padding(start = 9.dp, end = 7.dp)
                         .testTag("timeline_scroll_rail_flag")
                 ) {
