@@ -110,9 +110,6 @@ private val ScrollFlagShape = RoundedCornerShape(topStart = 14.dp, bottomStart =
 private val StampActiveFillBrush = Brush.verticalGradient(
     colors = listOf(Color(0xEB151822), Color(0xE00E1017))
 )
-private val StampIdleFillBrush = Brush.verticalGradient(
-    colors = listOf(Color(0xF5FFFFFF), Color(0xECF7F5EE))
-)
 private val JumpRibbonFillBrush = Brush.verticalGradient(
     colors = listOf(Color(0xF5141720), Color(0xEB0E1016))
 )
@@ -396,11 +393,6 @@ fun TimelineMonthStampOverlay(
     val isScrolling by remember(gridState) {
         derivedStateOf { gridState.isScrollInProgress }
     }
-    val hasScrolledPastTop by remember(gridState) {
-        derivedStateOf {
-            gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 48
-        }
-    }
     val scrollProgressFraction by remember(gridState, clusterLayout) {
         derivedStateOf {
             val maxIndex = (clusterLayout.gridItems.size - 1).coerceAtLeast(1)
@@ -423,8 +415,10 @@ fun TimelineMonthStampOverlay(
     }
 
     val currentCluster = activeCluster ?: return
-    val showFloatingStamp = isScrolling || lingerVisible || hasScrolledPastTop || isJumpRibbonOpen
-    val isElevatedDarkMode = isScrolling || lingerVisible || isJumpRibbonOpen
+    // Stamp visibility follows the scroll-rail flag: while scrolling + a short
+    // post-fling linger (or while the jump ribbon is open) — never parked at top.
+    val showFloatingStamp = isScrolling || lingerVisible || isJumpRibbonOpen
+    val isElevatedDarkMode = showFloatingStamp
     val stampAccessibilityDesc = stringResource(R.string.cd_timeline_month_stamp) +
         "：${currentCluster.stampLabel}，${currentCluster.compactSummaryText}"
 
@@ -481,12 +475,12 @@ fun TimelineMonthStampOverlay(
                             )
                         }
                         .clip(StampOverlayShape)
-                        .background(if (isElevatedDarkMode) StampActiveFillBrush else StampIdleFillBrush)
+                        .background(StampActiveFillBrush)
                         .drawBehind {
                             // Archival perforated collector stamp inner dashed frame + corner ticks
                             val inset = 3.5.dp.toPx()
                             drawRoundRect(
-                                color = if (isElevatedDarkMode) StampInnerDarkRim else StampInnerLightRim,
+                                color = StampInnerDarkRim,
                                 topLeft = Offset(inset, inset),
                                 size = Size(size.width - inset * 2f, size.height - inset * 2f),
                                 cornerRadius = CornerRadius(14.5.dp.toPx(), 14.5.dp.toPx()),
