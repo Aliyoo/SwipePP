@@ -69,6 +69,7 @@ import com.example.ui.theme.CoralDanger
 import com.example.ui.theme.EmeraldKeep
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.ObsidianOverlayGlass
 import com.example.ui.theme.SurfacePure
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -960,7 +961,7 @@ private fun FootprintPinMarker(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .clip(CircleShape)
-                        .background(Color(0xCC12141B))
+                        .background(ObsidianOverlayGlass)
                         .padding(horizontal = 4.dp, vertical = 1.dp)
                 ) {
                     Text(

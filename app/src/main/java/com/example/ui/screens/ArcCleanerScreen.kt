@@ -114,6 +114,7 @@ import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.GalleryTactileOrbButton
 import com.example.ui.components.InlineVideoPlayer
 import com.example.ui.components.ObsidianGlassPill
+import com.example.ui.components.ObsidianIconOrb
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.PhotoDetailLightbox
 import com.example.ui.components.formatPhotoDateTime
@@ -132,6 +133,8 @@ import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.InkTertiary
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.ObsidianOverlayBorderStrong
+import com.example.ui.theme.ObsidianOverlayOrb
 import com.example.ui.theme.SolarAmber
 import com.example.ui.theme.SolarAmberSoft
 import com.example.ui.theme.StudioCanvas
@@ -1030,23 +1033,15 @@ private fun ModernArcSwipeCard(
 
                         // Center Play Indicator for non-focused video cards in the pager
                         if (item.primaryPhoto.isVideo) {
-                            Surface(
-                                shape = CircleShape,
-                                color = Color(0xB310131A),
-                                border = BorderStroke(1.5.dp, Color.White.copy(alpha = 0.85f)),
-                                modifier = Modifier
-                                    .align(Alignment.Center)
-                                    .size(58.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Filled.PlayArrow,
-                                        contentDescription = stringResource(R.string.cd_play_video),
-                                        tint = Color.White,
-                                        modifier = Modifier.size(34.dp)
-                                    )
-                                }
-                            }
+                            ObsidianIconOrb(
+                                icon = Icons.Filled.PlayArrow,
+                                contentDescription = stringResource(R.string.cd_play_video),
+                                onClick = null,
+                                size = 58.dp,
+                                iconSize = 34.dp,
+                                borderColor = ObsidianOverlayBorderStrong,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
                         }
                     }
 
@@ -1060,8 +1055,7 @@ private fun ModernArcSwipeCard(
                     ) {
                         if (item is CleanupCardItem.BurstStack) {
                             ObsidianGlassPill(
-                                color = Color(0xBC10131A),
-                                borderColor = Color.White.copy(alpha = 0.30f)
+                                color = ObsidianOverlayOrb
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -1109,8 +1103,7 @@ private fun ModernArcSwipeCard(
                             }
                         } else if (item.primaryPhoto.widthPx > 0 && item.primaryPhoto.heightPx > 0) {
                             ObsidianGlassPill(
-                                color = Color(0xA610131A),
-                                borderColor = Color.White.copy(alpha = 0.26f)
+                                color = ObsidianOverlayOrb
                             ) {
                                 Text(
                                     text = "${item.primaryPhoto.widthPx}×${item.primaryPhoto.heightPx}",

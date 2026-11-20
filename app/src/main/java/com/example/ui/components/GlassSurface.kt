@@ -11,10 +11,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
@@ -25,6 +29,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -41,6 +46,12 @@ import com.example.ui.theme.GlassLightBottom
 import com.example.ui.theme.GlassLightTop
 import com.example.ui.theme.GlassObsidianBottom
 import com.example.ui.theme.GlassObsidianTop
+import com.example.ui.theme.ObsidianOverlayBorder
+import com.example.ui.theme.ObsidianOverlayGlass
+import com.example.ui.theme.ObsidianOverlayOrb
+import com.example.ui.theme.ObsidianSatinBottom
+import com.example.ui.theme.ObsidianSatinMid
+import com.example.ui.theme.ObsidianSatinTop
 import com.example.ui.theme.GlassSpecularRimEnd
 import com.example.ui.theme.GlassSpecularRimMid
 import com.example.ui.theme.GlassSpecularRimStart
@@ -55,6 +66,19 @@ import com.example.ui.theme.SkylightSapphireGlow
  */
 val supportsHardwareBlur: Boolean
     get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+/**
+ * Sculpted obsidian satin — the shared dark material (top-lit slate → deep ink) used for
+ * selected states, floating bars and docks so dark chrome never reads as flat black.
+ */
+fun obsidianSatinBrush(alpha: Float = 1f): Brush =
+    Brush.verticalGradient(
+        colors = listOf(
+            ObsidianSatinTop.copy(alpha = alpha),
+            ObsidianSatinMid.copy(alpha = alpha),
+            ObsidianSatinBottom.copy(alpha = alpha)
+        )
+    )
 
 /**
  * High-performance Light Alabaster Glassmorphism surface.
@@ -242,8 +266,8 @@ fun ObsidianGlassCard(
 @Composable
 fun ObsidianGlassPill(
     modifier: Modifier = Modifier,
-    color: Color = Color(0xB812141B),
-    borderColor: Color = Color.White.copy(alpha = 0.28f),
+    color: Color = ObsidianOverlayGlass,
+    borderColor: Color = ObsidianOverlayBorder,
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
@@ -263,6 +287,54 @@ fun ObsidianGlassPill(
             border = BorderStroke(0.85.dp, borderColor),
             modifier = modifier,
             content = content
+        )
+    }
+}
+
+/**
+ * Unified circular icon orb for media overlays: smoked obsidian disc with a hairline
+ * rim. Used for close buttons, play/pause orbs and media badges so every dark overlay
+ * icon button shares one fill, rim and press behavior.
+ */
+@Composable
+fun ObsidianIconOrb(
+    icon: ImageVector,
+    contentDescription: String?,
+    onClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    size: Dp = 48.dp,
+    iconSize: Dp = 24.dp,
+    tint: Color = Color.White,
+    color: Color = ObsidianOverlayOrb,
+    borderColor: Color? = ObsidianOverlayBorder
+) {
+    val orbContent: @Composable () -> Unit = {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = tint,
+                modifier = Modifier.size(iconSize)
+            )
+        }
+    }
+    val orbModifier = modifier.size(size)
+    if (onClick != null) {
+        Surface(
+            onClick = onClick,
+            shape = CircleShape,
+            color = color,
+            border = borderColor?.let { BorderStroke(1.dp, it) },
+            modifier = orbModifier,
+            content = orbContent
+        )
+    } else {
+        Surface(
+            shape = CircleShape,
+            color = color,
+            border = borderColor?.let { BorderStroke(1.dp, it) },
+            modifier = orbModifier,
+            content = orbContent
         )
     }
 }

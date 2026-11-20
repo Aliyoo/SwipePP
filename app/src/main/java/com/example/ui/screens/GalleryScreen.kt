@@ -127,6 +127,8 @@ import com.example.ui.theme.HairlineBorder
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.ObsidianSatinBottom
+import com.example.ui.theme.ObsidianSatinTop
 import com.example.ui.theme.SolarAmber
 import com.example.ui.theme.SurfaceMuted
 import com.example.ui.theme.SurfacePure
@@ -1027,16 +1029,19 @@ private fun FloatingBatchEditStrip(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Surface(
-            onClick = onCompress,
-            enabled = compressibleImageCount > 0,
+        ObsidianGlassCard(
+            // Empty lambda when disabled so the card still consumes taps instead of
+            // letting them fall through to the photo grid underneath.
+            onClick = if (compressibleImageCount > 0) onCompress else ({}),
             shape = RoundedCornerShape(22.dp),
-            color = Color(0xEC161B26),
-            border = BorderStroke(1.dp, EmeraldKeep.copy(alpha = if (compressibleImageCount > 0) 0.48f else 0.16f)),
+            topColor = ObsidianSatinTop,
+            bottomColor = ObsidianSatinBottom,
+            borderAccent = if (compressibleImageCount > 0) EmeraldKeep else null,
             shadowElevation = 10.dp,
             modifier = Modifier
                 .weight(1f)
                 .heightIn(min = 48.dp)
+                .alpha(if (compressibleImageCount > 0) 1f else 0.55f)
                 .testTag("bulk_compress_button")
         ) {
             Row(
@@ -1067,11 +1072,12 @@ private fun FloatingBatchEditStrip(
             }
         }
 
-        Surface(
+        ObsidianGlassCard(
             onClick = onEditLocation,
             shape = RoundedCornerShape(22.dp),
-            color = Color(0xEC161B26),
-            border = BorderStroke(1.dp, SolarAmber.copy(alpha = 0.48f)),
+            topColor = ObsidianSatinTop,
+            bottomColor = ObsidianSatinBottom,
+            borderAccent = SolarAmber,
             shadowElevation = 10.dp,
             modifier = Modifier
                 .weight(1f)
@@ -1201,7 +1207,9 @@ private fun FloatingBulkActionBar(
     onDelete: () -> Unit
 ) {
     ObsidianGlassCard(
-        shape = RoundedCornerShape(30.dp),
+        shape = RoundedCornerShape(22.dp),
+        topColor = ObsidianSatinTop,
+        bottomColor = ObsidianSatinBottom,
         shadowElevation = 18.dp,
         modifier = Modifier
             .widthIn(max = 420.dp)

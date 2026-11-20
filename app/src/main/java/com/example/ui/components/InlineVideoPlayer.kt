@@ -80,6 +80,11 @@ import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.ObsidianOverlayBorderStrong
+import com.example.ui.theme.ObsidianOverlayChipOnDark
+import com.example.ui.theme.ObsidianOverlayOrb
+import com.example.ui.theme.ObsidianSatinBottom
+import com.example.ui.theme.ObsidianSatinTop
 import com.example.ui.theme.SolarAmber
 import kotlinx.coroutines.delay
 
@@ -287,8 +292,6 @@ fun InlineVideoPlayer(
         if (isBuffering && playbackError == null && playWhenReady) {
             ObsidianGlassCard(
                 shape = CircleShape,
-                topColor = Color(0xA6141822),
-                bottomColor = Color(0x880B0E14),
                 modifier = Modifier.size(48.dp)
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
@@ -304,8 +307,6 @@ fun InlineVideoPlayer(
         // Playback error recovery pill
         if (playbackError != null) {
             ObsidianGlassPill(
-                color = Color(0xCC141822),
-                borderColor = Color.White.copy(alpha = 0.28f),
                 modifier = Modifier.clickable { togglePlayPause() }
             ) {
                 Row(
@@ -334,24 +335,15 @@ fun InlineVideoPlayer(
             enter = fadeIn(),
             exit = fadeOut()
         ) {
-            Surface(
+            ObsidianIconOrb(
+                icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                contentDescription = if (isPlaying) "暂停视频" else "播放视频",
                 onClick = togglePlayPause,
-                shape = CircleShape,
-                color = Color(0x9E10131C),
-                border = BorderStroke(1.25.dp, Color.White.copy(alpha = 0.65f)),
-                modifier = Modifier
-                    .size(if (showFullControls) 64.dp else 54.dp)
-                    .testTag("inline_video_play_pause")
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isPlaying) "暂停视频" else "播放视频",
-                        tint = Color.White,
-                        modifier = Modifier.size(if (showFullControls) 34.dp else 28.dp)
-                    )
-                }
-            }
+                size = if (showFullControls) 64.dp else 54.dp,
+                iconSize = if (showFullControls) 34.dp else 28.dp,
+                borderColor = ObsidianOverlayBorderStrong,
+                modifier = Modifier.testTag("inline_video_play_pause")
+            )
         }
 
         if (showFullControls) {
@@ -370,23 +362,16 @@ fun InlineVideoPlayer(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Surface(
+                        ObsidianIconOrb(
+                            icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (isPlaying) "暂停视频" else "播放视频",
                             onClick = togglePlayPause,
-                            shape = CircleShape,
-                            color = Color.White.copy(alpha = 0.12f),
-                            modifier = Modifier
-                                .size(34.dp)
-                                .testTag("inline_video_dock_play_pause")
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                    contentDescription = if (isPlaying) "暂停视频" else "播放视频",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
+                            size = 34.dp,
+                            iconSize = 18.dp,
+                            color = ObsidianOverlayChipOnDark,
+                            borderColor = null,
+                            modifier = Modifier.testTag("inline_video_dock_play_pause")
+                        )
 
                         Text(
                             text = formatVideoDuration(displayPos),
@@ -426,23 +411,16 @@ fun InlineVideoPlayer(
                             color = Color.White.copy(alpha = 0.72f)
                         )
 
-                        Surface(
+                        ObsidianIconOrb(
+                            icon = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                            contentDescription = if (isMuted) "取消静音" else "静音",
                             onClick = { isMuted = !isMuted },
-                            shape = CircleShape,
-                            color = Color.White.copy(alpha = 0.12f),
-                            modifier = Modifier
-                                .size(34.dp)
-                                .testTag("inline_video_mute_toggle")
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                                    contentDescription = if (isMuted) "取消静音" else "静音",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
+                            size = 34.dp,
+                            iconSize = 18.dp,
+                            color = ObsidianOverlayChipOnDark,
+                            borderColor = null,
+                            modifier = Modifier.testTag("inline_video_mute_toggle")
+                        )
                     }
                 }
             }
@@ -461,10 +439,10 @@ fun InlineVideoPlayer(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color(0xE812151E),
-                        border = BorderStroke(0.85.dp, Color.White.copy(alpha = 0.14f)),
+                    ObsidianGlassCard(
+                        shape = RoundedCornerShape(22.dp),
+                        topColor = ObsidianSatinTop.copy(alpha = 0.94f),
+                        bottomColor = ObsidianSatinBottom.copy(alpha = 0.94f),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
@@ -489,8 +467,7 @@ fun InlineVideoPlayer(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     ObsidianGlassPill(
-                        color = Color(0xA610131C),
-                        borderColor = Color.White.copy(alpha = 0.26f)
+                        color = ObsidianOverlayOrb
                     ) {
                         Text(
                             text = "${formatVideoDuration(positionMs)} / ${formatVideoDuration(durationMs)}",
@@ -503,44 +480,24 @@ fun InlineVideoPlayer(
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Surface(
+                        ObsidianIconOrb(
+                            icon = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                            contentDescription = if (isMuted) "开启声音" else "静音",
                             onClick = { isMuted = !isMuted },
-                            shape = CircleShape,
-                            color = Color(0xA610131C),
-                            border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.30f)),
-                            modifier = Modifier
-                                .size(34.dp)
-                                .testTag("card_video_mute_toggle")
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                                    contentDescription = if (isMuted) "开启声音" else "静音",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
+                            size = 34.dp,
+                            iconSize = 16.dp,
+                            modifier = Modifier.testTag("card_video_mute_toggle")
+                        )
 
                         if (onOpenFullscreen != null) {
-                            Surface(
+                            ObsidianIconOrb(
+                                icon = Icons.Filled.Fullscreen,
+                                contentDescription = "全屏播放",
                                 onClick = onOpenFullscreen,
-                                shape = CircleShape,
-                                color = Color(0xA610131C),
-                                border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.30f)),
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .testTag("card_video_fullscreen_button")
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Fullscreen,
-                                        contentDescription = "全屏播放",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(17.dp)
-                                    )
-                                }
-                            }
+                                size = 34.dp,
+                                iconSize = 17.dp,
+                                modifier = Modifier.testTag("card_video_fullscreen_button")
+                            )
                         }
                     }
                 }
@@ -644,22 +601,14 @@ private fun SampleVideoInlinePreview(
             enter = fadeIn(),
             exit = fadeOut()
         ) {
-            Surface(
+            ObsidianIconOrb(
+                icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                contentDescription = if (isPlaying) "暂停预览" else "播放预览",
                 onClick = { isPlaying = !isPlaying },
-                shape = CircleShape,
-                color = Color(0x9E10131C),
-                border = BorderStroke(1.25.dp, Color.White.copy(alpha = 0.65f)),
-                modifier = Modifier.size(if (showFullControls) 64.dp else 54.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isPlaying) "暂停预览" else "播放预览",
-                        tint = Color.White,
-                        modifier = Modifier.size(if (showFullControls) 34.dp else 28.dp)
-                    )
-                }
-            }
+                size = if (showFullControls) 64.dp else 54.dp,
+                iconSize = if (showFullControls) 34.dp else 28.dp,
+                borderColor = ObsidianOverlayBorderStrong
+            )
         }
 
         val progress = (elapsedMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f)
@@ -691,21 +640,15 @@ private fun SampleVideoInlinePreview(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Surface(
+                        ObsidianIconOrb(
+                            icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (isPlaying) "暂停预览" else "播放预览",
                             onClick = { isPlaying = !isPlaying },
-                            shape = CircleShape,
-                            color = Color.White.copy(alpha = 0.12f),
-                            modifier = Modifier.size(34.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                    contentDescription = if (isPlaying) "暂停预览" else "播放预览",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
+                            size = 34.dp,
+                            iconSize = 18.dp,
+                            color = ObsidianOverlayChipOnDark,
+                            borderColor = null
+                        )
                         Text(
                             text = formatVideoDuration(elapsedMs),
                             fontFamily = JetBrainsMonoFontFamily,
@@ -749,10 +692,10 @@ private fun SampleVideoInlinePreview(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color(0xE812151E),
-                        border = BorderStroke(0.85.dp, Color.White.copy(alpha = 0.14f)),
+                    ObsidianGlassCard(
+                        shape = RoundedCornerShape(22.dp),
+                        topColor = ObsidianSatinTop.copy(alpha = 0.94f),
+                        bottomColor = ObsidianSatinBottom.copy(alpha = 0.94f),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
@@ -775,8 +718,7 @@ private fun SampleVideoInlinePreview(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     ObsidianGlassPill(
-                        color = Color(0xA610131C),
-                        borderColor = Color.White.copy(alpha = 0.26f)
+                        color = ObsidianOverlayOrb
                     ) {
                         Text(
                             text = "${formatVideoDuration(elapsedMs)} / ${formatVideoDuration(totalMs)}",
@@ -787,22 +729,13 @@ private fun SampleVideoInlinePreview(
                         )
                     }
                     if (onOpenFullscreen != null) {
-                        Surface(
+                        ObsidianIconOrb(
+                            icon = Icons.Filled.Fullscreen,
+                            contentDescription = "全屏播放",
                             onClick = onOpenFullscreen,
-                            shape = CircleShape,
-                            color = Color(0xA610131C),
-                            border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.30f)),
-                            modifier = Modifier.size(34.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Filled.Fullscreen,
-                                    contentDescription = "全屏播放",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(17.dp)
-                                )
-                            }
-                        }
+                            size = 34.dp,
+                            iconSize = 17.dp
+                        )
                     }
                 }
                 Box(

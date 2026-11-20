@@ -16,16 +16,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -38,7 +40,6 @@ import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -49,6 +50,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -57,6 +59,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,6 +69,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.os.Build
+import android.view.WindowManager
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
 import com.example.data.PhotoStatus
@@ -72,6 +85,9 @@ import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CoralDanger
 import com.example.ui.theme.EmeraldKeep
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.ObsidianOverlayGlass
+import com.example.ui.theme.ObsidianSatinBottom
+import com.example.ui.theme.ObsidianSatinTop
 import com.example.ui.theme.SolarAmber
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -141,6 +157,24 @@ fun PhotoDetailLightbox(
         )
     ) {
         BackHandler(onBack = onDismiss)
+
+        // With the default display-cutout mode the dialog window is shrunk below
+        // the top cutout/status region, which shifts the whole content down and
+        // clips the bottom dock off-screen. Draw edge-to-edge under the cutout so
+        // the HUD's bottom edge really is the screen's bottom edge.
+        val view = LocalView.current
+        SideEffect {
+            if (Build.VERSION.SDK_INT >= 28) {
+                val window = (view as? DialogWindowProvider)?.window
+                    ?: (view.parent as? DialogWindowProvider)?.window
+                window?.let {
+                    it.attributes = it.attributes.apply {
+                        layoutInDisplayCutoutMode =
+                            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    }
+                }
+            }
+        }
 
         Box(
             modifier = Modifier
@@ -263,23 +297,13 @@ fun PhotoDetailLightbox(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = Color(0xCC151924),
-                        border = BorderStroke(0.85.dp, Color.White.copy(alpha = 0.16f)),
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        IconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier.testTag("lightbox_close_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Close,
-                                contentDescription = "关闭预览",
-                                tint = Color.White
-                            )
-                        }
-                    }
+                    ObsidianIconOrb(
+                        icon = Icons.Filled.Close,
+                        contentDescription = "关闭预览",
+                        onClick = onDismiss,
+                        color = ObsidianOverlayGlass,
+                        modifier = Modifier.testTag("lightbox_close_button")
+                    )
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -314,11 +338,7 @@ fun PhotoDetailLightbox(
                     }
 
                     // Quality Score Badge (consistent dark matte pill, zero shadow bleed)
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = Color(0xCC151924),
-                        border = BorderStroke(0.85.dp, Color.White.copy(alpha = 0.16f))
-                    ) {
+                    ObsidianGlassPill {
                         Row(
                             modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -363,6 +383,20 @@ private fun LightboxBottomHud(
 ) {
     val hasActions = onRestore != null || onTrash != null || onFavorite != null || onKeep != null
 
+    // Dialog windows can report zero WindowInsets on some Android versions (b/246909281),
+    // which would let the dock slide under the system navigation bar; read the host
+    // Activity's window insets as a fallback so the actions always clear it.
+    val dialogNavBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val density = LocalDensity.current
+    val context = LocalContext.current
+    val fallbackNavBottom = remember {
+        val bottomPx = context.findActivity()?.window?.decorView
+            ?.let { ViewCompat.getRootWindowInsets(it) }
+            ?.getInsets(WindowInsetsCompat.Type.navigationBars())?.bottom ?: 0
+        with(density) { bottomPx.toDp() }
+    }
+    val navClearanceFallback = (fallbackNavBottom - dialogNavBottom).coerceAtLeast(0.dp)
+
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(),
@@ -382,7 +416,7 @@ private fun LightboxBottomHud(
                     )
                 )
                 .navigationBarsPadding()
-                .padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 12.dp)
+                .padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 12.dp + navClearanceFallback)
         ) {
             Column(
                 modifier = Modifier
@@ -433,10 +467,7 @@ private fun LightboxBottomHud(
                     }
 
                     if (!photo.isVideo && zoomScale > 1.05f) {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = Color(0xD91A1F2E),
-                            border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.16f)),
+                        ObsidianGlassPill(
                             modifier = Modifier.padding(start = 8.dp)
                         ) {
                             Text(
@@ -451,12 +482,12 @@ private fun LightboxBottomHud(
                     }
                 }
 
-                // Single Unified High-Clarity Smoked Dock (zero shadowElevation bleed, crisp 1px rim)
+                // Single Unified Obsidian Satin Dock (gradient + specular lip + rim)
                 if (videoScrubber != null || hasActions) {
-                    Surface(
+                    ObsidianGlassCard(
                         shape = RoundedCornerShape(22.dp),
-                        color = Color(0xEC141822),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+                        topColor = ObsidianSatinTop.copy(alpha = 0.94f),
+                        bottomColor = ObsidianSatinBottom.copy(alpha = 0.94f),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("lightbox_bottom_dock")
@@ -588,4 +619,10 @@ private fun LightboxActionPill(
             )
         }
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
