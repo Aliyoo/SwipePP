@@ -61,6 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -494,7 +495,8 @@ fun FootprintMapScreen(
                 .padding(
                     end = 14.dp,
                     bottom = if (selectedCluster != null || showingUnlocated) 140.dp + floatingDockInset * 0.4f else 0.dp
-                ),
+                )
+                .pointerInput(Unit) {},
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

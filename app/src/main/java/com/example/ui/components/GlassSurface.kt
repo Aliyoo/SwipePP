@@ -30,9 +30,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -167,7 +170,18 @@ fun FrostedGlassCard(
             )
         }
         .border(width = 1.dp, brush = borderBrush, shape = shape)
-        .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+        .then(
+            if (onClick != null) {
+                Modifier.clickable(onClick = onClick)
+            } else {
+                // Match Material 3 Surface: block pointer hit-testing from leaking through
+                // empty padding or inter-button gaps to siblings behind this glass surface,
+                // while still letting gestures propagate up to parent scroll/click ancestors.
+                Modifier
+                    .semantics(mergeDescendants = false) { isTraversalGroup = true }
+                    .pointerInput(Unit) {}
+            }
+        )
 
     Box(modifier = containerModifier) {
         // Strictly static GPU-cached internal frosted light diffusion ribbon (never blurs child text!)
@@ -255,7 +269,18 @@ fun ObsidianGlassCard(
             )
         }
         .border(width = 0.9.dp, brush = borderBrush, shape = shape)
-        .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+        .then(
+            if (onClick != null) {
+                Modifier.clickable(onClick = onClick)
+            } else {
+                // Match Material 3 Surface: block pointer hit-testing from leaking through
+                // empty padding or inter-button gaps to siblings behind this glass surface,
+                // while still letting gestures propagate up to parent scroll/click ancestors.
+                Modifier
+                    .semantics(mergeDescendants = false) { isTraversalGroup = true }
+                    .pointerInput(Unit) {}
+            }
+        )
 
     Box(modifier = containerModifier, content = content)
 }

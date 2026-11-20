@@ -292,6 +292,7 @@ fun PhotoDetailLightbox(
                                 1.0f to Color.Transparent
                             )
                         )
+                        .pointerInput(Unit) {}
                         .statusBarsPadding()
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,

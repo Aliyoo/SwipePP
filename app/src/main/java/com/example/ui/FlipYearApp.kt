@@ -669,6 +669,7 @@ private fun FloatingGalleryDock(
         modifier = Modifier
             .widthIn(max = 396.dp)
             .fillMaxWidth()
+            .testTag("floating_gallery_dock")
     ) {
         Row(
             modifier = Modifier
