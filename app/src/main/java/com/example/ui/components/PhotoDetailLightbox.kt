@@ -52,6 +52,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -62,6 +63,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,11 +71,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.view.WindowManager
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
 import com.example.data.PhotoStatus
@@ -151,6 +155,22 @@ fun PhotoDetailLightbox(
         )
     ) {
         BackHandler(onBack = onDismiss)
+
+        // With the default display-cutout mode the dialog window is shrunk below
+        // the top cutout/status region, which shifts the whole content down and
+        // clips the bottom dock off-screen. Draw edge-to-edge under the cutout so
+        // the HUD's bottom edge really is the screen's bottom edge.
+        val view = LocalView.current
+        SideEffect {
+            val window = (view as? DialogWindowProvider)?.window
+                ?: (view.parent as? DialogWindowProvider)?.window
+            window?.let {
+                it.attributes = it.attributes.apply {
+                    layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+            }
+        }
 
         Box(
             modifier = Modifier
