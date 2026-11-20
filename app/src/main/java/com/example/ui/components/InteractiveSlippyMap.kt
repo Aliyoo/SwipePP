@@ -40,6 +40,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -69,6 +71,7 @@ import com.example.ui.theme.CoralDanger
 import com.example.ui.theme.EmeraldKeep
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.ObsidianOverlayGlass
 import com.example.ui.theme.SurfacePure
 import kotlinx.coroutines.CoroutineScope
@@ -101,6 +104,19 @@ private const val BASE_TILE_DP = 256f
 private const val MAX_VISIBLE_PINS = 36
 private const val MAX_TRAVEL_ARCS = 28
 private const val MAX_RENDERED_TILES = 120
+
+// Hue-preserving luminance inversion matrix (Invert * HueRotate180 scaled to 0.85 over #141822 obsidian base)
+// Turns daylight map tiles (AMap, ArcGIS, OSM) into sleek low-glare nocturnal darkroom cartography while keeping water blue and labels crisp.
+private val NocturnalMapTileColorFilter = ColorFilter.colorMatrix(
+    ColorMatrix(
+        floatArrayOf(
+            0.488f, -1.215f, -0.122f, 0f, 237f,
+            -0.362f, -0.366f, -0.122f, 0f, 241f,
+            -0.362f, -1.215f, 0.728f, 0f, 251f,
+            0f, 0f, 0f, 1f, 0f
+        )
+    )
+)
 
 fun lonToNormX(lon: Double): Double {
     val safeLon = if (lon.isFinite()) lon.coerceIn(-180.0, 180.0) else 0.0
@@ -468,19 +484,31 @@ fun InteractiveSlippyMap(
         if (projectedMeta.size <= MAX_TRAVEL_ARCS) projectedMeta else projectedMeta.take(MAX_TRAVEL_ARCS)
     }
 
+    val isDark = LocalIsDarkTheme.current
+    val cobaltAccent = CobaltPrimary
     val reusableContinentPath = remember { Path() }
     val reusableArcPath = remember { Path() }
     val arcDashEffect = remember { PathEffect.dashPathEffect(floatArrayOf(12f, 9f), 0f) }
+    val oceanGradient = remember(isDark) {
+        if (isDark) {
+            Brush.verticalGradient(
+                colors = listOf(Color(0xFF0C1320), Color(0xFF111B2E), Color(0xFF0B111D))
+            )
+        } else {
+            Brush.verticalGradient(
+                colors = listOf(Color(0xFFDCE9F9), Color(0xFFE6F0FB), Color(0xFFDCE8F8))
+            )
+        }
+    }
+    val landFillColor = if (isDark) Color(0xFF1A253A) else Color(0xFFF6F8FC)
+    val landStrokeColor = if (isDark) Color(0xFF334769) else Color(0xFFBCCAE0)
+    val tileColorFilter = if (isDark) NocturnalMapTileColorFilter else null
 
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .clipToBounds()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0xFFDCE9F9), Color(0xFFE6F0FB), Color(0xFFDCE8F8))
-                )
-            )
+            .background(oceanGradient)
             .testTag("footprint_interactive_map")
     ) {
         val viewportWidthPx = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
@@ -545,7 +573,7 @@ fun InteractiveSlippyMap(
         ) {
             // Layer 1: Always-ready Vector World Atlas (zero per-frame trig, reused Path)
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val gridColor = CobaltPrimary.copy(alpha = 0.08f)
+                val gridColor = cobaltAccent.copy(alpha = if (isDark) 0.14f else 0.08f)
                 val stepDeg = when {
                     zoom < 3f -> 30
                     zoom < 5f -> 15
@@ -569,7 +597,7 @@ fun InteractiveSlippyMap(
                     val pt = projectToScreen(centerX, ny)
                     if (pt.y in -20f..(size.height + 20f)) {
                         drawLine(
-                            color = if (lat == 0) CobaltPrimary.copy(alpha = 0.16f) else gridColor,
+                            color = if (lat == 0) cobaltAccent.copy(alpha = if (isDark) 0.26f else 0.16f) else gridColor,
                             start = Offset(0f, pt.y),
                             end = Offset(size.width, pt.y),
                             strokeWidth = if (lat == 0) 1.3.dp.toPx() else 1.dp.toPx()
@@ -577,8 +605,8 @@ fun InteractiveSlippyMap(
                     }
                 }
 
-                val landFill = Color(0xFFF6F8FC)
-                val landStroke = Color(0xFFBCCAE0)
+                val landFill = landFillColor
+                val landStroke = landStrokeColor
                 val strokeStyle = Stroke(
                     width = 1.1.dp.toPx(),
                     join = StrokeJoin.Round,
@@ -676,6 +704,7 @@ fun InteractiveSlippyMap(
                                         imageLoader = tileImageLoader,
                                         contentDescription = null,
                                         contentScale = ContentScale.FillBounds,
+                                        colorFilter = tileColorFilter,
                                         onSuccess = {
                                             loadedTileCount++
                                             if (mapStyle == FootprintMapStyle.AMAP_ZH) {
@@ -737,7 +766,7 @@ fun InteractiveSlippyMap(
                                 reusableArcPath.quadraticTo(midX, midY - lift, curr.x, curr.y)
                                 drawPath(
                                     path = reusableArcPath,
-                                    color = CobaltPrimary.copy(alpha = 0.45f),
+                                    color = cobaltAccent.copy(alpha = if (isDark) 0.65f else 0.45f),
                                     style = strokeStyle
                                 )
                             }

@@ -546,6 +546,9 @@ fun ArcCleanerScreen(
                     val sidePad = ((maxWidth - cardWidth) / 2f).coerceAtLeast(24.dp)
 
                     // Leica-inspired Precision Optical Aperture & Timeline Arc Dial
+                    val dialArcInk = InkPrimary
+                    val dialTickTertiary = InkTertiary
+                    val dialCobalt = CobaltPrimary
                     Canvas(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -563,7 +566,7 @@ fun ArcCleanerScreen(
                         }
                         drawPath(
                             path = arcPath,
-                            color = InkPrimary.copy(alpha = 0.14f),
+                            color = dialArcInk.copy(alpha = 0.16f),
                             style = Stroke(width = 1.4.dp.toPx(), cap = StrokeCap.Round)
                         )
 
@@ -577,7 +580,7 @@ fun ArcCleanerScreen(
                             val isMajor = i % 5 == 0
                             val tickH = if (isMajor) 8.dp.toPx() else 4.dp.toPx()
                             drawLine(
-                                color = if (isMajor) CobaltPrimary.copy(alpha = 0.55f) else InkTertiary.copy(alpha = 0.35f),
+                                color = if (isMajor) dialCobalt.copy(alpha = 0.62f) else dialTickTertiary.copy(alpha = 0.40f),
                                 start = Offset(x, y - tickH * 0.5f),
                                 end = Offset(x, y + tickH * 0.5f),
                                 strokeWidth = if (isMajor) 1.5.dp.toPx() else 0.9.dp.toPx(),
@@ -588,12 +591,12 @@ fun ArcCleanerScreen(
                         // Glowing center focal indicator dot
                         val centerPt = Offset(size.width * 0.5f, size.height * 0.48f)
                         drawCircle(
-                            color = CobaltPrimary.copy(alpha = 0.18f),
+                            color = dialCobalt.copy(alpha = 0.22f),
                             radius = 10.dp.toPx(),
                             center = centerPt
                         )
                         drawCircle(
-                            color = CobaltPrimary,
+                            color = dialCobalt,
                             radius = 4.2.dp.toPx(),
                             center = centerPt
                         )

@@ -99,3 +99,37 @@ data class CleanupStatsEntity(
     val totalPurgedCount: Int = 0,
     val cleanedStreakDays: Int = 1
 )
+
+enum class YearbookCoverMode(val label: String) {
+    SMART_CAROUSEL("智能轮播"),
+    SINGLE_CUSTOM("单图定格"),
+    CUSTOM_CAROUSEL("多图轮播")
+}
+
+@Immutable
+@Entity(tableName = "yearbook_covers")
+data class YearbookCoverConfigEntity(
+    @PrimaryKey val year: Int,
+    val mode: String = YearbookCoverMode.SMART_CAROUSEL.name,
+    val selectedPhotoIdsCsv: String = "",
+    val intervalSeconds: Int = 5,
+    val updatedAtMillis: Long = 0L
+) {
+    val coverMode: YearbookCoverMode
+        get() = when (mode) {
+            YearbookCoverMode.SINGLE_CUSTOM.name -> YearbookCoverMode.SINGLE_CUSTOM
+            YearbookCoverMode.CUSTOM_CAROUSEL.name -> YearbookCoverMode.CUSTOM_CAROUSEL
+            else -> YearbookCoverMode.SMART_CAROUSEL
+        }
+
+    val selectedPhotoIds: List<Long>
+        get() = if (selectedPhotoIdsCsv.isBlank()) {
+            emptyList()
+        } else {
+            selectedPhotoIdsCsv
+                .split(',')
+                .mapNotNull { it.trim().toLongOrNull() }
+                .distinct()
+        }
+}
+

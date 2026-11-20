@@ -5,6 +5,7 @@ import com.example.data.CleanupStatsEntity
 import com.example.data.MediaAccessLevel
 import com.example.data.MonthStampEntity
 import com.example.data.PhotoItemEntity
+import com.example.data.YearbookCoverMode
 
 enum class MediaFilter(val label: String) {
     ALL("全部"),
@@ -16,6 +17,10 @@ enum class MediaFilter(val label: String) {
 data class YearbookSummary(
     val year: Int,
     val coverPhoto: PhotoItemEntity?,
+    val coverSlides: List<PhotoItemEntity> = listOfNotNull(coverPhoto),
+    val coverMode: YearbookCoverMode = YearbookCoverMode.SMART_CAROUSEL,
+    val coverIntervalSeconds: Int = YearbookCoverCurator.DEFAULT_INTERVAL_SECONDS,
+    val customCoverPhotoIds: List<Long> = emptyList(),
     val totalPhotos: Int,
     val videoCount: Int,
     val unreviewedCount: Int,

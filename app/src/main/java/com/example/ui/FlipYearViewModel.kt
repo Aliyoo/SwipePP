@@ -18,6 +18,8 @@ import com.example.data.PhotoRestoreSpec
 import com.example.data.PhotoStatus
 import com.example.data.ResolvedGeoLocation
 import com.example.data.SameDayLocationMatch
+import com.example.data.YearbookCoverConfigEntity
+import com.example.data.YearbookCoverMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -132,10 +134,11 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     private val derivedLibraryFlow = combine(
         repository.allActivePhotos,
         repository.trashedPhotos,
-        repository.monthStamps,
+        combine(repository.monthStamps, repository.yearbookCovers) { stamps, covers -> stamps to covers },
         repository.cleanupStats,
         mediaFilter
-    ) { activePhotos, trashed, stamps, stats, filter ->
+    ) { activePhotos, trashed, stampsAndCovers, stats, filter ->
+        val (stamps, coverConfigs) = stampsAndCovers
         var totalImageCount = 0
         var totalVideoCount = 0
         var hasDeviceMedia = false
@@ -155,7 +158,12 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             stampMap[s.yearMonthKey] = s
         }
 
-        val yearbooks = buildYearbooksLinear(filtered, stampMap)
+        val coverConfigMap = HashMap<Int, YearbookCoverConfigEntity>(coverConfigs.size * 2)
+        for (c in coverConfigs) {
+            coverConfigMap[c.year] = c
+        }
+
+        val yearbooks = buildYearbooksLinear(filtered, stampMap, coverConfigMap)
 
         val visibleGallery = ArrayList<PhotoItemEntity>(filtered.size)
         for (p in filtered) {
@@ -332,6 +340,36 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
 
     fun setMediaFilter(filter: MediaFilter) {
         mediaFilter.value = filter
+    }
+
+    fun saveYearbookCover(
+        year: Int,
+        mode: YearbookCoverMode,
+        selectedPhotoIds: List<Long>,
+        intervalSeconds: Int
+    ) {
+        viewModelScope.launch {
+            val sanitizedInterval = intervalSeconds.coerceIn(3, 12)
+            repository.saveYearbookCover(
+                year = year,
+                mode = mode,
+                selectedPhotoIds = selectedPhotoIds,
+                intervalSeconds = sanitizedInterval
+            )
+            val msg = when (mode) {
+                YearbookCoverMode.SMART_CAROUSEL -> "${year}年已切换为智能精选轮播（每${sanitizedInterval}秒）"
+                YearbookCoverMode.SINGLE_CUSTOM -> "已锁定 ${year}年专属单图封面"
+                YearbookCoverMode.CUSTOM_CAROUSEL -> "已保存 ${year}年 ${selectedPhotoIds.size} 张自选轮播封面"
+            }
+            showBanner(msg)
+        }
+    }
+
+    fun resetYearbookCoverToSmart(year: Int) {
+        viewModelScope.launch {
+            repository.resetYearbookCover(year)
+            showBanner("${year}年已恢复智能精选轮播封面")
+        }
     }
 
     fun getMonthPagesForYear(year: Int, state: FlipYearUiState = uiState.value): List<MonthPageModel> {
@@ -1100,17 +1138,15 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         var keptCount = 0
         var trashedCount = 0
         var reclaimableBytes = 0L
-        var favoriteCover: PhotoItemEntity? = null
-        var firstVisibleImage: PhotoItemEntity? = null
-        var firstVisibleAny: PhotoItemEntity? = null
-        var firstAny: PhotoItemEntity? = null
+        val yearPhotos = ArrayList<PhotoItemEntity>(32)
         val monthPresent = BooleanArray(13)
         val monthUnreviewed = IntArray(13)
     }
 
     private fun buildYearbooksLinear(
         photos: List<PhotoItemEntity>,
-        stamps: Map<String, MonthStampEntity>
+        stamps: Map<String, MonthStampEntity>,
+        coverConfigs: Map<Int, YearbookCoverConfigEntity>
     ): List<YearbookSummary> {
         if (photos.isEmpty()) return emptyList()
         val byYear = HashMap<Int, YearAcc>(16)
@@ -1118,7 +1154,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         for (p in photos) {
             val acc = byYear.getOrPut(p.year) { YearAcc(p.year) }
             acc.total++
-            if (acc.firstAny == null) acc.firstAny = p
+            acc.yearPhotos.add(p)
             if (p.isVideo) acc.videoCount++
 
             val m = p.month
@@ -1134,12 +1170,6 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 PhotoStatus.KEPT -> acc.keptCount++
                 PhotoStatus.TRASHED -> acc.trashedCount++
                 PhotoStatus.PURGED -> Unit
-            }
-
-            if (st != PhotoStatus.TRASHED) {
-                if (acc.firstVisibleAny == null) acc.firstVisibleAny = p
-                if (!p.isVideo && acc.firstVisibleImage == null) acc.firstVisibleImage = p
-                if (p.isFavorite && acc.favoriteCover == null) acc.favoriteCover = p
             }
         }
 
@@ -1157,14 +1187,18 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     }
                 }
             }
-            val cover = acc.favoriteCover
-                ?: acc.firstVisibleImage
-                ?: acc.firstVisibleAny
-                ?: acc.firstAny
+            val resolvedCover = YearbookCoverCurator.resolveCoverPresentation(
+                yearPhotos = acc.yearPhotos,
+                config = coverConfigs[year]
+            )
 
             YearbookSummary(
                 year = year,
-                coverPhoto = cover,
+                coverPhoto = resolvedCover.coverPhoto,
+                coverSlides = resolvedCover.slides,
+                coverMode = resolvedCover.mode,
+                coverIntervalSeconds = resolvedCover.intervalSeconds,
+                customCoverPhotoIds = resolvedCover.customPhotoIds,
                 totalPhotos = acc.total,
                 videoCount = acc.videoCount,
                 unreviewedCount = acc.unreviewedCount,

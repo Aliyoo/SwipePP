@@ -91,6 +91,7 @@ import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.InkTertiary
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.OutfitFontFamily
 import com.example.ui.theme.SolarAmber
 import com.example.ui.theme.SurfacePure
@@ -271,6 +272,9 @@ fun MonthlyClusterHeaderStamp(
     cluster: MonthlyClusterSummary,
     modifier: Modifier = Modifier
 ) {
+    val isDark = LocalIsDarkTheme.current
+    val stampInnerRim = if (isDark) Color(0x666B8FFF) else StampInnerLightRim
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -289,7 +293,7 @@ fun MonthlyClusterHeaderStamp(
                 .drawBehind {
                     val inset = 2.5.dp.toPx()
                     drawRoundRect(
-                        color = StampInnerLightRim,
+                        color = stampInnerRim,
                         topLeft = Offset(inset, inset),
                         size = Size(size.width - inset * 2f, size.height - inset * 2f),
                         cornerRadius = CornerRadius(9.5.dp.toPx(), 9.5.dp.toPx()),
@@ -632,6 +636,7 @@ fun TimelineMonthStampOverlay(
                 val indicatorOffsetY = (displayFraction * travelPx).roundToInt()
 
                 // Hairline vertical timeline track
+                val scrollRailTrackColor = if (LocalIsDarkTheme.current) Color(0x47FFFFFF) else ScrollRailTrackBg
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
@@ -639,7 +644,7 @@ fun TimelineMonthStampOverlay(
                         .width(3.dp)
                         .fillMaxHeight()
                         .clip(CircleShape)
-                        .background(ScrollRailTrackBg)
+                        .background(scrollRailTrackColor)
                 )
 
                 // Gliding micro stamp flag ("Jan 2026") — draggable fast-scrub thumb.

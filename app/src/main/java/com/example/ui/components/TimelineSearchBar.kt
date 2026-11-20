@@ -84,11 +84,14 @@ import com.example.ui.theme.CobaltDark
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CobaltSoft
 import com.example.ui.theme.CoralDanger
+import com.example.ui.theme.GlassLightBottom
+import com.example.ui.theme.GlassLightTop
 import com.example.ui.theme.HairlineBorder
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.InkTertiary
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.SolarAmber
 import com.example.ui.theme.SolarAmberSoft
 import com.example.ui.theme.SurfaceMuted
@@ -114,6 +117,7 @@ fun TimelineGlobalSearchBar(
     onResetAll: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isDark = LocalIsDarkTheme.current
     val focusManager = LocalFocusManager.current
     var isFocused by remember { mutableStateOf(false) }
     val hasDateFilter = searchQuery.dateRange?.isActive == true
@@ -125,8 +129,16 @@ fun TimelineGlobalSearchBar(
     ) {
         FrostedGlassCard(
             shape = RoundedCornerShape(24.dp),
-            topColor = if (isFocused) Color(0xFAFFFFFF) else Color(0xECFFFFFF),
-            bottomColor = if (isFocused) Color(0xF5F7F9FF) else Color(0xDEF5F3EC),
+            topColor = if (isDark) {
+                if (isFocused) Color(0xF2252C3E) else GlassLightTop
+            } else {
+                if (isFocused) Color(0xFAFFFFFF) else Color(0xECFFFFFF)
+            },
+            bottomColor = if (isDark) {
+                if (isFocused) Color(0xEB1B2130) else GlassLightBottom
+            } else {
+                if (isFocused) Color(0xF5F7F9FF) else Color(0xDEF5F3EC)
+            },
             borderAccent = if (isFocused || searchQuery.isActive) CobaltPrimary else null,
             shadowElevation = if (isFocused) 10.dp else 5.dp,
             modifier = Modifier

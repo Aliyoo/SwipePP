@@ -1,8 +1,16 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -16,6 +24,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,10 +48,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.outlined.PhotoLibrary
@@ -61,6 +74,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -86,6 +100,8 @@ import androidx.compose.ui.util.lerp
 import com.example.R
 import com.example.data.ImageDownsampleTier
 import com.example.data.MediaAccessLevel
+import com.example.data.PhotoItemEntity
+import com.example.data.YearbookCoverMode
 import com.example.sensor.rememberHapticEngine
 import com.example.ui.FlipYearUiState
 import com.example.ui.LocalFloatingDockInset
@@ -99,7 +115,11 @@ import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.ObsidianGlassCard
 import com.example.ui.components.ObsidianGlassPill
 import com.example.ui.components.PhotoArtwork
+import com.example.ui.components.ThemeAppearanceSheet
+import com.example.ui.components.YearbookCoverStudioSheet
+import com.example.ui.components.activeChromeSatinBrush
 import com.example.ui.components.formatStorageSize
+import com.example.ui.theme.AppThemeMode
 import com.example.ui.theme.CobaltDark
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CobaltSoft
@@ -111,11 +131,13 @@ import com.example.ui.theme.EditionTeal
 import com.example.ui.theme.EditorialSerifFontFamily
 import com.example.ui.theme.EmeraldKeep
 import com.example.ui.theme.GlassLightSubtle
+import com.example.ui.theme.GlassSpecularRimStart
 import com.example.ui.theme.HairlineBorder
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.InkTertiary
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.OutfitFontFamily
 import com.example.ui.theme.SkylightChampagneGlow
 import com.example.ui.theme.SkylightSapphireGlow
@@ -135,6 +157,8 @@ import kotlin.math.absoluteValue
 @Composable
 fun BookshelfScreen(
     uiState: FlipYearUiState,
+    themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    onSelectThemeMode: (AppThemeMode) -> Unit = {},
     onOpenYearbook: (Int) -> Unit,
     onStartYearCleanup: (year: Int, includeReviewed: Boolean) -> Unit = { _, _ -> },
     onOpenVault: () -> Unit = {},
@@ -142,12 +166,17 @@ fun BookshelfScreen(
     onRescanDeviceMedia: () -> Unit,
     onSelectFilter: (MediaFilter) -> Unit,
     onLoadDemoArchive: () -> Unit,
+    onSaveYearbookCover: (year: Int, mode: YearbookCoverMode, selectedPhotoIds: List<Long>, intervalSeconds: Int) -> Unit = { _, _, _, _ -> },
+    onResetYearbookCover: (year: Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val books = uiState.yearbooks
     val haptics = rememberHapticEngine()
     val scope = rememberCoroutineScope()
+    val isDark = LocalIsDarkTheme.current
     var menuExpanded by remember { mutableStateOf(false) }
+    var showThemeSheet by remember { mutableStateOf(false) }
+    var customizingYear by remember { mutableStateOf<Int?>(null) }
 
     val floatingDockInset = LocalFloatingDockInset.current
 
@@ -229,6 +258,24 @@ fun BookshelfScreen(
                         }
                     }
 
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    IconButton(
+                        onClick = { showThemeSheet = true },
+                        modifier = Modifier.testTag("bookshelf_theme_button")
+                    ) {
+                        Icon(
+                            imageVector = when (themeMode) {
+                                AppThemeMode.SYSTEM -> Icons.Filled.BrightnessAuto
+                                AppThemeMode.LIGHT -> Icons.Filled.LightMode
+                                AppThemeMode.DARK -> Icons.Filled.DarkMode
+                            },
+                            contentDescription = stringResource(R.string.cd_theme_switcher),
+                            tint = if (isDark) SolarAmber else CobaltPrimary,
+                            modifier = Modifier.size(21.dp)
+                        )
+                    }
+
                     Box {
                         IconButton(
                             onClick = { menuExpanded = true },
@@ -245,6 +292,24 @@ fun BookshelfScreen(
                             onDismissRequest = { menuExpanded = false },
                             containerColor = SurfacePure
                         ) {
+                            DropdownMenuItem(
+                                text = { Text("外观主题 · ${themeMode.label}", color = InkPrimary) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = when (themeMode) {
+                                            AppThemeMode.SYSTEM -> Icons.Filled.BrightnessAuto
+                                            AppThemeMode.LIGHT -> Icons.Filled.LightMode
+                                            AppThemeMode.DARK -> Icons.Filled.DarkMode
+                                        },
+                                        contentDescription = null,
+                                        tint = if (isDark) SolarAmber else CobaltPrimary
+                                    )
+                                },
+                                onClick = {
+                                    menuExpanded = false
+                                    showThemeSheet = true
+                                }
+                            )
                             DropdownMenuItem(
                                 text = { Text("授权全部照片与视频权限", color = InkPrimary) },
                                 leadingIcon = {
@@ -382,8 +447,12 @@ fun BookshelfScreen(
                             Surface(
                                 onClick = { onSelectFilter(filter) },
                                 shape = RoundedCornerShape(50),
-                                color = if (selected) SurfacePure.copy(alpha = 0.94f) else Color.Transparent,
-                                border = if (selected) BorderStroke(0.8.dp, Color.White.copy(alpha = 0.9f)) else null,
+                                color = if (selected) {
+                                    if (isDark) SurfaceSubtle else SurfacePure.copy(alpha = 0.94f)
+                                } else {
+                                    Color.Transparent
+                                },
+                                border = if (selected) BorderStroke(0.8.dp, GlassSpecularRimStart) else null,
                                 shadowElevation = if (selected) 3.dp else 0.dp,
                                 modifier = Modifier
                                     .weight(1f)
@@ -433,16 +502,32 @@ fun BookshelfScreen(
 
                 // Adaptive 3D Bookshelf Carousel: dynamically adapts perspective & depth-of-field to scroll speed
                 val settledBook = books[pagerState.settledPage.coerceIn(0, books.lastIndex)]
+                var activeAmbientCoverPhoto by remember(settledBook.year, settledBook.coverPhoto) {
+                    mutableStateOf(settledBook.coverPhoto)
+                }
+
                 Adaptive3DBookshelfCarousel(
                     items = books,
                     pagerState = pagerState,
-                    settledCoverPhoto = settledBook.coverPhoto,
+                    settledCoverPhoto = activeAmbientCoverPhoto ?: settledBook.coverPhoto,
                     itemKey = { it.year },
                     pagerTestTag = "bookshelf_3d_pager",
                     modifier = Modifier.weight(1f)
-                ) { book, page, _, cardModifier ->
+                ) { book, page, kinematics, cardModifier ->
+                    val isBookSettledCenter = kinematics.isCentered && pagerState.settledPage == page
                     ModernYearbook3DCard(
                         summary = book,
+                        isFocused = isBookSettledCenter,
+                        isCarouselPaused = pagerState.isScrollInProgress || customizingYear != null,
+                        onCustomizeCover = {
+                            haptics.pageFlipLift()
+                            customizingYear = book.year
+                        },
+                        onActiveSlideChanged = { slidePhoto ->
+                            if (pagerState.settledPage == page && slidePhoto != null) {
+                                activeAmbientCoverPhoto = slidePhoto
+                            }
+                        },
                         onClick = {
                             if (pagerState.currentPage == page) {
                                 onOpenYearbook(book.year)
@@ -492,11 +577,41 @@ fun BookshelfScreen(
             }
         }
     }
+
+    val targetBook = customizingYear?.let { year -> books.find { it.year == year } }
+    if (targetBook != null) {
+        val yearPhotos = remember(uiState.allPhotos, targetBook.year) {
+            uiState.allPhotos.filter { it.year == targetBook.year }
+        }
+        YearbookCoverStudioSheet(
+            summary = targetBook,
+            yearPhotos = yearPhotos,
+            onDismiss = { customizingYear = null },
+            onSaveCover = { mode, ids, interval ->
+                onSaveYearbookCover(targetBook.year, mode, ids, interval)
+            },
+            onResetToSmart = {
+                onResetYearbookCover(targetBook.year)
+            }
+        )
+    }
+
+    if (showThemeSheet) {
+        ThemeAppearanceSheet(
+            currentMode = themeMode,
+            onSelectMode = onSelectThemeMode,
+            onDismiss = { showThemeSheet = false }
+        )
+    }
 }
 
 @Composable
 private fun ModernYearbook3DCard(
     summary: YearbookSummary,
+    isFocused: Boolean,
+    isCarouselPaused: Boolean,
+    onCustomizeCover: () -> Unit,
+    onActiveSlideChanged: (PhotoItemEntity?) -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -517,23 +632,80 @@ private fun ModernYearbook3DCard(
         )
     }
 
+    val slides = remember(summary.coverSlides, summary.coverPhoto) {
+        summary.coverSlides.ifEmpty { listOfNotNull(summary.coverPhoto) }
+    }
+    val slideKeys = remember(slides) { slides.map { it.id } }
+    var currentSlideIndex by remember(summary.year, slideKeys) { mutableIntStateOf(0) }
+    val safeSlideIndex = if (slides.isEmpty()) 0 else currentSlideIndex.coerceIn(0, slides.lastIndex)
+    val displayedPhoto = slides.getOrNull(safeSlideIndex) ?: summary.coverPhoto
+    val slideProgress = remember(summary.year, slideKeys) { Animatable(0f) }
+
+    val isCarouselActive = isFocused && !isCarouselPaused && slides.size > 1
+
+    LaunchedEffect(displayedPhoto, isFocused) {
+        if (isFocused) {
+            onActiveSlideChanged(displayedPhoto)
+        }
+    }
+
+    // Smooth museum-grade slideshow clock + Ken Burns progress — strictly active ONLY on the focused center book
+    LaunchedEffect(summary.year, slideKeys, summary.coverIntervalSeconds, isCarouselActive) {
+        if (!isCarouselActive) {
+            slideProgress.snapTo(0f)
+            return@LaunchedEffect
+        }
+        val durationMs = (summary.coverIntervalSeconds.coerceIn(3, 12) * 1000)
+        while (true) {
+            slideProgress.snapTo(0f)
+            slideProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = durationMs, easing = LinearEasing)
+            )
+            currentSlideIndex = (currentSlideIndex + 1) % slides.size
+        }
+    }
+
+    val bookSpotShadow = if (LocalIsDarkTheme.current) Color.Black.copy(alpha = 0.60f) else InkPrimary.copy(alpha = 0.30f)
+
     Box(
         modifier = modifier
-            .shadow(elevation = 22.dp, shape = bookShape, spotColor = InkPrimary.copy(alpha = 0.30f))
+            .shadow(elevation = 22.dp, shape = bookShape, spotColor = bookSpotShadow)
             .clip(bookShape)
             .background(coverColor)
             .clickable(onClick = onClick)
     ) {
-        // 100% Full-Bleed Edge-to-Edge Hero Cover Photograph (zero awkward right white bar)
-        if (summary.coverPhoto != null) {
-            PhotoArtwork(
-                photo = summary.coverPhoto,
-                contentDescription = stringResource(R.string.cd_yearbook_cover),
-                showVideoBadge = false,
-                downsampleTier = ImageDownsampleTier.HERO_CARD,
-                targetSizePx = 768,
+        // 100% Full-Bleed Edge-to-Edge Living Cover Showcase (Crossfade + whisper-subtle Ken Burns drift)
+        if (displayedPhoto != null) {
+            val kenBurnsScale = if (isCarouselActive) lerp(1.00f, 1.07f, slideProgress.value) else 1f
+            val kenBurnsPanX = if (isCarouselActive) {
+                val direction = if (safeSlideIndex % 2 == 0) 1f else -1f
+                lerp(-6f, 6f, slideProgress.value) * direction
+            } else {
+                0f
+            }
+
+            Crossfade(
+                targetState = displayedPhoto,
+                animationSpec = tween(durationMillis = 820),
+                label = "yearbook_cover_crossfade",
                 modifier = Modifier.fillMaxSize()
-            )
+            ) { slidePhoto ->
+                PhotoArtwork(
+                    photo = slidePhoto,
+                    contentDescription = stringResource(R.string.cd_yearbook_cover),
+                    showVideoBadge = false,
+                    downsampleTier = ImageDownsampleTier.HERO_CARD,
+                    targetSizePx = 768,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = kenBurnsScale
+                            scaleY = kenBurnsScale
+                            translationX = kenBurnsPanX
+                        }
+                )
+            }
         }
 
         // Cinematic Editorial Vignette for crisp legibility at top & bottom while preserving center photo clarity
@@ -542,7 +714,7 @@ private fun ModernYearbook3DCard(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        0.0f to coverColor.copy(alpha = 0.70f),
+                        0.0f to coverColor.copy(alpha = 0.72f),
                         0.34f to coverColor.copy(alpha = 0.12f),
                         0.66f to coverColor.copy(alpha = 0.18f),
                         1.0f to coverColor.copy(alpha = 0.86f)
@@ -594,80 +766,199 @@ private fun ModernYearbook3DCard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 22.dp, end = 16.dp, top = 18.dp, bottom = 16.dp),
+                .padding(start = 22.dp, end = 16.dp, top = if (slides.size > 1) 12.dp else 18.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column {
-                    Text(
-                        text = "EDITION // ${summary.year % 100}",
-                        fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 9.sp,
-                        letterSpacing = 1.5.sp,
-                        color = Color.White.copy(alpha = 0.78f)
-                    )
-                    Text(
-                        text = summary.year.toString(),
-                        fontFamily = EditorialSerifFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 44.sp,
-                        lineHeight = 46.sp,
-                        letterSpacing = (-1.0).sp,
-                        color = Color.White
-                    )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Hairline Editorial Slideshow Progress Bars (only visible in multi-slide carousel modes)
+                if (slides.size > 1) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("cover_carousel_bars_${summary.year}"),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        slides.indices.forEach { idx ->
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(2.5.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.26f))
+                            ) {
+                                val segmentFill = when {
+                                    idx < safeSlideIndex -> 1f
+                                    idx == safeSlideIndex -> if (isCarouselActive) slideProgress.value.coerceIn(0.08f, 1f) else 1f
+                                    else -> 0f
+                                }
+                                if (segmentFill > 0f) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .fillMaxWidth(segmentFill)
+                                            .clip(CircleShape)
+                                            .background(Color.White.copy(alpha = if (idx == safeSlideIndex) 0.96f else 0.72f))
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
 
-                if (summary.unreviewedCount == 0 && summary.totalPhotos > 0) {
-                    Surface(
-                        shape = CircleShape,
-                        color = EmeraldKeep,
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.CheckCircle,
-                            contentDescription = "年度已整理",
-                            tint = Color.White,
-                            modifier = Modifier
-                                .padding(5.dp)
-                                .size(16.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Column {
+                        Text(
+                            text = "EDITION // ${summary.year % 100}",
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontSize = 9.sp,
+                            letterSpacing = 1.5.sp,
+                            color = Color.White.copy(alpha = 0.78f)
+                        )
+                        Text(
+                            text = summary.year.toString(),
+                            fontFamily = EditorialSerifFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 44.sp,
+                            lineHeight = 46.sp,
+                            letterSpacing = (-1.0).sp,
+                            color = Color.White
                         )
                     }
-                } else {
-                    ObsidianGlassPill {
-                        Text(
-                            text = "${summary.unreviewedCount} 待理",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
-                        )
+
+                    if (summary.unreviewedCount == 0 && summary.totalPhotos > 0) {
+                        Surface(
+                            shape = CircleShape,
+                            color = EmeraldKeep,
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = "年度已整理",
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .padding(5.dp)
+                                    .size(16.dp)
+                            )
+                        }
+                    } else {
+                        ObsidianGlassPill {
+                            Text(
+                                text = "${summary.unreviewedCount} 待理",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                            )
+                        }
                     }
                 }
             }
 
-            // Bottom Frosted Obsidian Glass Archive Plate
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (summary.videoCount > 0) {
-                    ObsidianGlassPill {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            // Bottom Frosted Obsidian Glass Archive Plate + Live Slide Context & Cover Customizer
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Left: Live Cover Slide Story Chip (or Video badge)
+                    Box(modifier = Modifier.weight(1f, fill = false)) {
+                        if (slides.size > 1 && displayedPhoto != null) {
+                            ObsidianGlassPill {
+                                AnimatedContent(
+                                    targetState = displayedPhoto to safeSlideIndex,
+                                    transitionSpec = { fadeIn(tween(320)) togetherWith fadeOut(tween(220)) },
+                                    label = "cover_slide_meta"
+                                ) { (slidePhoto, idx) ->
+                                    val locationSuffix = slidePhoto.locationName?.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()
+                                    val slideLabel = if (locationSuffix.isNotEmpty()) {
+                                        "${slidePhoto.month}月$locationSuffix"
+                                    } else {
+                                        "${slidePhoto.month}月精选 · ${idx + 1}/${slides.size}"
+                                    }
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.AutoAwesome,
+                                            contentDescription = null,
+                                            tint = SolarAmber,
+                                            modifier = Modifier.size(11.dp)
+                                        )
+                                        Text(
+                                            text = slideLabel,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontSize = 10.5.sp,
+                                            color = Color.White,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        } else if (summary.videoCount > 0) {
+                            ObsidianGlassPill {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Videocam,
+                                        contentDescription = null,
+                                        tint = SolarAmber,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Text(
+                                        text = "${summary.videoCount} 视频",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Right: Subtle 48dp-accessible Cover Studio Trigger (shown on focused book)
+                    if (isFocused) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            contentAlignment = Alignment.CenterEnd,
+                            modifier = Modifier
+                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                .clip(RoundedCornerShape(50))
+                                .clickable(
+                                    onClickLabel = stringResource(R.string.cd_customize_cover),
+                                    onClick = onCustomizeCover
+                                )
+                                .testTag("customize_cover_button_${summary.year}")
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.Videocam,
-                                contentDescription = null,
-                                tint = SolarAmber,
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Text(
-                                text = "${summary.videoCount} 视频",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White
-                            )
+                            ObsidianGlassPill {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.PhotoLibrary,
+                                        contentDescription = stringResource(R.string.cd_customize_cover),
+                                        tint = SolarAmber,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.action_customize_cover),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -778,6 +1069,11 @@ private fun ModernYearWheel(
         }
     }
 
+    val activeYearBrush = activeChromeSatinBrush()
+    val transparentBrush = remember {
+        Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
+    }
+
     FrostedGlassCard(
         shape = RoundedCornerShape(50),
         shadowElevation = 4.dp,
@@ -803,13 +1099,7 @@ private fun ModernYearWheel(
                         .width(pillWidth)
                         .height(36.dp)
                         .clip(RoundedCornerShape(50))
-                        .background(
-                            if (selected) {
-                                Brush.linearGradient(listOf(Color(0xFF252935), Color(0xFF12141B)))
-                            } else {
-                                Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
-                            }
-                        )
+                        .background(if (selected) activeYearBrush else transparentBrush)
                         .clickable { onSelectIndex(idx) }
                         .testTag("year_wheel_$year")
                 ) {

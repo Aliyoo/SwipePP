@@ -22,6 +22,9 @@ interface FlipYearDao {
     @Query("SELECT * FROM cleanup_stats WHERE id = 1")
     fun observeCleanupStats(): Flow<CleanupStatsEntity?>
 
+    @Query("SELECT * FROM yearbook_covers")
+    fun observeYearbookCovers(): Flow<List<YearbookCoverConfigEntity>>
+
     @Query("SELECT COUNT(*) FROM photos")
     suspend fun getTotalPhotoCount(): Int
 
@@ -140,6 +143,12 @@ interface FlipYearDao {
 
     @Query("DELETE FROM month_stamps")
     suspend fun clearAllMonthStamps()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertYearbookCover(config: YearbookCoverConfigEntity)
+
+    @Query("DELETE FROM yearbook_covers WHERE year = :year")
+    suspend fun deleteYearbookCover(year: Int)
 
     /**
      * Commits an entire MediaStore delta sync inside a single SQLite transaction so Room emits

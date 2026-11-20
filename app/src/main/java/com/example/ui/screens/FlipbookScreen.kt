@@ -98,6 +98,7 @@ import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.InkTertiary
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.OutfitFontFamily
 import com.example.ui.theme.SolarAmber
 import com.example.ui.theme.SolarAmberSoft
@@ -446,6 +447,10 @@ private fun ModernCalendarBookPage(
     val scale = 1f - (absOffset * 0.05f)
     val pageShape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 22.dp, bottomEnd = 22.dp)
 
+    val isDark = LocalIsDarkTheme.current
+    val pageShadowColor = if (isDark) Color.Black.copy(alpha = 0.55f) else InkPrimary.copy(alpha = 0.14f)
+    val spineShadowColor = if (isDark) Color.Black.copy(alpha = 0.34f) else InkPrimary.copy(alpha = 0.08f)
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -456,7 +461,7 @@ private fun ModernCalendarBookPage(
                 scaleY = scale
                 cameraDistance = 16f * density
             }
-            .shadow(elevation = 12.dp, shape = pageShape, spotColor = InkPrimary.copy(alpha = 0.14f))
+            .shadow(elevation = 12.dp, shape = pageShape, spotColor = pageShadowColor)
             .clip(pageShape)
             .background(SurfacePure)
             .border(1.dp, HairlineBorder, pageShape)
@@ -469,7 +474,7 @@ private fun ModernCalendarBookPage(
                 .background(
                     Brush.horizontalGradient(
                         colors = listOf(
-                            InkPrimary.copy(alpha = 0.08f),
+                            spineShadowColor,
                             Color.Transparent
                         )
                     )

@@ -78,11 +78,14 @@ import com.example.ui.theme.CobaltSoft
 import com.example.ui.theme.CoralDanger
 import com.example.ui.theme.CoralSoft
 import com.example.ui.theme.EmeraldKeep
+import com.example.ui.theme.GlassLightBottom
+import com.example.ui.theme.GlassLightTop
 import com.example.ui.theme.HairlineBorder
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.InkTertiary
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.ObsidianOverlayBorder
 import com.example.ui.theme.ObsidianOverlayGlass
 import com.example.ui.theme.ObsidianOverlayOrb
@@ -90,7 +93,7 @@ import com.example.ui.theme.SolarAmber
 import com.example.ui.theme.SurfaceMuted
 import com.example.ui.theme.SurfacePure
 
-// Hoisted static shapes, brushes & colors to guarantee zero per-tile allocations during high-FPS scrolling
+// Hoisted static shapes & invariant overlay colors to guarantee zero per-tile allocations during high-FPS scrolling
 private val TileShape = RoundedCornerShape(14.dp)
 private val FrameCardShape = RoundedCornerShape(16.dp)
 private val FrameImageShape = RoundedCornerShape(11.dp)
@@ -101,29 +104,12 @@ private val PillShape = RoundedCornerShape(50)
 private val BurstBottomScrimBrush = Brush.verticalGradient(
     colors = listOf(Color.Transparent, Color(0xAD000000))
 )
-private val BestButtonActiveBrush = Brush.linearGradient(
-    colors = listOf(Color(0xFF252935), Color(0xFF12141B))
-)
-private val BestButtonIdleBrush = Brush.verticalGradient(
-    colors = listOf(Color(0xE0FFFFFF), Color(0xC2F5F3EC))
-)
-
-private val SelectedOverlayTint = CobaltPrimary.copy(alpha = 0.16f)
 private val ObsidianPillBg = ObsidianOverlayGlass
 private val ObsidianPillBorder = ObsidianOverlayBorder
 private val SequencePillBg = ObsidianOverlayOrb
 private val UnselectedCheckBg = Color(0x47000000)
 private val UnselectedCheckBorder = Color(0xEBFFFFFF)
-private val BackCardDeepFill = Color(0xFFD6DAE3)
-private val BackCardMidFill = Color(0xFFE4E7EE)
-private val BackCardShadowTint = Color(0x1612141B)
-private val FrontCardShadowTint = Color(0x1C12141B)
-private val BackCardRimBorder = Color(0xFFFDFCF9)
-private val FrameSelectedBg = CobaltSoft.copy(alpha = 0.78f)
-private val FrameBestBg = CobaltSoft.copy(alpha = 0.55f)
-private val FrameIdleBg = SurfaceMuted.copy(alpha = 0.65f)
 private val BestActiveBorder = Color(0x3DFFFFFF)
-private val TrashButtonBorder = BorderStroke(1.dp, CoralDanger.copy(alpha = 0.25f))
 
 /**
  * High-FPS interactive Gallery Grid supporting collapsible/expandable Burst Stacks.
@@ -405,7 +391,7 @@ private fun SingleGalleryTile(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(SelectedOverlayTint)
+                    .background(CobaltPrimary.copy(alpha = 0.18f))
             )
         }
 
@@ -598,6 +584,14 @@ private fun CollapsedBurstStackTile(
         Modifier
     }
 
+    val isDark = LocalIsDarkTheme.current
+    val backCardDeepFill = if (isDark) Color(0xFF1C2230) else Color(0xFFD6DAE3)
+    val backCardMidFill = if (isDark) Color(0xFF242B3D) else Color(0xFFE4E7EE)
+    val backCardShadowTint = if (isDark) Color(0x45000000) else Color(0x1612141B)
+    val frontCardShadowTint = if (isDark) Color(0x58000000) else Color(0x1C12141B)
+    val backCardRimBorder = if (isDark) Color(0xFF36405A) else Color(0xFFFDFCF9)
+    val frontIdleBorder = if (isDark) Color(0xFF3F4A66) else Color.White
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -623,19 +617,19 @@ private fun CollapsedBurstStackTile(
                         )
                     }) {
                         drawRoundRect(
-                            color = BackCardShadowTint,
+                            color = backCardShadowTint,
                             topLeft = Offset(left3, top3 + 1.5.dp.toPx()),
                             size = Size(cardW3, cardH3),
                             cornerRadius = corner
                         )
                         drawRoundRect(
-                            color = BackCardDeepFill,
+                            color = backCardDeepFill,
                             topLeft = Offset(left3, top3),
                             size = Size(cardW3, cardH3),
                             cornerRadius = corner
                         )
                         drawRoundRect(
-                            color = BackCardRimBorder,
+                            color = backCardRimBorder,
                             topLeft = Offset(left3, top3),
                             size = Size(cardW3, cardH3),
                             cornerRadius = corner,
@@ -656,19 +650,19 @@ private fun CollapsedBurstStackTile(
                     )
                 }) {
                     drawRoundRect(
-                        color = BackCardShadowTint,
+                        color = backCardShadowTint,
                         topLeft = Offset(left2, top2 + 1.5.dp.toPx()),
                         size = Size(cardW2, cardH2),
                         cornerRadius = corner
                     )
                     drawRoundRect(
-                        color = BackCardMidFill,
+                        color = backCardMidFill,
                         topLeft = Offset(left2, top2),
                         size = Size(cardW2, cardH2),
                         cornerRadius = corner
                     )
                     drawRoundRect(
-                        color = BackCardRimBorder,
+                        color = backCardRimBorder,
                         topLeft = Offset(left2, top2),
                         size = Size(cardW2, cardH2),
                         cornerRadius = corner,
@@ -678,7 +672,7 @@ private fun CollapsedBurstStackTile(
 
                 // Soft grounded shadow halo behind front print (zero RenderNode elevation cost)
                 drawRoundRect(
-                    color = FrontCardShadowTint,
+                    color = frontCardShadowTint,
                     topLeft = Offset(1.dp.toPx(), topFront + 2.5.dp.toPx()),
                     size = Size(size.width - 2.dp.toPx(), size.height - topFront),
                     cornerRadius = CornerRadius(14.dp.toPx(), 14.dp.toPx())
@@ -690,7 +684,7 @@ private fun CollapsedBurstStackTile(
             )
             .testTag("burst_collapsed_tile_${burst.groupId}")
     ) {
-        // Front Top Card (Gallery Print Cover with Crisp White or Cobalt Selection Rim)
+        // Front Top Card (Gallery Print Cover with Crisp Rim or Cobalt Selection Rim)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -699,7 +693,7 @@ private fun CollapsedBurstStackTile(
                 .background(SurfacePure)
                 .border(
                     width = if (anySelected) 2.5.dp else 1.8.dp,
-                    color = if (anySelected) CobaltPrimary else Color.White,
+                    color = if (anySelected) CobaltPrimary else frontIdleBorder,
                     shape = TileShape
                 )
         ) {
@@ -716,7 +710,7 @@ private fun CollapsedBurstStackTile(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(SelectedOverlayTint)
+                        .background(CobaltPrimary.copy(alpha = 0.18f))
                 )
             }
 
@@ -998,9 +992,9 @@ private fun BurstFrameCard(
 ) {
     val highlight = isSelected || isBest
     val containerColor = when {
-        isSelected -> FrameSelectedBg
-        isBest -> FrameBestBg
-        else -> FrameIdleBg
+        isSelected -> CobaltSoft.copy(alpha = 0.78f)
+        isBest -> CobaltSoft.copy(alpha = 0.55f)
+        else -> SurfaceMuted.copy(alpha = 0.65f)
     }
 
     Column(
@@ -1039,7 +1033,7 @@ private fun BurstFrameCard(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(SelectedOverlayTint)
+                        .background(CobaltPrimary.copy(alpha = 0.18f))
                 )
             }
 
@@ -1120,6 +1114,13 @@ private fun BurstFrameCard(
 
         Spacer(modifier = Modifier.height(5.dp))
 
+        val bestActiveBrush = activeChromeSatinBrush()
+        val glassTop = GlassLightTop
+        val glassBottom = GlassLightBottom
+        val bestIdleBrush = remember(glassTop, glassBottom) {
+            Brush.verticalGradient(colors = listOf(glassTop, glassBottom))
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -1131,7 +1132,7 @@ private fun BurstFrameCard(
                     .weight(1f)
                     .height(36.dp)
                     .clip(SmallButtonShape)
-                    .background(if (isBest) BestButtonActiveBrush else BestButtonIdleBrush)
+                    .background(if (isBest) bestActiveBrush else bestIdleBrush)
                     .border(
                         1.dp,
                         if (isBest) BestActiveBorder else HairlineBorder,
@@ -1153,7 +1154,7 @@ private fun BurstFrameCard(
                     onClick = onTrash,
                     shape = SmallButtonShape,
                     color = CoralSoft,
-                    border = TrashButtonBorder,
+                    border = BorderStroke(1.dp, CoralDanger.copy(alpha = 0.28f)),
                     modifier = Modifier.size(36.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {

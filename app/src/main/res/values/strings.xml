@@ -72,4 +72,19 @@
     <string name="cd_timeline_search_clear">清除搜索关键词</string>
     <string name="cd_timeline_search_date">按日期范围筛选</string>
     <string name="cd_timeline_search_filters">打开日期、地点与标签筛选面板</string>
+    <string name="action_customize_cover">换封面</string>
+    <string name="cd_customize_cover">自定义年度影集封面与轮播设置</string>
+    <string name="cover_studio_title">定制年度封面</string>
+    <string name="cover_studio_save">保存封面设置</string>
+    <string name="cover_studio_reset_smart">恢复智能推荐</string>
+    <string name="cover_mode_smart_desc">自动过滤截屏与低质图，优先挑选收藏与高画质佳作，按月份均衡轮播。</string>
+    <string name="cover_mode_single_desc">锁定 1 张最具代表性的照片作为静态典藏封面，沉稳耐看。</string>
+    <string name="cover_mode_custom_desc">按点击顺序自选 2–6 张年度高光照片，定制专属动态封面。</string>
+    <string name="cover_speed_label">轮播节奏</string>
+    <string name="cover_speed_fast">3秒 · 轻快</string>
+    <string name="cover_speed_balanced">5秒 · 舒缓</string>
+    <string name="cover_speed_calm">8秒 · 沉静</string>
+    <string name="theme_appearance_title">外观主题</string>
+    <string name="theme_appearance_subtitle">选择画廊氛围，支持自动跟随系统或手动切换日光画廊 / 暗夜暗房</string>
+    <string name="cd_theme_switcher">切换浅色或暗色主题外观</string>
 </resources>

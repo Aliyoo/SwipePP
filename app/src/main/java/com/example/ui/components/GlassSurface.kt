@@ -49,6 +49,8 @@ import com.example.ui.theme.GlassLightBottom
 import com.example.ui.theme.GlassLightTop
 import com.example.ui.theme.GlassObsidianBottom
 import com.example.ui.theme.GlassObsidianTop
+import com.example.ui.theme.LocalFlipYearPalette
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.ObsidianOverlayBorder
 import com.example.ui.theme.ObsidianOverlayGlass
 import com.example.ui.theme.ObsidianOverlayOrb
@@ -72,7 +74,7 @@ val supportsHardwareBlur: Boolean
 
 /**
  * Sculpted obsidian satin — the shared dark material (top-lit slate → deep ink) used for
- * selected states, floating bars and docks so dark chrome never reads as flat black.
+ * media overlays and light-theme active surfaces.
  */
 fun obsidianSatinBrush(alpha: Float = 1f): Brush =
     Brush.verticalGradient(
@@ -84,7 +86,26 @@ fun obsidianSatinBrush(alpha: Float = 1f): Brush =
     )
 
 /**
- * High-performance Light Alabaster Glassmorphism surface.
+ * Theme-adaptive primary active chrome brush:
+ * - Light theme: sculpted deep obsidian satin with crisp high contrast on alabaster canvas.
+ * - Dark theme: luminous sapphire-slate satin that elevates unmistakably above dark obsidian surfaces.
+ */
+@Composable
+fun activeChromeSatinBrush(alpha: Float = 1f): Brush {
+    val palette = LocalFlipYearPalette.current
+    return remember(palette, alpha) {
+        Brush.verticalGradient(
+            colors = listOf(
+                palette.activeChromeTop.copy(alpha = alpha),
+                palette.activeChromeMid.copy(alpha = alpha),
+                palette.activeChromeBottom.copy(alpha = alpha)
+            )
+        )
+    }
+}
+
+/**
+ * High-performance Adaptive Glassmorphism surface (Alabaster Frost in Light, Smoked Museum Slate in Dark).
  *
  * Performance Architecture:
  * - Zero per-frame backdrop re-blurring during scrolling or 3D paging.
@@ -106,22 +127,26 @@ fun FrostedGlassCard(
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val borderBrush = remember(borderAccent) {
+    val isDark = LocalIsDarkTheme.current
+    val rimStart = GlassSpecularRimStart
+    val rimMid = GlassSpecularRimMid
+    val rimEnd = GlassSpecularRimEnd
+    val sapphireGlow = SkylightSapphireGlow
+    val champagneGlow = SkylightChampagneGlow
+    val shadowInk = if (isDark) Color.Black else InkPrimary
+
+    val borderBrush = remember(borderAccent, rimStart, rimMid, rimEnd, isDark) {
         if (borderAccent != null) {
             Brush.linearGradient(
                 colors = listOf(
-                    GlassSpecularRimStart,
-                    borderAccent.copy(alpha = 0.42f),
-                    borderAccent.copy(alpha = 0.24f)
+                    rimStart,
+                    borderAccent.copy(alpha = if (isDark) 0.56f else 0.42f),
+                    borderAccent.copy(alpha = if (isDark) 0.32f else 0.24f)
                 )
             )
         } else {
             Brush.linearGradient(
-                colors = listOf(
-                    GlassSpecularRimStart,
-                    GlassSpecularRimMid,
-                    GlassSpecularRimEnd
-                )
+                colors = listOf(rimStart, rimMid, rimEnd)
             )
         }
     }
@@ -130,15 +155,25 @@ fun FrostedGlassCard(
         Brush.verticalGradient(colors = listOf(topColor, bottomColor))
     }
 
-    val sheenBrush = remember {
+    val sheenBrush = remember(isDark) {
         Brush.linearGradient(
-            colors = listOf(
-                Color.White.copy(alpha = 0.34f),
-                Color.White.copy(alpha = 0.05f),
-                Color.Transparent
-            )
+            colors = if (isDark) {
+                listOf(
+                    Color.White.copy(alpha = 0.08f),
+                    Color.White.copy(alpha = 0.02f),
+                    Color.Transparent
+                )
+            } else {
+                listOf(
+                    Color.White.copy(alpha = 0.34f),
+                    Color.White.copy(alpha = 0.05f),
+                    Color.Transparent
+                )
+            }
         )
     }
+
+    val topHighlightColor = if (isDark) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.68f)
 
     val containerModifier = modifier
         .then(
@@ -146,8 +181,8 @@ fun FrostedGlassCard(
                 Modifier.shadow(
                     elevation = shadowElevation,
                     shape = shape,
-                    ambientColor = InkPrimary.copy(alpha = 0.14f),
-                    spotColor = InkPrimary.copy(alpha = 0.20f)
+                    ambientColor = shadowInk.copy(alpha = if (isDark) 0.45f else 0.14f),
+                    spotColor = shadowInk.copy(alpha = if (isDark) 0.58f else 0.20f)
                 )
             } else {
                 Modifier
@@ -163,7 +198,7 @@ fun FrostedGlassCard(
             drawRect(brush = sheenBrush)
             // Razor-thin top edge glass highlight
             drawLine(
-                color = Color.White.copy(alpha = 0.68f),
+                color = topHighlightColor,
                 start = Offset(0f, 0.75.dp.toPx()),
                 end = Offset(size.width, 0.75.dp.toPx()),
                 strokeWidth = 1.dp.toPx()
@@ -192,11 +227,19 @@ fun FrostedGlassCard(
                     .blur(radius = 18.dp, edgeTreatment = BlurredEdgeTreatment.Rectangle)
                     .background(
                         Brush.linearGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.26f),
-                                SkylightSapphireGlow.copy(alpha = 0.12f),
-                                SkylightChampagneGlow.copy(alpha = 0.14f)
-                            )
+                            colors = if (isDark) {
+                                listOf(
+                                    Color.White.copy(alpha = 0.06f),
+                                    sapphireGlow.copy(alpha = 0.20f),
+                                    champagneGlow.copy(alpha = 0.14f)
+                                )
+                            } else {
+                                listOf(
+                                    Color.White.copy(alpha = 0.26f),
+                                    sapphireGlow.copy(alpha = 0.12f),
+                                    champagneGlow.copy(alpha = 0.14f)
+                                )
+                            }
                         )
                     )
             )

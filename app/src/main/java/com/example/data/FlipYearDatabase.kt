@@ -11,9 +11,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     entities = [
         PhotoItemEntity::class,
         MonthStampEntity::class,
-        CleanupStatsEntity::class
+        CleanupStatsEntity::class,
+        YearbookCoverConfigEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class FlipYearDatabase : RoomDatabase() {
@@ -36,6 +37,20 @@ abstract class FlipYearDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `yearbook_covers` (" +
+                        "`year` INTEGER NOT NULL, " +
+                        "`mode` TEXT NOT NULL, " +
+                        "`selectedPhotoIdsCsv` TEXT NOT NULL, " +
+                        "`intervalSeconds` INTEGER NOT NULL, " +
+                        "`updatedAtMillis` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`year`))"
+                )
+            }
+        }
+
         fun getInstance(context: Context): FlipYearDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -43,7 +58,7 @@ abstract class FlipYearDatabase : RoomDatabase() {
                     FlipYearDatabase::class.java,
                     "flipyear_cleaner.db"
                 )
-                    .addMigrations(MIGRATION_2_3)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                     .also { INSTANCE = it }

@@ -3,7 +3,6 @@ package com.example.ui.components
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -14,8 +13,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -55,10 +52,12 @@ import com.example.ui.theme.GlassSpecularRimMid
 import com.example.ui.theme.GlassSpecularRimStart
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
+import com.example.ui.theme.LocalFlipYearPalette
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.SolarAmber
 
 enum class GalleryButtonTone {
-    /** Primary signature sculpted obsidian satin with Champagne Gold accent */
+    /** Primary signature sculpted satin with Champagne Gold accent */
     OBSIDIAN,
 
     /** Curated International Klein Sapphire satin gradient for key cleanup actions */
@@ -67,7 +66,7 @@ enum class GalleryButtonTone {
     /** Gallery Vermilion satin gradient for destructive confirmation */
     DANGER,
 
-    /** Frosted alabaster translucent glass for secondary actions */
+    /** Frosted translucent glass for secondary actions */
     GLASS,
 
     /** Soft rose-tinted frosted glass for non-primary destructive actions */
@@ -75,9 +74,8 @@ enum class GalleryButtonTone {
 }
 
 /**
- * Unified sculpted satin/glass action button replacing flat solid Material buttons across FlipYear.
- * Features directional satin gradient, top specular hairline highlight, luminous bevel rim,
- * soft tinted shadow, and spring press physics.
+ * Unified sculpted satin/glass action button across FlipYear, calibrated for both Alabaster Daylight
+ * and Nocturnal Leica Darkroom palettes.
  */
 @Composable
 fun GalleryActionButton(
@@ -91,6 +89,19 @@ fun GalleryActionButton(
     shape: Shape = RoundedCornerShape(16.dp),
     enabled: Boolean = true
 ) {
+    val isDark = LocalIsDarkTheme.current
+    val palette = LocalFlipYearPalette.current
+    val activeBrush = activeChromeSatinBrush()
+    val glassTop = GlassLightTop
+    val glassBottom = GlassLightBottom
+    val rimStart = GlassSpecularRimStart
+    val rimMid = GlassSpecularRimMid
+    val rimEnd = GlassSpecularRimEnd
+    val cobalt = CobaltPrimary
+    val cobaltDark = CobaltDark
+    val coral = CoralDanger
+    val inkPrimary = InkPrimary
+
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
@@ -102,67 +113,76 @@ fun GalleryActionButton(
         label = "gallery_btn_scale"
     )
 
-    val fillBrush = remember(tone) {
+    val fillBrush = remember(tone, isDark, activeBrush, glassTop, glassBottom, cobalt, cobaltDark, coral) {
         when (tone) {
-            GalleryButtonTone.OBSIDIAN -> obsidianSatinBrush()
-            GalleryButtonTone.SAPPHIRE -> Brush.linearGradient(
-                colors = listOf(Color(0xFF395EF2), CobaltPrimary, CobaltDark)
-            )
+            GalleryButtonTone.OBSIDIAN -> activeBrush
+            GalleryButtonTone.SAPPHIRE -> if (isDark) {
+                Brush.linearGradient(colors = listOf(Color(0xFF4F76FF), Color(0xFF3457D9), Color(0xFF233DA6)))
+            } else {
+                Brush.linearGradient(colors = listOf(Color(0xFF395EF2), cobalt, cobaltDark))
+            }
             GalleryButtonTone.DANGER -> Brush.linearGradient(
-                colors = listOf(Color(0xFFF24B61), CoralDanger, Color(0xFFC42339))
+                colors = listOf(Color(0xFFF24B61), coral, Color(0xFFC42339))
             )
             GalleryButtonTone.GLASS -> Brush.verticalGradient(
-                colors = listOf(GlassLightTop, GlassLightBottom)
+                colors = listOf(glassTop, glassBottom)
             )
-            GalleryButtonTone.DANGER_GLASS -> Brush.verticalGradient(
-                colors = listOf(Color(0xE8FFF2F4), Color(0xD4FDE5E9))
-            )
+            GalleryButtonTone.DANGER_GLASS -> if (isDark) {
+                Brush.verticalGradient(colors = listOf(Color(0xD93D1A25), Color(0xCC2B111A)))
+            } else {
+                Brush.verticalGradient(colors = listOf(Color(0xE8FFF2F4), Color(0xD4FDE5E9)))
+            }
         }
     }
 
-    val borderBrush = remember(tone) {
+    val borderBrush = remember(tone, isDark, palette, rimStart, rimMid, rimEnd, coral) {
         when (tone) {
             GalleryButtonTone.OBSIDIAN -> Brush.linearGradient(
-                colors = listOf(Color.White.copy(alpha = 0.28f), Color.White.copy(alpha = 0.08f), Color.White.copy(alpha = 0.14f))
+                colors = listOf(palette.activeChromeBorderStart, Color.White.copy(alpha = 0.08f), palette.activeChromeBorderEnd)
             )
             GalleryButtonTone.SAPPHIRE -> Brush.linearGradient(
-                colors = listOf(Color.White.copy(alpha = 0.42f), Color.White.copy(alpha = 0.12f), Color(0xFF8AA4FF).copy(alpha = 0.30f))
+                colors = listOf(Color.White.copy(alpha = 0.42f), Color.White.copy(alpha = 0.12f), Color(0xFF8AA4FF).copy(alpha = 0.34f))
             )
             GalleryButtonTone.DANGER -> Brush.linearGradient(
                 colors = listOf(Color.White.copy(alpha = 0.38f), Color.White.copy(alpha = 0.10f), Color(0xFFFFA5B1).copy(alpha = 0.30f))
             )
             GalleryButtonTone.GLASS -> Brush.linearGradient(
-                colors = listOf(GlassSpecularRimStart, GlassSpecularRimMid, GlassSpecularRimEnd)
+                colors = listOf(rimStart, rimMid, rimEnd)
             )
             GalleryButtonTone.DANGER_GLASS -> Brush.linearGradient(
-                colors = listOf(Color.White.copy(alpha = 0.85f), CoralDanger.copy(alpha = 0.34f), CoralDanger.copy(alpha = 0.22f))
+                colors = if (isDark) {
+                    listOf(coral.copy(alpha = 0.55f), coral.copy(alpha = 0.28f), coral.copy(alpha = 0.18f))
+                } else {
+                    listOf(Color.White.copy(alpha = 0.85f), coral.copy(alpha = 0.34f), coral.copy(alpha = 0.22f))
+                }
             )
         }
     }
 
     val contentColor = when (tone) {
         GalleryButtonTone.OBSIDIAN, GalleryButtonTone.SAPPHIRE, GalleryButtonTone.DANGER -> Color.White
-        GalleryButtonTone.GLASS -> InkPrimary
-        GalleryButtonTone.DANGER_GLASS -> CoralDanger
+        GalleryButtonTone.GLASS -> inkPrimary
+        GalleryButtonTone.DANGER_GLASS -> coral
     }
 
     val resolvedIconTint = iconTint ?: when (tone) {
         GalleryButtonTone.OBSIDIAN -> SolarAmber
         GalleryButtonTone.SAPPHIRE, GalleryButtonTone.DANGER -> Color.White
-        GalleryButtonTone.GLASS -> CobaltPrimary
-        GalleryButtonTone.DANGER_GLASS -> CoralDanger
+        GalleryButtonTone.GLASS -> cobalt
+        GalleryButtonTone.DANGER_GLASS -> coral
     }
 
     val shadowColor = when (tone) {
-        GalleryButtonTone.OBSIDIAN -> InkPrimary.copy(alpha = 0.34f)
-        GalleryButtonTone.SAPPHIRE -> CobaltPrimary.copy(alpha = 0.34f)
-        GalleryButtonTone.DANGER -> CoralDanger.copy(alpha = 0.34f)
-        GalleryButtonTone.GLASS -> InkPrimary.copy(alpha = 0.12f)
-        GalleryButtonTone.DANGER_GLASS -> CoralDanger.copy(alpha = 0.14f)
+        GalleryButtonTone.OBSIDIAN -> (if (isDark) cobalt else inkPrimary).copy(alpha = if (isDark) 0.38f else 0.34f)
+        GalleryButtonTone.SAPPHIRE -> cobalt.copy(alpha = 0.36f)
+        GalleryButtonTone.DANGER -> coral.copy(alpha = 0.34f)
+        GalleryButtonTone.GLASS -> (if (isDark) Color.Black else inkPrimary).copy(alpha = if (isDark) 0.42f else 0.12f)
+        GalleryButtonTone.DANGER_GLASS -> coral.copy(alpha = 0.18f)
     }
 
     val topSheenColor = when (tone) {
-        GalleryButtonTone.GLASS, GalleryButtonTone.DANGER_GLASS -> Color.White.copy(alpha = 0.72f)
+        GalleryButtonTone.GLASS, GalleryButtonTone.DANGER_GLASS ->
+            Color.White.copy(alpha = if (isDark) 0.16f else 0.72f)
         else -> Color.White.copy(alpha = 0.24f)
     }
 
@@ -189,7 +209,6 @@ fun GalleryActionButton(
             .clip(shape)
             .drawBehind {
                 drawRect(brush = fillBrush)
-                // Fine specular light line along top bevel
                 drawLine(
                     color = topSheenColor,
                     start = Offset(0f, 0.75.dp.toPx()),
@@ -201,7 +220,7 @@ fun GalleryActionButton(
             .clickable(
                 enabled = enabled,
                 interactionSource = interactionSource,
-                indication = ripple(color = if (tone == GalleryButtonTone.GLASS) InkPrimary else Color.White),
+                indication = ripple(color = if (tone == GalleryButtonTone.GLASS) inkPrimary else Color.White),
                 onClick = onClick
             )
             .padding(horizontal = 18.dp, vertical = 10.dp)
@@ -233,8 +252,6 @@ fun GalleryActionButton(
 
 /**
  * Unified sculptural filter & selector capsule chip across Bookshelf, Gallery, Flipbook, and Map.
- * Active state uses Obsidian Satin (harmonizing with the Floating Gallery Dock);
- * Inactive state uses Frosted Alabaster Glass with subtle specular rim.
  */
 @Composable
 fun GallerySelectableChip(
@@ -246,6 +263,16 @@ fun GallerySelectableChip(
     unselectedBorderAccent: Color? = null,
     content: @Composable RowScope.() -> Unit
 ) {
+    val isDark = LocalIsDarkTheme.current
+    val palette = LocalFlipYearPalette.current
+    val activeBrush = activeChromeSatinBrush()
+    val glassTop = GlassLightTop
+    val glassBottom = GlassLightBottom
+    val rimStart = GlassSpecularRimStart
+    val rimMid = GlassSpecularRimMid
+    val rimEnd = GlassSpecularRimEnd
+    val inkPrimary = InkPrimary
+
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
@@ -254,31 +281,31 @@ fun GallerySelectableChip(
         label = "chip_scale"
     )
 
-    val activeBrush = remember {
-        obsidianSatinBrush()
-    }
-    val inactiveBrush = remember(unselectedTint) {
+    val inactiveBrush = remember(unselectedTint, glassTop, glassBottom) {
         if (unselectedTint != null) {
             Brush.verticalGradient(colors = listOf(unselectedTint.copy(alpha = 0.92f), unselectedTint.copy(alpha = 0.78f)))
         } else {
-            Brush.verticalGradient(colors = listOf(GlassLightTop, GlassLightBottom))
+            Brush.verticalGradient(colors = listOf(glassTop, glassBottom))
         }
     }
-    val borderBrush = remember(selected, unselectedBorderAccent) {
+    val borderBrush = remember(selected, unselectedBorderAccent, isDark, palette, rimStart, rimMid, rimEnd) {
         if (selected) {
             Brush.linearGradient(
-                colors = listOf(Color.White.copy(alpha = 0.28f), Color.White.copy(alpha = 0.08f))
+                colors = listOf(palette.activeChromeBorderStart, palette.activeChromeBorderEnd)
             )
         } else if (unselectedBorderAccent != null) {
             Brush.linearGradient(
-                colors = listOf(Color.White.copy(alpha = 0.85f), unselectedBorderAccent.copy(alpha = 0.40f))
+                colors = listOf(
+                    if (isDark) unselectedBorderAccent.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.85f),
+                    unselectedBorderAccent.copy(alpha = 0.40f)
+                )
             )
         } else {
-            Brush.linearGradient(
-                colors = listOf(GlassSpecularRimStart, GlassSpecularRimMid, GlassSpecularRimEnd)
-            )
+            Brush.linearGradient(colors = listOf(rimStart, rimMid, rimEnd))
         }
     }
+
+    val shadowInk = if (isDark) Color.Black else inkPrimary
 
     Box(
         contentAlignment = Alignment.Center,
@@ -290,8 +317,8 @@ fun GallerySelectableChip(
             .shadow(
                 elevation = if (selected) 6.dp else 3.dp,
                 shape = shape,
-                ambientColor = InkPrimary.copy(alpha = if (selected) 0.24f else 0.10f),
-                spotColor = InkPrimary.copy(alpha = if (selected) 0.28f else 0.14f)
+                ambientColor = shadowInk.copy(alpha = if (selected) 0.28f else 0.14f),
+                spotColor = shadowInk.copy(alpha = if (selected) 0.34f else 0.18f)
             )
             .clip(shape)
             .drawBehind {
@@ -300,7 +327,7 @@ fun GallerySelectableChip(
             .border(width = 1.dp, brush = borderBrush, shape = shape)
             .clickable(
                 interactionSource = interactionSource,
-                indication = ripple(color = if (selected) Color.White else InkPrimary),
+                indication = ripple(color = if (selected) Color.White else inkPrimary),
                 onClick = onClick
             )
     ) {
@@ -325,6 +352,7 @@ fun GalleryTactileOrbButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isDark = LocalIsDarkTheme.current
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
@@ -336,18 +364,27 @@ fun GalleryTactileOrbButton(
         label = "orb_scale"
     )
 
-    val fillBrush = remember(tintSurface) {
-        Brush.verticalGradient(
-            colors = listOf(
-                Color.White.copy(alpha = 0.92f),
-                tintSurface.copy(alpha = 0.92f)
+    val fillBrush = remember(tintSurface, isDark) {
+        if (isDark) {
+            Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xEB262D40),
+                    tintSurface.copy(alpha = 0.94f)
+                )
             )
-        )
+        } else {
+            Brush.verticalGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.92f),
+                    tintSurface.copy(alpha = 0.92f)
+                )
+            )
+        }
     }
-    val rimBrush = remember(accentColor) {
+    val rimBrush = remember(accentColor, isDark) {
         Brush.linearGradient(
             colors = listOf(
-                Color.White.copy(alpha = 0.95f),
+                if (isDark) accentColor.copy(alpha = 0.62f) else Color.White.copy(alpha = 0.95f),
                 accentColor.copy(alpha = 0.38f),
                 accentColor.copy(alpha = 0.52f)
             )
@@ -369,8 +406,8 @@ fun GalleryTactileOrbButton(
                 .shadow(
                     elevation = if (pressed) 4.dp else 10.dp,
                     shape = CircleShape,
-                    ambientColor = accentColor.copy(alpha = 0.24f),
-                    spotColor = accentColor.copy(alpha = 0.34f)
+                    ambientColor = accentColor.copy(alpha = if (isDark) 0.30f else 0.24f),
+                    spotColor = accentColor.copy(alpha = if (isDark) 0.42f else 0.34f)
                 )
                 .clip(CircleShape)
                 .drawBehind {

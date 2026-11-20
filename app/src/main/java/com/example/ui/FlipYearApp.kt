@@ -97,20 +97,23 @@ import com.example.R
 import com.example.data.MediaAccessLevel
 import com.example.ui.components.FrostedGlassCard
 import com.example.ui.components.ObsidianGlassCard
+import com.example.ui.components.activeChromeSatinBrush
 import com.example.ui.components.monthChineseName
-import com.example.ui.components.obsidianSatinBrush
 import com.example.ui.screens.ArcCleanerScreen
 import com.example.ui.screens.BookshelfScreen
 import com.example.ui.screens.FlipbookScreen
 import com.example.ui.screens.FootprintMapScreen
 import com.example.ui.screens.GalleryScreen
 import com.example.ui.screens.TrashVaultScreen
+import com.example.ui.theme.AppThemeMode
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CobaltSoft
 import com.example.ui.theme.CoralDanger
 import com.example.ui.theme.HairlineBorder
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
+import com.example.ui.theme.LocalFlipYearPalette
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.StudioCanvas
 import com.example.ui.theme.SurfacePure
 
@@ -146,6 +149,8 @@ private data class TopLevelTab(
 
 @Composable
 fun FlipYearApp(
+    themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    onSelectThemeMode: (AppThemeMode) -> Unit = {},
     viewModel: FlipYearViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -333,6 +338,8 @@ fun FlipYearApp(
                         composable(FlipYearRoutes.BOOKSHELF) {
                             BookshelfScreen(
                                 uiState = uiState,
+                                themeMode = themeMode,
+                                onSelectThemeMode = onSelectThemeMode,
                                 onOpenYearbook = { year ->
                                     navController.navigate(FlipYearRoutes.flipbook(year))
                                 },
@@ -345,7 +352,9 @@ fun FlipYearApp(
                                 onRequestMediaPermission = requestMediaAccess,
                                 onRescanDeviceMedia = { viewModel.scanDeviceMedia(silent = false) },
                                 onSelectFilter = viewModel::setMediaFilter,
-                                onLoadDemoArchive = viewModel::loadDemoArchive
+                                onLoadDemoArchive = viewModel::loadDemoArchive,
+                                onSaveYearbookCover = viewModel::saveYearbookCover,
+                                onResetYearbookCover = viewModel::resetYearbookCoverToSmart
                             )
                         }
 
@@ -649,21 +658,23 @@ private fun FloatingGalleryDock(
     trashedCount: Int,
     onSelectTab: (String) -> Unit
 ) {
-    val activeObsidianBrush = remember { obsidianSatinBrush() }
-    val activeRimBrush = remember {
+    val isDark = LocalIsDarkTheme.current
+    val palette = LocalFlipYearPalette.current
+    val activeObsidianBrush = activeChromeSatinBrush()
+    val activeRimBrush = remember(palette) {
         Brush.linearGradient(
             colors = listOf(
-                Color.White.copy(alpha = 0.32f),
-                Color.White.copy(alpha = 0.08f),
-                Color.White.copy(alpha = 0.16f)
+                palette.activeChromeBorderStart,
+                Color.White.copy(alpha = 0.10f),
+                palette.activeChromeBorderEnd
             )
         )
     }
 
     FrostedGlassCard(
         shape = RoundedCornerShape(32.dp),
-        topColor = Color(0xDEFFFFFF),
-        bottomColor = Color(0xCCF7F5F0),
+        topColor = if (isDark) Color(0xEB1C2230) else Color(0xDEFFFFFF),
+        bottomColor = if (isDark) Color(0xDE131722) else Color(0xCCF7F5F0),
         shadowElevation = 18.dp,
         enableAmbientBlur = true,
         modifier = Modifier

@@ -27,6 +27,30 @@ class PhotoRepository(
     val cleanupStats: Flow<CleanupStatsEntity> = dao.observeCleanupStats().map {
         it ?: CleanupStatsEntity()
     }
+    val yearbookCovers: Flow<List<YearbookCoverConfigEntity>> = dao.observeYearbookCovers()
+
+    suspend fun saveYearbookCover(
+        year: Int,
+        mode: YearbookCoverMode,
+        selectedPhotoIds: List<Long>,
+        intervalSeconds: Int
+    ) = withContext(Dispatchers.IO) {
+        val sanitizedInterval = intervalSeconds.coerceIn(3, 12)
+        val csv = selectedPhotoIds.distinct().joinToString(",")
+        dao.upsertYearbookCover(
+            YearbookCoverConfigEntity(
+                year = year,
+                mode = mode.name,
+                selectedPhotoIdsCsv = csv,
+                intervalSeconds = sanitizedInterval,
+                updatedAtMillis = System.currentTimeMillis()
+            )
+        )
+    }
+
+    suspend fun resetYearbookCover(year: Int) = withContext(Dispatchers.IO) {
+        dao.deleteYearbookCover(year)
+    }
 
     fun requiredMediaPermissions(): Array<String> = scanner.requiredPermissions()
 

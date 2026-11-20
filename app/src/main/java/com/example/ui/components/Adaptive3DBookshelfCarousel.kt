@@ -45,6 +45,7 @@ import androidx.compose.ui.zIndex
 import com.example.data.PhotoItemEntity
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.InkPrimary
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.SkylightChampagneGlow
 import com.example.ui.theme.SkylightSapphireGlow
 import com.example.ui.theme.SolarAmber
@@ -203,6 +204,13 @@ fun <T> Adaptive3DBookshelfCarousel(
         }
 
         // 2) Kinetic Gallery Spotlight Halo — gently expands as scroll velocity accelerates
+        val isDark = LocalIsDarkTheme.current
+        val haloChampagne = SkylightChampagneGlow
+        val haloSapphire = SkylightSapphireGlow
+        val railCobalt = CobaltPrimary
+        val railAmber = SolarAmber
+        val pedestalShadowInk = if (isDark) Color.Black else InkPrimary
+
         Canvas(modifier = Modifier.fillMaxSize()) {
             val haloRadius = size.minDimension * lerp(0.56f, 0.66f, speedFactor)
             val centerPt = Offset(
@@ -212,8 +220,8 @@ fun <T> Adaptive3DBookshelfCarousel(
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        SkylightChampagneGlow.copy(alpha = lerp(0.28f, 0.38f, speedFactor)),
-                        SkylightSapphireGlow.copy(alpha = lerp(0.14f, 0.24f, speedFactor)),
+                        haloChampagne.copy(alpha = lerp(0.28f, 0.38f, speedFactor)),
+                        haloSapphire.copy(alpha = lerp(0.14f, 0.24f, speedFactor)),
                         Color.Transparent
                     ),
                     center = centerPt,
@@ -235,7 +243,7 @@ fun <T> Adaptive3DBookshelfCarousel(
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            InkPrimary.copy(alpha = lerp(0.22f, 0.11f, speedFactor)),
+                            pedestalShadowInk.copy(alpha = lerp(if (isDark) 0.52f else 0.22f, if (isDark) 0.26f else 0.11f, speedFactor)),
                             Color.Transparent
                         )
                     )
@@ -256,9 +264,9 @@ fun <T> Adaptive3DBookshelfCarousel(
                 brush = Brush.horizontalGradient(
                     colors = listOf(
                         Color.Transparent,
-                        CobaltPrimary.copy(alpha = lerp(0.28f, 0.65f, speedFactor)),
-                        SolarAmber.copy(alpha = lerp(0.45f, 0.85f, speedFactor)),
-                        CobaltPrimary.copy(alpha = lerp(0.28f, 0.65f, speedFactor)),
+                        railCobalt.copy(alpha = lerp(0.28f, 0.65f, speedFactor)),
+                        railAmber.copy(alpha = lerp(0.45f, 0.85f, speedFactor)),
+                        railCobalt.copy(alpha = lerp(0.28f, 0.65f, speedFactor)),
                         Color.Transparent
                     ),
                     startX = centerX - activeHalfSpan,
