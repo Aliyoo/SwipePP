@@ -1030,7 +1030,9 @@ private fun FloatingBatchEditStrip(
         verticalAlignment = Alignment.CenterVertically
     ) {
         ObsidianGlassCard(
-            onClick = if (compressibleImageCount > 0) onCompress else null,
+            // Empty lambda when disabled so the card still consumes taps instead of
+            // letting them fall through to the photo grid underneath.
+            onClick = if (compressibleImageCount > 0) onCompress else ({}),
             shape = RoundedCornerShape(22.dp),
             topColor = ObsidianSatinTop,
             bottomColor = ObsidianSatinBottom,
