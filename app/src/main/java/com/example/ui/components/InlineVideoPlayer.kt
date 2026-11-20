@@ -80,11 +80,11 @@ import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.ObsidianOverlayBorder
 import com.example.ui.theme.ObsidianOverlayBorderStrong
 import com.example.ui.theme.ObsidianOverlayChipOnDark
 import com.example.ui.theme.ObsidianOverlayOrb
-import com.example.ui.theme.ObsidianOverlayPanel
+import com.example.ui.theme.ObsidianSatinBottom
+import com.example.ui.theme.ObsidianSatinTop
 import com.example.ui.theme.SolarAmber
 import kotlinx.coroutines.delay
 
@@ -439,10 +439,10 @@ fun InlineVideoPlayer(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
-                    Surface(
+                    ObsidianGlassCard(
                         shape = RoundedCornerShape(22.dp),
-                        color = ObsidianOverlayPanel,
-                        border = BorderStroke(1.dp, ObsidianOverlayBorder),
+                        topColor = ObsidianSatinTop.copy(alpha = 0.94f),
+                        bottomColor = ObsidianSatinBottom.copy(alpha = 0.94f),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
@@ -692,10 +692,10 @@ private fun SampleVideoInlinePreview(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
-                    Surface(
+                    ObsidianGlassCard(
                         shape = RoundedCornerShape(22.dp),
-                        color = ObsidianOverlayPanel,
-                        border = BorderStroke(1.dp, ObsidianOverlayBorder),
+                        topColor = ObsidianSatinTop.copy(alpha = 0.94f),
+                        bottomColor = ObsidianSatinBottom.copy(alpha = 0.94f),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {

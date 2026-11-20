@@ -104,9 +104,7 @@ fun GalleryActionButton(
 
     val fillBrush = remember(tone) {
         when (tone) {
-            GalleryButtonTone.OBSIDIAN -> Brush.linearGradient(
-                colors = listOf(Color(0xFF262A36), Color(0xFF14161D), Color(0xFF0E1015))
-            )
+            GalleryButtonTone.OBSIDIAN -> obsidianSatinBrush()
             GalleryButtonTone.SAPPHIRE -> Brush.linearGradient(
                 colors = listOf(Color(0xFF395EF2), CobaltPrimary, CobaltDark)
             )
@@ -257,7 +255,7 @@ fun GallerySelectableChip(
     )
 
     val activeBrush = remember {
-        Brush.linearGradient(colors = listOf(Color(0xFF252935), Color(0xFF12141B)))
+        obsidianSatinBrush()
     }
     val inactiveBrush = remember(unselectedTint) {
         if (unselectedTint != null) {

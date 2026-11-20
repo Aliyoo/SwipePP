@@ -49,6 +49,9 @@ import com.example.ui.theme.GlassObsidianTop
 import com.example.ui.theme.ObsidianOverlayBorder
 import com.example.ui.theme.ObsidianOverlayGlass
 import com.example.ui.theme.ObsidianOverlayOrb
+import com.example.ui.theme.ObsidianSatinBottom
+import com.example.ui.theme.ObsidianSatinMid
+import com.example.ui.theme.ObsidianSatinTop
 import com.example.ui.theme.GlassSpecularRimEnd
 import com.example.ui.theme.GlassSpecularRimMid
 import com.example.ui.theme.GlassSpecularRimStart
@@ -63,6 +66,19 @@ import com.example.ui.theme.SkylightSapphireGlow
  */
 val supportsHardwareBlur: Boolean
     get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+/**
+ * Sculpted obsidian satin — the shared dark material (top-lit slate → deep ink) used for
+ * selected states, floating bars and docks so dark chrome never reads as flat black.
+ */
+fun obsidianSatinBrush(alpha: Float = 1f): Brush =
+    Brush.verticalGradient(
+        colors = listOf(
+            ObsidianSatinTop.copy(alpha = alpha),
+            ObsidianSatinMid.copy(alpha = alpha),
+            ObsidianSatinBottom.copy(alpha = alpha)
+        )
+    )
 
 /**
  * High-performance Light Alabaster Glassmorphism surface.

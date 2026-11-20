@@ -85,9 +85,9 @@ import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CoralDanger
 import com.example.ui.theme.EmeraldKeep
 import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.ObsidianOverlayBorder
 import com.example.ui.theme.ObsidianOverlayGlass
-import com.example.ui.theme.ObsidianOverlayPanel
+import com.example.ui.theme.ObsidianSatinBottom
+import com.example.ui.theme.ObsidianSatinTop
 import com.example.ui.theme.SolarAmber
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -482,12 +482,12 @@ private fun LightboxBottomHud(
                     }
                 }
 
-                // Single Unified High-Clarity Smoked Dock (zero shadowElevation bleed, crisp 1px rim)
+                // Single Unified Obsidian Satin Dock (gradient + specular lip + rim)
                 if (videoScrubber != null || hasActions) {
-                    Surface(
+                    ObsidianGlassCard(
                         shape = RoundedCornerShape(22.dp),
-                        color = ObsidianOverlayPanel,
-                        border = BorderStroke(1.dp, ObsidianOverlayBorder),
+                        topColor = ObsidianSatinTop.copy(alpha = 0.94f),
+                        bottomColor = ObsidianSatinBottom.copy(alpha = 0.94f),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("lightbox_bottom_dock")
