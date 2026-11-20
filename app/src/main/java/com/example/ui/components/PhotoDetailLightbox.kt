@@ -44,8 +44,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -385,18 +387,45 @@ private fun LightboxBottomHud(
     val hasActions = onRestore != null || onTrash != null || onFavorite != null || onKeep != null
 
     // Dialog windows can report zero WindowInsets on some Android versions (b/246909281),
-    // which would let the dock slide under the system navigation bar; read the host
-    // Activity's window insets as a fallback so the actions always clear it.
+    // and a one-shot read can race the first insets dispatch on some OEM builds
+    // (seen on Samsung One UI — both sources returned 0 and the dock slid under
+    // the gesture bar). Listen for dispatches on the dialog's own decor view — the
+    // authoritative insets for the window we actually draw in — seeded from the
+    // dialog and host-activity decor roots, and take the max of all sources.
     val dialogNavBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val density = LocalDensity.current
     val context = LocalContext.current
-    val fallbackNavBottom = remember {
-        val bottomPx = context.findActivity()?.window?.decorView
-            ?.let { ViewCompat.getRootWindowInsets(it) }
-            ?.getInsets(WindowInsetsCompat.Type.navigationBars())?.bottom ?: 0
-        with(density) { bottomPx.toDp() }
+    val view = LocalView.current
+    var decorNavBottomPx by remember { mutableIntStateOf(0) }
+    DisposableEffect(view) {
+        val dialogDecor = (
+            (view as? DialogWindowProvider)?.window
+                ?: (view.parent as? DialogWindowProvider)?.window
+            )?.decorView
+        val listener = androidx.core.view.OnApplyWindowInsetsListener { _, insets ->
+            val bottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+            if (bottom > decorNavBottomPx) decorNavBottomPx = bottom
+            insets
+        }
+        dialogDecor?.let { decor ->
+            ViewCompat.setOnApplyWindowInsetsListener(decor, listener)
+            ViewCompat.getRootWindowInsets(decor)?.let { wic ->
+                val bottom = wic.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+                if (bottom > decorNavBottomPx) decorNavBottomPx = bottom
+            }
+            ViewCompat.requestApplyInsets(decor)
+        }
+        context.findActivity()?.window?.decorView?.let { decor ->
+            ViewCompat.getRootWindowInsets(decor)?.let { wic ->
+                val bottom = wic.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+                if (bottom > decorNavBottomPx) decorNavBottomPx = bottom
+            }
+        }
+        onDispose {
+            dialogDecor?.let { ViewCompat.setOnApplyWindowInsetsListener(it, null) }
+        }
     }
-    val navClearanceFallback = (fallbackNavBottom - dialogNavBottom).coerceAtLeast(0.dp)
+    val navClearance = maxOf(dialogNavBottom, with(density) { decorNavBottomPx.toDp() })
 
     AnimatedVisibility(
         visible = visible,
@@ -416,8 +445,7 @@ private fun LightboxBottomHud(
                         1.0f to Color(0xF207090F)
                     )
                 )
-                .navigationBarsPadding()
-                .padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 12.dp + navClearanceFallback)
+                .padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 12.dp + navClearance)
         ) {
             Column(
                 modifier = Modifier
