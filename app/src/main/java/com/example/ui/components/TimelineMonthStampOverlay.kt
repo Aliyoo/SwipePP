@@ -400,12 +400,13 @@ fun TimelineMonthStampOverlay(
     var dragFraction by remember { mutableStateOf(0f) }
     val scope = rememberCoroutineScope()
 
-    // Keep the elevated active scroll stamp visible briefly after a fling settles
-    LaunchedEffect(isScrolling) {
-        if (isScrolling) {
+    // Keep the elevated active scroll stamp visible briefly after a fling or a
+    // flag scrub settles — re-armed on drag end so the overlay lingers ~2s.
+    LaunchedEffect(isScrolling, isDraggingFlag) {
+        if (isScrolling || isDraggingFlag) {
             lingerVisible = true
         } else {
-            delay(1500L)
+            delay(2200L)
             lingerVisible = false
         }
     }
@@ -640,7 +641,10 @@ fun TimelineMonthStampOverlay(
                 val trackHeightPx = constraints.maxHeight.toFloat().coerceAtLeast(1f)
                 val flagHeightPx = 30.dp
                 val travelPx = (trackHeightPx - 96f).coerceAtLeast(1f)
-                val indicatorOffsetY = (scrollProgressFraction * travelPx).roundToInt()
+                // While scrubbing the thumb follows the finger (dragFraction);
+                // otherwise it mirrors the grid's actual scroll position.
+                val displayFraction = if (isDraggingFlag) dragFraction else scrollProgressFraction
+                val indicatorOffsetY = (displayFraction * travelPx).roundToInt()
 
                 // Hairline vertical timeline track
                 Box(
