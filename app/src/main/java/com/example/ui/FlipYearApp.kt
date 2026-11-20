@@ -96,6 +96,9 @@ import androidx.navigation.navArgument
 import com.example.R
 import com.example.data.MediaAccessLevel
 import com.example.ui.components.FrostedGlassCard
+import com.example.ui.components.FullScreenOverlayHost
+import com.example.ui.components.FullScreenOverlayLayer
+import com.example.ui.components.LocalFullScreenOverlayHost
 import com.example.ui.components.ObsidianGlassCard
 import com.example.ui.components.activeChromeSatinBrush
 import com.example.ui.components.monthChineseName
@@ -276,8 +279,12 @@ fun FlipYearApp(
     ) {
         val useNavigationRail = maxWidth >= 640.dp
         val floatingDockInset = if (showTopLevelNav && !useNavigationRail) 82.dp else 0.dp
+        val fullScreenOverlayHost = remember { FullScreenOverlayHost() }
 
-        CompositionLocalProvider(LocalFloatingDockInset provides floatingDockInset) {
+        CompositionLocalProvider(
+            LocalFloatingDockInset provides floatingDockInset,
+            LocalFullScreenOverlayHost provides fullScreenOverlayHost
+        ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 // Full-bleed edge-to-edge content layer (extends completely behind the floating dock)
                 Row(modifier = Modifier.fillMaxSize()) {
@@ -641,6 +648,10 @@ fun FlipYearApp(
                         onSelectTab = navigateToTab
                     )
                 }
+
+                // True full-screen edge-to-edge overlay layer (e.g. PhotoDetailLightbox) inside
+                // MainActivity's window so system bars, cutouts, and bottom docks never clip.
+                FullScreenOverlayLayer(host = fullScreenOverlayHost)
             }
         }
     }

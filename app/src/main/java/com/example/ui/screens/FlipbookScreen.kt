@@ -65,8 +65,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.lerp
+import androidx.compose.ui.zIndex
 import com.example.R
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
@@ -154,9 +157,12 @@ fun FlipbookScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
                     IconButton(
                         onClick = onBack,
                         modifier = Modifier.testTag("flipbook_back_button")
@@ -167,11 +173,13 @@ fun FlipbookScreen(
                             tint = InkPrimary
                         )
                     }
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "$year 年度影集",
                             style = MaterialTheme.typography.headlineMedium,
-                            color = InkPrimary
+                            color = InkPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = if (showGalleryMode) {
@@ -180,7 +188,9 @@ fun FlipbookScreen(
                                 "左右滑动翻页 · ${stringResource(R.string.calendar_day_jump_hint)}"
                             },
                             style = MaterialTheme.typography.labelSmall,
-                            color = InkSecondary
+                            color = InkSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -220,7 +230,9 @@ fun FlipbookScreen(
                                     text = "月历",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (!showGalleryMode) InkPrimary else InkSecondary
+                                    color = if (!showGalleryMode) InkPrimary else InkSecondary,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                         }
@@ -249,7 +261,9 @@ fun FlipbookScreen(
                                     text = "画廊",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (showGalleryMode) InkPrimary else InkSecondary
+                                    color = if (showGalleryMode) InkPrimary else InkSecondary,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                         }
@@ -301,31 +315,48 @@ fun FlipbookScreen(
                         }
                 }
 
-                // Modern Crisp White 3D Hinged Flipbook
+                // Full-bleed HorizontalPager stage: keeps pages cleanly inset at rest via contentPadding
+                // while letting turning pages glide all the way to the screen edges without harsh 16dp slicing.
+                val scrollFraction = pagerState.currentPageOffsetFraction
+                    .let { if (it.isFinite()) it.absoluteValue else 0f }
+                val restingStackAlpha = (1f - scrollFraction * 4.2f).coerceIn(0f, 1f)
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                        .weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Underlying crisp page stack thickness
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(start = 6.dp, top = 6.dp, bottom = 2.dp)
-                            .clip(RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 22.dp, bottomEnd = 22.dp))
-                            .background(SurfaceSubtle)
-                    )
+                    // Underlying crisp page stack thickness — visible at rest, recedes smoothly during swipe
+                    if (monthPages.size > 1 && restingStackAlpha > 0.01f) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(start = 22.dp, end = 12.dp, top = 14.dp, bottom = 6.dp)
+                                .graphicsLayer { alpha = restingStackAlpha }
+                                .clip(RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 22.dp, bottomEnd = 22.dp))
+                                .background(SurfaceSubtle)
+                                .border(
+                                    0.8.dp,
+                                    HairlineBorder.copy(alpha = 0.7f),
+                                    RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 22.dp, bottomEnd = 22.dp)
+                                )
+                        )
+                    }
 
                     HorizontalPager(
                         state = pagerState,
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                        pageSpacing = 14.dp,
+                        beyondViewportPageCount = (monthPages.size - 1).coerceIn(0, 1),
                         modifier = Modifier
                             .fillMaxSize()
                             .testTag("flipbook_3d_pager")
                     ) { index ->
-                        val pageModel = monthPages[index]
-                        val pageOffset = ((pagerState.currentPage - index) + pagerState.currentPageOffsetFraction)
+                        val pageModel = monthPages.getOrNull(index) ?: return@HorizontalPager
+                        val rawOffset = pagerState.currentPageOffsetFraction
+                        val safeOffset = if (rawOffset.isFinite()) rawOffset else 0f
+                        val pageOffset = ((pagerState.currentPage - index) + safeOffset)
                         val clamped = pageOffset.coerceIn(-1f, 1f)
                         val isRecentStamp = recentlyStampedMonthKey == PhotoRepository.yearMonthKey(pageModel.year, pageModel.month)
 
@@ -441,10 +472,13 @@ private fun ModernCalendarBookPage(
     onCleanClick: () -> Unit,
     onDayClick: (Int) -> Unit
 ) {
-    val absOffset = pageOffset.absoluteValue
-    val hingeOrigin = if (pageOffset >= 0f) TransformOrigin(0f, 0.5f) else TransformOrigin(1f, 0.5f)
-    val rotationDeg = (-pageOffset * 56f).coerceIn(-66f, 66f)
-    val scale = 1f - (absOffset * 0.05f)
+    val absOffset = pageOffset.absoluteValue.coerceIn(0f, 1f)
+    // Restrained center-axis 3D folio turn: keeps projected near-edge strictly inside
+    // vertical viewport bounds at every scroll fraction so pages never bleed over the
+    // top header or bottom month selector pills while gliding edge-to-edge cleanly.
+    val rotationDeg = (-pageOffset * 18f).coerceIn(-22f, 22f)
+    val scale = lerp(1f, 0.90f, absOffset)
+    val pageAlpha = lerp(1f, 0.74f, absOffset)
     val pageShape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 22.dp, bottomEnd = 22.dp)
 
     val isDark = LocalIsDarkTheme.current
@@ -454,14 +488,16 @@ private fun ModernCalendarBookPage(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .zIndex(1f - absOffset)
             .graphicsLayer {
-                transformOrigin = hingeOrigin
+                transformOrigin = TransformOrigin.Center
                 rotationY = rotationDeg
                 scaleX = scale
                 scaleY = scale
-                cameraDistance = 16f * density
+                alpha = pageAlpha
+                cameraDistance = 24f * density
             }
-            .shadow(elevation = 12.dp, shape = pageShape, spotColor = pageShadowColor)
+            .shadow(elevation = lerp(12f, 4f, absOffset).dp, shape = pageShape, spotColor = pageShadowColor)
             .clip(pageShape)
             .background(SurfacePure)
             .border(1.dp, HairlineBorder, pageShape)
@@ -713,10 +749,11 @@ private fun ModernCalendarBookPage(
         }
 
         if (absOffset > 0.02f) {
+            val turnShadeColor = if (isDark) Color.Black else InkPrimary
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(InkPrimary.copy(alpha = (absOffset * 0.16f).coerceIn(0f, 0.24f)))
+                    .background(turnShadeColor.copy(alpha = (absOffset * if (isDark) 0.24f else 0.12f).coerceIn(0f, 0.26f)))
             )
         }
     }
@@ -886,7 +923,9 @@ private fun CalendarDaySlot(
                     fontFamily = JetBrainsMonoFontFamily,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = Color.White,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
         }

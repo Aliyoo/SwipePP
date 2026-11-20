@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -234,21 +235,25 @@ fun InlineVideoPlayer(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .fillMaxSize()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = {
-                    if (showFullControls && onToggleChrome != null) {
-                        onToggleChrome()
-                    } else {
-                        togglePlayPause()
-                    }
-                }
-            )
             .testTag("inline_video_player")
     ) {
-        // Real TextureView-backed ExoPlayer surface
-        AndroidView(
+        // Real TextureView-backed ExoPlayer surface (tap surface lives behind overlay controls)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {
+                        if (showFullControls && onToggleChrome != null) {
+                            onToggleChrome()
+                        } else {
+                            togglePlayPause()
+                        }
+                    }
+                )
+        ) {
+            AndroidView(
             factory = { ctx ->
                 (LayoutInflater.from(ctx).inflate(R.layout.view_inline_video_player, null, false) as PlayerView).apply {
                     player = exoPlayer
@@ -270,11 +275,12 @@ fun InlineVideoPlayer(
                     AspectRatioFrameLayout.RESIZE_MODE_FIT
                 }
             },
-            onRelease = { view ->
-                view.player = null
-            },
-            modifier = Modifier.fillMaxSize()
-        )
+                onRelease = { view ->
+                    view.player = null
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         // Poster frame remains visible until first decoded video frame paints (zero black flash)
         if (!hasRenderedFirstFrame || playbackError != null) {
@@ -437,6 +443,7 @@ fun InlineVideoPlayer(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
+                        .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
                     ObsidianGlassCard(
@@ -568,17 +575,6 @@ private fun SampleVideoInlinePreview(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .fillMaxSize()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = {
-                    if (showFullControls && onToggleChrome != null) {
-                        onToggleChrome()
-                    } else {
-                        isPlaying = !isPlaying
-                    }
-                }
-            )
             .testTag("inline_video_sample_preview")
     ) {
         PhotoArtwork(
@@ -589,6 +585,17 @@ private fun SampleVideoInlinePreview(
             downsampleTier = ImageDownsampleTier.HERO_CARD,
             modifier = Modifier
                 .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {
+                        if (showFullControls && onToggleChrome != null) {
+                            onToggleChrome()
+                        } else {
+                            isPlaying = !isPlaying
+                        }
+                    }
+                )
                 .graphicsLayer {
                     val s = if (isPlaying) kenBurnsScale else 1f
                     scaleX = s
@@ -690,6 +697,7 @@ private fun SampleVideoInlinePreview(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
+                        .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
                     ObsidianGlassCard(

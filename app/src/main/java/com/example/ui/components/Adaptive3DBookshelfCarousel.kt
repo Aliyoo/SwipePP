@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -94,13 +95,15 @@ fun <T> Adaptive3DBookshelfCarousel(
     var lastVelocitySampleNanos by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(pagerState) {
-        var prevPosition = pagerState.currentPage + pagerState.currentPageOffsetFraction
+        val initFrac = pagerState.currentPageOffsetFraction.let { if (it.isFinite()) it else 0f }
+        var prevPosition = pagerState.currentPage + initFrac
         var prevTimeNanos = System.nanoTime()
         var smoothedSpeed = 0f
         var smoothedSigned = 0f
 
         snapshotFlow {
-            pagerState.currentPage + pagerState.currentPageOffsetFraction
+            val frac = pagerState.currentPageOffsetFraction
+            pagerState.currentPage + (if (frac.isFinite()) frac else 0f)
         }.collect { currentPos ->
             val now = System.nanoTime()
             val dtSec = ((now - prevTimeNanos) / 1_000_000_000f).coerceIn(0.004f, 0.25f)
@@ -108,7 +111,7 @@ fun <T> Adaptive3DBookshelfCarousel(
             prevPosition = currentPos
             prevTimeNanos = now
 
-            if (delta.absoluteValue > 0.0005f) {
+            if (delta.isFinite() && delta.absoluteValue > 0.0005f) {
                 val pagesPerSec = (delta / dtSec).coerceIn(-6.5f, 6.5f)
                 val normalizedSpeed = (pagesPerSec.absoluteValue / 4.2f).coerceIn(0f, 1f)
                 val normalizedSigned = (pagesPerSec / 4.2f).coerceIn(-1f, 1f)
@@ -212,7 +215,7 @@ fun <T> Adaptive3DBookshelfCarousel(
         val pedestalShadowInk = if (isDark) Color.Black else InkPrimary
 
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val haloRadius = size.minDimension * lerp(0.56f, 0.66f, speedFactor)
+            val haloRadius = (size.minDimension * lerp(0.56f, 0.66f, speedFactor)).coerceAtLeast(1f)
             val centerPt = Offset(
                 x = size.width * 0.5f - signedVelocity * size.width * 0.06f,
                 y = size.height * 0.47f
@@ -260,38 +263,45 @@ fun <T> Adaptive3DBookshelfCarousel(
         ) {
             val centerX = size.width * 0.5f
             val activeHalfSpan = size.width * lerp(0.24f, 0.48f, speedFactor)
-            drawLine(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        railCobalt.copy(alpha = lerp(0.28f, 0.65f, speedFactor)),
-                        railAmber.copy(alpha = lerp(0.45f, 0.85f, speedFactor)),
-                        railCobalt.copy(alpha = lerp(0.28f, 0.65f, speedFactor)),
-                        Color.Transparent
+            if (activeHalfSpan > 0.5f) {
+                drawLine(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            railCobalt.copy(alpha = lerp(0.28f, 0.65f, speedFactor)),
+                            railAmber.copy(alpha = lerp(0.45f, 0.85f, speedFactor)),
+                            railCobalt.copy(alpha = lerp(0.28f, 0.65f, speedFactor)),
+                            Color.Transparent
+                        ),
+                        startX = centerX - activeHalfSpan,
+                        endX = centerX + activeHalfSpan
                     ),
-                    startX = centerX - activeHalfSpan,
-                    endX = centerX + activeHalfSpan
-                ),
-                start = Offset(centerX - activeHalfSpan, size.height * 0.5f),
-                end = Offset(centerX + activeHalfSpan, size.height * 0.5f),
-                strokeWidth = 2.dp.toPx()
-            )
+                    start = Offset(centerX - activeHalfSpan, size.height * 0.5f),
+                    end = Offset(centerX + activeHalfSpan, size.height * 0.5f),
+                    strokeWidth = 2.dp.toPx()
+                )
+            }
         }
 
         // 4) Adaptive 3D Horizontal Pager with Scroll-Velocity Perspective & Optical Depth of Field
+        // Avoid HorizontalPager(key = ...) which triggers a Compose Foundation 1.7 crash in
+        // NearestRangeKeyIndexMap when pageCount grows across filter transitions (e.g. Videos -> Photos)
+        // before latestKey updates; key the inner card composable instead with strict bounds checks.
+        val safeBeyondViewport = (items.size - 1).coerceIn(0, 2)
         HorizontalPager(
             state = pagerState,
             pageSize = PageSize.Fixed(bookCardWidth),
             contentPadding = PaddingValues(horizontal = horizontalPad),
             pageSpacing = adaptiveSpacing,
-            beyondViewportPageCount = 2,
-            key = { pageIdx -> itemKey(items[pageIdx]) },
+            beyondViewportPageCount = safeBeyondViewport,
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(pagerTestTag)
         ) { page ->
-            val item = items[page]
-            val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
+            val item = items.getOrNull(page) ?: return@HorizontalPager
+            val rawOffsetFraction = pagerState.currentPageOffsetFraction
+            val safeOffsetFraction = if (rawOffsetFraction.isFinite()) rawOffsetFraction else 0f
+            val pageOffset = (pagerState.currentPage - page) + safeOffsetFraction
             val absOffset = pageOffset.absoluteValue.coerceIn(0f, 1.5f)
             val clampedOffset = absOffset.coerceIn(0f, 1f)
 
@@ -331,43 +341,45 @@ fun <T> Adaptive3DBookshelfCarousel(
                 isCentered = absOffset < 0.12f
             )
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(0.70f)
-                    .zIndex(1f - clampedOffset)
-                    .graphicsLayer {
-                        scaleX = dynamicScale
-                        scaleY = dynamicScale
-                        alpha = dynamicAlpha
-                        rotationY = dynamicRotationY
-                        rotationX = dynamicRotationX
-                        translationY = dynamicTranslationY
-                        translationX = dynamicTranslationX
-                        cameraDistance = dynamicCameraDistance * density
-                    }
-            ) {
-                // Apply hardware RenderEffect DoF blur ONLY to defocused flanking cards on API 31+
-                val dofModifier = if (rawBlurDp >= 0.5f) {
-                    Modifier
-                        .fillMaxSize()
-                        .blur(radius = rawBlurDp.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                } else {
-                    Modifier.fillMaxSize()
-                }
-
-                itemContent(item, page, kinematics, dofModifier)
-
-                // Atmospheric Depth-of-Field veil (provides focal-plane separation across ALL Android API 24-36!)
-                if (dofFactor > 0.05f) {
-                    Box(
-                        modifier = Modifier
+            key(itemKey(item)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(0.70f)
+                        .zIndex(1f - clampedOffset)
+                        .graphicsLayer {
+                            scaleX = dynamicScale
+                            scaleY = dynamicScale
+                            alpha = dynamicAlpha
+                            rotationY = dynamicRotationY
+                            rotationX = dynamicRotationX
+                            translationY = dynamicTranslationY
+                            translationX = dynamicTranslationX
+                            cameraDistance = dynamicCameraDistance * density
+                        }
+                ) {
+                    // Apply hardware RenderEffect DoF blur ONLY to defocused flanking cards on API 31+
+                    val dofModifier = if (rawBlurDp >= 0.5f) {
+                        Modifier
                             .fillMaxSize()
-                            .clip(itemShape)
-                            .background(
-                                StudioCanvas.copy(alpha = (dofFactor * lerp(0.16f, 0.28f, speedFactor)).coerceIn(0f, 0.30f))
-                            )
-                    )
+                            .blur(radius = rawBlurDp.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                    } else {
+                        Modifier.fillMaxSize()
+                    }
+
+                    itemContent(item, page, kinematics, dofModifier)
+
+                    // Atmospheric Depth-of-Field veil (provides focal-plane separation across ALL Android API 24-36!)
+                    if (dofFactor > 0.05f) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(itemShape)
+                                .background(
+                                    StudioCanvas.copy(alpha = (dofFactor * lerp(0.16f, 0.28f, speedFactor)).coerceIn(0f, 0.30f))
+                                )
+                        )
+                    }
                 }
             }
         }

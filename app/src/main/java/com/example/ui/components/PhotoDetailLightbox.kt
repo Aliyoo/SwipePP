@@ -1,5 +1,11 @@
 package com.example.ui.components
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.os.Build
+import android.view.Gravity
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -17,17 +23,20 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -45,14 +54,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -62,9 +71,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -72,13 +82,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
-import android.os.Build
-import android.view.WindowManager
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
 import com.example.data.PhotoStatus
@@ -97,6 +102,10 @@ import java.util.Locale
 /**
  * Editorial full-screen darkroom photo & video inspection lightbox.
  * Supports pinch-to-zoom, double-tap 2.5x zoom, pan while zoomed, and unified zero-overlap bottom controls.
+ *
+ * When hosted inside [FlipYearApp], renders directly into [LocalFullScreenOverlayHost] inside
+ * `MainActivity`'s true edge-to-edge window instead of spawning a floating Android Dialog window,
+ * eliminating Samsung One UI / Android 15–16 dialog window cutout offset and bottom-bar truncation.
  */
 @Composable
 fun PhotoDetailLightbox(
@@ -106,8 +115,110 @@ fun PhotoDetailLightbox(
     onTrash: ((PhotoItemEntity) -> Unit)? = null,
     onRestore: ((PhotoItemEntity) -> Unit)? = null
 ) {
+    val overlayHost = LocalFullScreenOverlayHost.current
+    if (overlayHost != null) {
+        val entryId = remember { Any() }
+        val latestPhoto by rememberUpdatedState(photo)
+        val latestOnDismiss by rememberUpdatedState(onDismiss)
+        val latestOnKeep by rememberUpdatedState(onKeep)
+        val latestOnTrash by rememberUpdatedState(onTrash)
+        val latestOnRestore by rememberUpdatedState(onRestore)
+
+        DisposableEffect(overlayHost, entryId) {
+            overlayHost.upsert(entryId) {
+                PhotoDetailLightboxContent(
+                    photo = latestPhoto,
+                    onDismiss = latestOnDismiss,
+                    onKeep = latestOnKeep,
+                    onTrash = latestOnTrash,
+                    onRestore = latestOnRestore
+                )
+            }
+            onDispose {
+                overlayHost.remove(entryId)
+            }
+        }
+        return
+    }
+
+    // Standalone fallback (previews / isolated tests without FlipYearApp's FullScreenOverlayHost)
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        val view = LocalView.current
+        SideEffect {
+            val window = (view as? DialogWindowProvider)?.window
+                ?: (view.parent as? DialogWindowProvider)?.window
+            window?.let { w ->
+                WindowCompat.setDecorFitsSystemWindows(w, false)
+                w.setLayout(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT
+                )
+                w.setGravity(Gravity.FILL)
+                w.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                val lp = w.attributes
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    lp.layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                    lp.fitInsetsTypes = 0
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    lp.layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+                w.attributes = lp
+            }
+        }
+
+        PhotoDetailLightboxContent(
+            photo = photo,
+            onDismiss = onDismiss,
+            onKeep = onKeep,
+            onTrash = onTrash,
+            onRestore = onRestore
+        )
+    }
+}
+
+@Composable
+private fun PhotoDetailLightboxContent(
+    photo: PhotoItemEntity,
+    onDismiss: () -> Unit,
+    onKeep: ((PhotoItemEntity, Boolean) -> Unit)?,
+    onTrash: ((PhotoItemEntity) -> Unit)?,
+    onRestore: ((PhotoItemEntity) -> Unit)?
+) {
     val haptics = rememberHapticEngine()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val view = LocalView.current
+
+    BackHandler(onBack = onDismiss)
+
+    // Ensure crisp light system bar icons over the pitch-dark #0A0C12 darkroom canvas,
+    // restoring the previous theme appearance cleanly when the lightbox closes.
+    DisposableEffect(view) {
+        val window = (view as? DialogWindowProvider)?.window
+            ?: (view.parent as? DialogWindowProvider)?.window
+            ?: context.findActivity()?.window
+        val controller = window?.let { WindowInsetsControllerCompat(it, it.decorView) }
+        val prevLightStatus = controller?.isAppearanceLightStatusBars
+        val prevLightNav = controller?.isAppearanceLightNavigationBars
+        controller?.isAppearanceLightStatusBars = false
+        controller?.isAppearanceLightNavigationBars = false
+        onDispose {
+            if (prevLightStatus != null) {
+                controller.isAppearanceLightStatusBars = prevLightStatus
+            }
+            if (prevLightNav != null) {
+                controller.isAppearanceLightNavigationBars = prevLightNav
+            }
+        }
+    }
 
     var scale by remember(photo.id) { mutableFloatStateOf(1f) }
     var offset by remember(photo.id) { mutableStateOf(Offset.Zero) }
@@ -151,216 +262,194 @@ fun PhotoDetailLightbox(
         )
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0A0C12))
+            .semantics(mergeDescendants = false) { isTraversalGroup = true }
+            .pointerInput(Unit) {}
+            .testTag("photo_detail_lightbox")
     ) {
-        BackHandler(onBack = onDismiss)
-
-        // With the default display-cutout mode the dialog window is shrunk below
-        // the top cutout/status region, which shifts the whole content down and
-        // clips the bottom dock off-screen. Draw edge-to-edge under the cutout so
-        // the HUD's bottom edge really is the screen's bottom edge.
-        val view = LocalView.current
-        SideEffect {
-            if (Build.VERSION.SDK_INT >= 28) {
-                val window = (view as? DialogWindowProvider)?.window
-                    ?: (view.parent as? DialogWindowProvider)?.window
-                window?.let {
-                    it.attributes = it.attributes.apply {
-                        layoutInDisplayCutoutMode =
-                            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-                    }
-                }
-            }
-        }
-
+        // Static GPU-blurred ambient photo radiance behind darkroom veil
+        BlurredAmbientPhotoBackdrop(
+            photo = photo,
+            alpha = 0.28f,
+            blurRadius = 34.dp,
+            modifier = Modifier.fillMaxSize()
+        )
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF0A0C12))
-                .testTag("photo_detail_lightbox")
-        ) {
-            // Static GPU-blurred ambient photo radiance behind darkroom veil
-            BlurredAmbientPhotoBackdrop(
+                .background(Color(0xC2090B10))
+        )
+
+        // Interactive Zoom & Pan Photo Canvas OR Embedded Inline Video Player
+        if (photo.isVideo) {
+            InlineVideoPlayer(
                 photo = photo,
-                alpha = 0.28f,
-                blurRadius = 34.dp,
+                playWhenReady = true,
+                initialMuted = false,
+                fillCrop = false,
+                showFullControls = true,
+                showChrome = showChrome,
+                onToggleChrome = { showChrome = !showChrome },
+                bottomDockOverlay = { scrubberContent ->
+                    renderUnifiedBottomHud(scrubberContent)
+                },
                 modifier = Modifier.fillMaxSize()
             )
+        } else {
             Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xC2090B10))
-            )
-
-            // Interactive Zoom & Pan Photo Canvas OR Embedded Inline Video Player
-            if (photo.isVideo) {
-                InlineVideoPlayer(
-                    photo = photo,
-                    playWhenReady = true,
-                    initialMuted = false,
-                    fillCrop = false,
-                    showFullControls = true,
-                    showChrome = showChrome,
-                    onToggleChrome = { showChrome = !showChrome },
-                    bottomDockOverlay = { scrubberContent ->
-                        renderUnifiedBottomHud(scrubberContent)
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pointerInput(photo.id) {
-                            detectTransformGestures { _, pan, zoom, _ ->
-                                val newScale = (scale * zoom).coerceIn(1f, 4.5f)
-                                scale = newScale
-                                if (newScale > 1.02f) {
-                                    val maxShiftX = (size.width * (newScale - 1f)) / 2f
-                                    val maxShiftY = (size.height * (newScale - 1f)) / 2f
-                                    offset = Offset(
-                                        x = (offset.x + pan.x).coerceIn(-maxShiftX, maxShiftX),
-                                        y = (offset.y + pan.y).coerceIn(-maxShiftY, maxShiftY)
-                                    )
-                                } else {
-                                    offset = Offset.Zero
-                                }
+                    .pointerInput(photo.id) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            val newScale = (scale * zoom).coerceIn(1f, 4.5f)
+                            scale = newScale
+                            if (newScale > 1.02f) {
+                                val maxShiftX = (size.width * (newScale - 1f)) / 2f
+                                val maxShiftY = (size.height * (newScale - 1f)) / 2f
+                                offset = Offset(
+                                    x = (offset.x + pan.x).coerceIn(-maxShiftX, maxShiftX),
+                                    y = (offset.y + pan.y).coerceIn(-maxShiftY, maxShiftY)
+                                )
+                            } else {
+                                offset = Offset.Zero
                             }
                         }
-                        .pointerInput(photo.id) {
-                            detectTapGestures(
-                                onTap = { showChrome = !showChrome },
-                                onDoubleTap = {
-                                    scope.launch {
-                                        val target = if (scale > 1.4f) 1f else 2.5f
-                                        scaleAnim.snapTo(scale)
-                                        scaleAnim.animateTo(
-                                            targetValue = target,
-                                            animationSpec = spring(
-                                                dampingRatio = Spring.DampingRatioNoBouncy,
-                                                stiffness = Spring.StiffnessMedium
-                                            )
-                                        ) {
-                                            scale = value
-                                            if (value <= 1.05f) offset = Offset.Zero
-                                        }
+                    }
+                    .pointerInput(photo.id) {
+                        detectTapGestures(
+                            onTap = { showChrome = !showChrome },
+                            onDoubleTap = {
+                                scope.launch {
+                                    val target = if (scale > 1.4f) 1f else 2.5f
+                                    scaleAnim.snapTo(scale)
+                                    scaleAnim.animateTo(
+                                        targetValue = target,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioNoBouncy,
+                                            stiffness = Spring.StiffnessMedium
+                                        )
+                                    ) {
+                                        scale = value
+                                        if (value <= 1.05f) offset = Offset.Zero
                                     }
                                 }
-                            )
-                        }
-                ) {
-                    PhotoArtwork(
-                        photo = photo,
-                        contentDescription = photo.caption,
-                        contentScale = ContentScale.Fit,
-                        showVideoBadge = false,
-                        downsampleTier = ImageDownsampleTier.LIGHTBOX_FULL,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                                translationX = offset.x
-                                translationY = offset.y
                             }
-                    )
-                }
-
-                Box(modifier = Modifier.align(Alignment.BottomCenter)) {
-                    renderUnifiedBottomHud(null)
-                }
-            }
-
-            // Top High-Contrast Darkroom Header Scrim + Controls
-            AnimatedVisibility(
-                visible = showChrome,
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier.align(Alignment.TopCenter)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                0.0f to Color(0xCC06080D),
-                                0.65f to Color(0x6606080D),
-                                1.0f to Color.Transparent
-                            )
-                        )
-                        .pointerInput(Unit) {}
-                        .statusBarsPadding()
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    ObsidianIconOrb(
-                        icon = Icons.Filled.Close,
-                        contentDescription = "关闭预览",
-                        onClick = onDismiss,
-                        color = ObsidianOverlayGlass,
-                        modifier = Modifier.testTag("lightbox_close_button")
-                    )
-
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 12.dp)
-                    ) {
-                        Text(
-                            text = formatPhotoDateTime(photo.takenAtMillis),
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White
-                        )
-                        val metaLine = buildString {
-                            if (photo.widthPx > 0 && photo.heightPx > 0) {
-                                append("${photo.widthPx}×${photo.heightPx} · ")
-                            }
-                            append(formatStorageSize(photo.fileSizeBytes))
-                            if (photo.isVideo) {
-                                append(" · ${formatVideoDuration(photo.durationMs)}")
-                            }
-                        }
-                        Text(
-                            text = metaLine,
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 11.sp,
-                            color = Color.White.copy(alpha = 0.78f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
                         )
                     }
-
-                    // Quality Score Badge (consistent dark matte pill, zero shadow bleed)
-                    ObsidianGlassPill {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Star,
-                                contentDescription = null,
-                                tint = SolarAmber,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Text(
-                                text = "${photo.qualityScore}",
-                                fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
+            ) {
+                PhotoArtwork(
+                    photo = photo,
+                    contentDescription = photo.caption,
+                    contentScale = ContentScale.Fit,
+                    showVideoBadge = false,
+                    downsampleTier = ImageDownsampleTier.LIGHTBOX_FULL,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = offset.x
+                            translationY = offset.y
                         }
+                )
+            }
+
+            Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+                renderUnifiedBottomHud(null)
+            }
+        }
+
+        // Top High-Contrast Darkroom Header Scrim + Controls
+        AnimatedVisibility(
+            visible = showChrome,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            0.0f to Color(0xCC06080D),
+                            0.65f to Color(0x6606080D),
+                            1.0f to Color.Transparent
+                        )
+                    )
+                    .pointerInput(Unit) {}
+                    .windowInsetsPadding(
+                        WindowInsets.statusBars
+                            .union(WindowInsets.displayCutout)
+                            .only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
+                    )
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                ObsidianIconOrb(
+                    icon = Icons.Filled.Close,
+                    contentDescription = "关闭预览",
+                    onClick = onDismiss,
+                    color = ObsidianOverlayGlass,
+                    modifier = Modifier.testTag("lightbox_close_button")
+                )
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 12.dp)
+                ) {
+                    Text(
+                        text = formatPhotoDateTime(photo.takenAtMillis),
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                    val metaLine = buildString {
+                        if (photo.widthPx > 0 && photo.heightPx > 0) {
+                            append("${photo.widthPx}×${photo.heightPx} · ")
+                        }
+                        append(formatStorageSize(photo.fileSizeBytes))
+                        if (photo.isVideo) {
+                            append(" · ${formatVideoDuration(photo.durationMs)}")
+                        }
+                    }
+                    Text(
+                        text = metaLine,
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontSize = 11.sp,
+                        color = Color.White.copy(alpha = 0.78f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Quality Score Badge (consistent dark matte pill, zero shadow bleed)
+                ObsidianGlassPill {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = null,
+                            tint = SolarAmber,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            text = "${photo.qualityScore}",
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
                     }
                 }
             }
@@ -386,47 +475,6 @@ private fun LightboxBottomHud(
 ) {
     val hasActions = onRestore != null || onTrash != null || onFavorite != null || onKeep != null
 
-    // Dialog windows can report zero WindowInsets on some Android versions (b/246909281),
-    // and a one-shot read can race the first insets dispatch on some OEM builds
-    // (seen on Samsung One UI — both sources returned 0 and the dock slid under
-    // the gesture bar). Listen for dispatches on the dialog's own decor view — the
-    // authoritative insets for the window we actually draw in — seeded from the
-    // dialog and host-activity decor roots, and take the max of all sources.
-    val dialogNavBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val density = LocalDensity.current
-    val context = LocalContext.current
-    val view = LocalView.current
-    var decorNavBottomPx by remember { mutableIntStateOf(0) }
-    DisposableEffect(view) {
-        val dialogDecor = (
-            (view as? DialogWindowProvider)?.window
-                ?: (view.parent as? DialogWindowProvider)?.window
-            )?.decorView
-        val listener = androidx.core.view.OnApplyWindowInsetsListener { _, insets ->
-            val bottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
-            if (bottom > decorNavBottomPx) decorNavBottomPx = bottom
-            insets
-        }
-        dialogDecor?.let { decor ->
-            ViewCompat.setOnApplyWindowInsetsListener(decor, listener)
-            ViewCompat.getRootWindowInsets(decor)?.let { wic ->
-                val bottom = wic.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
-                if (bottom > decorNavBottomPx) decorNavBottomPx = bottom
-            }
-            ViewCompat.requestApplyInsets(decor)
-        }
-        context.findActivity()?.window?.decorView?.let { decor ->
-            ViewCompat.getRootWindowInsets(decor)?.let { wic ->
-                val bottom = wic.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
-                if (bottom > decorNavBottomPx) decorNavBottomPx = bottom
-            }
-        }
-        onDispose {
-            dialogDecor?.let { ViewCompat.setOnApplyWindowInsetsListener(it, null) }
-        }
-    }
-    val navClearance = maxOf(dialogNavBottom, with(density) { decorNavBottomPx.toDp() })
-
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(),
@@ -445,7 +493,13 @@ private fun LightboxBottomHud(
                         1.0f to Color(0xF207090F)
                     )
                 )
-                .padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 12.dp + navClearance)
+                .pointerInput(Unit) {}
+                .windowInsetsPadding(
+                    WindowInsets.navigationBars
+                        .union(WindowInsets.displayCutout)
+                        .only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)
+                )
+                .padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 14.dp)
         ) {
             Column(
                 modifier = Modifier

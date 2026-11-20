@@ -74,6 +74,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -489,90 +490,98 @@ fun BookshelfScreen(
                     modifier = Modifier.weight(1f)
                 )
             } else {
-                val pagerState = rememberPagerState(initialPage = 0, pageCount = { books.size })
+                // Scope PagerState cleanly per MediaFilter so switching All -> Videos -> Photos
+                // never carries over stale page indices, scroll offsets, or key maps across filters.
+                key(uiState.mediaFilter) {
+                    val pagerState = rememberPagerState(initialPage = 0, pageCount = { books.size })
 
-                LaunchedEffect(pagerState) {
-                    snapshotFlow { pagerState.currentPage }
-                        .drop(1)
-                        .distinctUntilChanged()
-                        .collect {
-                            haptics.bookshelfDetent()
-                        }
-                }
-
-                // Adaptive 3D Bookshelf Carousel: dynamically adapts perspective & depth-of-field to scroll speed
-                val settledBook = books[pagerState.settledPage.coerceIn(0, books.lastIndex)]
-                var activeAmbientCoverPhoto by remember(settledBook.year, settledBook.coverPhoto) {
-                    mutableStateOf(settledBook.coverPhoto)
-                }
-
-                Adaptive3DBookshelfCarousel(
-                    items = books,
-                    pagerState = pagerState,
-                    settledCoverPhoto = activeAmbientCoverPhoto ?: settledBook.coverPhoto,
-                    itemKey = { it.year },
-                    pagerTestTag = "bookshelf_3d_pager",
-                    modifier = Modifier.weight(1f)
-                ) { book, page, kinematics, cardModifier ->
-                    val isBookSettledCenter = kinematics.isCentered && pagerState.settledPage == page
-                    ModernYearbook3DCard(
-                        summary = book,
-                        isFocused = isBookSettledCenter,
-                        isCarouselPaused = pagerState.isScrollInProgress || customizingYear != null,
-                        onCustomizeCover = {
-                            haptics.pageFlipLift()
-                            customizingYear = book.year
-                        },
-                        onActiveSlideChanged = { slidePhoto ->
-                            if (pagerState.settledPage == page && slidePhoto != null) {
-                                activeAmbientCoverPhoto = slidePhoto
+                    LaunchedEffect(pagerState) {
+                        snapshotFlow { pagerState.currentPage }
+                            .drop(1)
+                            .distinctUntilChanged()
+                            .collect {
+                                haptics.bookshelfDetent()
                             }
-                        },
-                        onClick = {
-                            if (pagerState.currentPage == page) {
-                                onOpenYearbook(book.year)
-                            } else {
-                                scope.launch { pagerState.animateScrollToPage(page) }
-                            }
-                        },
-                        modifier = cardModifier.testTag("yearbook_card_${book.year}")
-                    )
-                }
+                    }
 
-                // Active Year Wheel Scrubber + Primary Action
-                val activeBook = books[pagerState.currentPage.coerceIn(0, books.lastIndex)]
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    ModernYearWheel(
-                        years = books.map { it.year },
-                        selectedIndex = pagerState.currentPage,
-                        onSelectIndex = { idx ->
-                            scope.launch { pagerState.animateScrollToPage(idx) }
-                        }
-                    )
+                    // Adaptive 3D Bookshelf Carousel: dynamically adapts perspective & depth-of-field to scroll speed
+                    val safeSettledIndex = pagerState.settledPage.coerceIn(0, books.lastIndex)
+                    val settledBook = books[safeSettledIndex]
+                    var activeAmbientCoverPhoto by remember(settledBook.year, settledBook.coverPhoto) {
+                        mutableStateOf(settledBook.coverPhoto)
+                    }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Adaptive3DBookshelfCarousel(
+                        items = books,
+                        pagerState = pagerState,
+                        settledCoverPhoto = activeAmbientCoverPhoto ?: settledBook.coverPhoto,
+                        itemKey = { it.year },
+                        pagerTestTag = "bookshelf_3d_pager",
+                        modifier = Modifier.weight(1f)
+                    ) { book, page, kinematics, cardModifier ->
+                        val isBookSettledCenter = kinematics.isCentered && safeSettledIndex == page
+                        ModernYearbook3DCard(
+                            summary = book,
+                            isFocused = isBookSettledCenter,
+                            isCarouselPaused = pagerState.isScrollInProgress || customizingYear != null,
+                            onCustomizeCover = {
+                                haptics.pageFlipLift()
+                                customizingYear = book.year
+                            },
+                            onActiveSlideChanged = { slidePhoto ->
+                                if (safeSettledIndex == page && slidePhoto != null) {
+                                    activeAmbientCoverPhoto = slidePhoto
+                                }
+                            },
+                            onClick = {
+                                if (pagerState.currentPage == page) {
+                                    onOpenYearbook(book.year)
+                                } else if (page in books.indices) {
+                                    scope.launch { pagerState.animateScrollToPage(page) }
+                                }
+                            },
+                            modifier = cardModifier.testTag("yearbook_card_${book.year}")
+                        )
+                    }
 
-                    GalleryActionButton(
-                        text = if (activeBook.unreviewedCount > 0) {
-                            "立即整理 ${activeBook.year} 年 · ${activeBook.unreviewedCount} 项待理"
-                        } else {
-                            "重温 ${activeBook.year} 年精选回忆"
-                        },
-                        leadingIcon = if (activeBook.unreviewedCount > 0) Icons.Filled.CleaningServices else Icons.Filled.AutoAwesome,
-                        tone = GalleryButtonTone.OBSIDIAN,
-                        onClick = {
-                            onStartYearCleanup(activeBook.year, activeBook.unreviewedCount == 0)
-                        },
+                    // Active Year Wheel Scrubber + Primary Action
+                    val safeCurrentIndex = pagerState.currentPage.coerceIn(0, books.lastIndex)
+                    val activeBook = books[safeCurrentIndex]
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("open_yearbook_button")
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
+                            .padding(horizontal = 24.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        ModernYearWheel(
+                            years = books.map { it.year },
+                            selectedIndex = safeCurrentIndex,
+                            onSelectIndex = { idx ->
+                                if (idx in books.indices) {
+                                    scope.launch { pagerState.animateScrollToPage(idx) }
+                                }
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        GalleryActionButton(
+                            text = if (activeBook.unreviewedCount > 0) {
+                                "立即整理 ${activeBook.year} 年 · ${activeBook.unreviewedCount} 项待理"
+                            } else {
+                                "重温 ${activeBook.year} 年精选回忆"
+                            },
+                            leadingIcon = if (activeBook.unreviewedCount > 0) Icons.Filled.CleaningServices else Icons.Filled.AutoAwesome,
+                            tone = GalleryButtonTone.OBSIDIAN,
+                            onClick = {
+                                onStartYearCleanup(activeBook.year, activeBook.unreviewedCount == 0)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("open_yearbook_button")
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
                 }
             }
         }
@@ -662,7 +671,9 @@ private fun ModernYearbook3DCard(
                 targetValue = 1f,
                 animationSpec = tween(durationMillis = durationMs, easing = LinearEasing)
             )
-            currentSlideIndex = (currentSlideIndex + 1) % slides.size
+            if (slides.size > 1) {
+                currentSlideIndex = (currentSlideIndex + 1) % slides.size
+            }
         }
     }
 
