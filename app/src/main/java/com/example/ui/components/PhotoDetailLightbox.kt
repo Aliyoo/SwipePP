@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -41,7 +40,6 @@ import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -87,6 +85,9 @@ import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CoralDanger
 import com.example.ui.theme.EmeraldKeep
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.ObsidianOverlayBorder
+import com.example.ui.theme.ObsidianOverlayGlass
+import com.example.ui.theme.ObsidianOverlayPanel
 import com.example.ui.theme.SolarAmber
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -296,23 +297,13 @@ fun PhotoDetailLightbox(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = Color(0xCC151924),
-                        border = BorderStroke(0.85.dp, Color.White.copy(alpha = 0.16f)),
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        IconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier.testTag("lightbox_close_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Close,
-                                contentDescription = "关闭预览",
-                                tint = Color.White
-                            )
-                        }
-                    }
+                    ObsidianIconOrb(
+                        icon = Icons.Filled.Close,
+                        contentDescription = "关闭预览",
+                        onClick = onDismiss,
+                        color = ObsidianOverlayGlass,
+                        modifier = Modifier.testTag("lightbox_close_button")
+                    )
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -347,11 +338,7 @@ fun PhotoDetailLightbox(
                     }
 
                     // Quality Score Badge (consistent dark matte pill, zero shadow bleed)
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = Color(0xCC151924),
-                        border = BorderStroke(0.85.dp, Color.White.copy(alpha = 0.16f))
-                    ) {
+                    ObsidianGlassPill {
                         Row(
                             modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -480,10 +467,7 @@ private fun LightboxBottomHud(
                     }
 
                     if (!photo.isVideo && zoomScale > 1.05f) {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = Color(0xD91A1F2E),
-                            border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.16f)),
+                        ObsidianGlassPill(
                             modifier = Modifier.padding(start = 8.dp)
                         ) {
                             Text(
@@ -502,8 +486,8 @@ private fun LightboxBottomHud(
                 if (videoScrubber != null || hasActions) {
                     Surface(
                         shape = RoundedCornerShape(22.dp),
-                        color = Color(0xEC141822),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+                        color = ObsidianOverlayPanel,
+                        border = BorderStroke(1.dp, ObsidianOverlayBorder),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("lightbox_bottom_dock")

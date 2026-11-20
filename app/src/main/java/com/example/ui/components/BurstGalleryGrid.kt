@@ -83,6 +83,9 @@ import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.InkTertiary
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.ObsidianOverlayBorder
+import com.example.ui.theme.ObsidianOverlayGlass
+import com.example.ui.theme.ObsidianOverlayOrb
 import com.example.ui.theme.SolarAmber
 import com.example.ui.theme.SurfaceMuted
 import com.example.ui.theme.SurfacePure
@@ -106,9 +109,9 @@ private val BestButtonIdleBrush = Brush.verticalGradient(
 )
 
 private val SelectedOverlayTint = CobaltPrimary.copy(alpha = 0.16f)
-private val ObsidianPillBg = Color(0xCC121316)
-private val ObsidianPillBorder = Color(0x4DFFFFFF)
-private val SequencePillBg = Color(0xBB10131A)
+private val ObsidianPillBg = ObsidianOverlayGlass
+private val ObsidianPillBorder = ObsidianOverlayBorder
+private val SequencePillBg = ObsidianOverlayOrb
 private val UnselectedCheckBg = Color(0x47000000)
 private val UnselectedCheckBorder = Color(0xEBFFFFFF)
 private val BackCardDeepFill = Color(0xFFD6DAE3)

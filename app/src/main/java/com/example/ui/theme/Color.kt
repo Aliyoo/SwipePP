@@ -58,3 +58,14 @@ val GlassDarkRimStart = Color(0x6BFFFFFF)
 val GlassDarkRimMid = Color(0x24FFFFFF)
 val GlassDarkRimEnd = Color(0x3DFFFFFF)
 
+// Unified dark obsidian overlay chrome (bars, docks, pills, orbs floating over media).
+// Three opacity levels: translucent orbs → glass badges → solid panels/bars.
+val ObsidianOverlayOrb = Color(0xB3141822)      // ~70% — media play orbs, icon buttons on imagery
+val ObsidianOverlayGlass = Color(0xCC151924)    // ~80% — badges & pills floating on media
+val ObsidianOverlayPanel = Color(0xF2151924)    // ~95% — docks & panels over scrolling content
+val ObsidianOverlayBarTop = Color(0xFF181D28)   // opaque bar gradient top
+val ObsidianOverlayBarBottom = Color(0xFF10141C)// opaque bar gradient bottom
+val ObsidianOverlayChipOnDark = Color(0x1FFFFFFF)// ~12% white — small chips inside dark docks
+val ObsidianOverlayBorder = Color(0x38FFFFFF)   // ~22% hairline rim on dark chrome
+val ObsidianOverlayBorderStrong = Color(0xA6FFFFFF) // ~65% — hero play orb emphasis rim
+
