@@ -16,9 +16,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -57,6 +60,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,6 +69,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
 import com.example.data.PhotoStatus
@@ -363,6 +373,20 @@ private fun LightboxBottomHud(
 ) {
     val hasActions = onRestore != null || onTrash != null || onFavorite != null || onKeep != null
 
+    // Dialog windows can report zero WindowInsets on some Android versions (b/246909281),
+    // which would let the dock slide under the system navigation bar; read the host
+    // Activity's window insets as a fallback so the actions always clear it.
+    val dialogNavBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val density = LocalDensity.current
+    val context = LocalContext.current
+    val fallbackNavBottom = remember {
+        val bottomPx = context.findActivity()?.window?.decorView
+            ?.let { ViewCompat.getRootWindowInsets(it) }
+            ?.getInsets(WindowInsetsCompat.Type.navigationBars())?.bottom ?: 0
+        with(density) { bottomPx.toDp() }
+    }
+    val navClearanceFallback = (fallbackNavBottom - dialogNavBottom).coerceAtLeast(0.dp)
+
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(),
@@ -382,7 +406,7 @@ private fun LightboxBottomHud(
                     )
                 )
                 .navigationBarsPadding()
-                .padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 12.dp)
+                .padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 12.dp + navClearanceFallback)
         ) {
             Column(
                 modifier = Modifier
@@ -588,4 +612,10 @@ private fun LightboxActionPill(
             )
         }
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

@@ -1031,7 +1031,7 @@ private fun FloatingBatchEditStrip(
             onClick = onCompress,
             enabled = compressibleImageCount > 0,
             shape = RoundedCornerShape(22.dp),
-            color = Color(0xEC161B26),
+            color = Color(0xFF161B26),
             border = BorderStroke(1.dp, EmeraldKeep.copy(alpha = if (compressibleImageCount > 0) 0.48f else 0.16f)),
             shadowElevation = 10.dp,
             modifier = Modifier
@@ -1070,7 +1070,7 @@ private fun FloatingBatchEditStrip(
         Surface(
             onClick = onEditLocation,
             shape = RoundedCornerShape(22.dp),
-            color = Color(0xEC161B26),
+            color = Color(0xFF161B26),
             border = BorderStroke(1.dp, SolarAmber.copy(alpha = 0.48f)),
             shadowElevation = 10.dp,
             modifier = Modifier
@@ -1202,6 +1202,8 @@ private fun FloatingBulkActionBar(
 ) {
     ObsidianGlassCard(
         shape = RoundedCornerShape(30.dp),
+        topColor = Color(0xFF181D28),
+        bottomColor = Color(0xFF10141C),
         shadowElevation = 18.dp,
         modifier = Modifier
             .widthIn(max = 420.dp)
