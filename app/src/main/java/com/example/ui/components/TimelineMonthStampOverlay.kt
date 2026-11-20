@@ -71,6 +71,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -664,6 +665,19 @@ fun TimelineMonthStampOverlay(
                         .clip(ScrollFlagShape)
                         .background(if (isDraggingFlag) Color(0xF21A1E29) else Color(0xDE12141C))
                         .border(0.9.dp, if (isDraggingFlag) Color(0x7AFFFFFF) else Color(0x45FFFFFF), ScrollFlagShape)
+                        .semantics {
+                            contentDescription =
+                                "快速滚动，当前${currentCluster.stampLabel}"
+                            setProgress { target ->
+                                dragFraction = target.coerceIn(0f, 1f)
+                                val targetIndex =
+                                    (dragFraction * (clusterLayout.gridItems.size - 1))
+                                        .roundToInt()
+                                        .coerceAtLeast(0)
+                                scope.launch { gridState.scrollToItem(targetIndex) }
+                                true
+                            }
+                        }
                         .pointerInput(travelPx, clusterLayout) {
                             detectVerticalDragGestures(
                                 onDragStart = {
