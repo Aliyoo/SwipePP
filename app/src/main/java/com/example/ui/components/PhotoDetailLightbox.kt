@@ -77,6 +77,7 @@ import androidx.core.view.WindowInsetsCompat
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.os.Build
 import android.view.WindowManager
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
@@ -162,12 +163,14 @@ fun PhotoDetailLightbox(
         // the HUD's bottom edge really is the screen's bottom edge.
         val view = LocalView.current
         SideEffect {
-            val window = (view as? DialogWindowProvider)?.window
-                ?: (view.parent as? DialogWindowProvider)?.window
-            window?.let {
-                it.attributes = it.attributes.apply {
-                    layoutInDisplayCutoutMode =
-                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            if (Build.VERSION.SDK_INT >= 28) {
+                val window = (view as? DialogWindowProvider)?.window
+                    ?: (view.parent as? DialogWindowProvider)?.window
+                window?.let {
+                    it.attributes = it.attributes.apply {
+                        layoutInDisplayCutoutMode =
+                            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    }
                 }
             }
         }
