@@ -229,12 +229,6 @@ fun BurstGalleryGrid(
             TimelineMonthStampOverlay(
                 gridState = gridState,
                 clusterLayout = clusterLayout,
-                onJumpToCluster = { cluster ->
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    coroutineScope.launch {
-                        gridState.animateScrollToItem(cluster.firstGridIndex)
-                    }
-                },
                 modifier = Modifier.fillMaxSize()
             )
         }
