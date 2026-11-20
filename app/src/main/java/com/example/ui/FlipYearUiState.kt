@@ -1,0 +1,172 @@
+package com.example.ui
+
+import androidx.compose.runtime.Immutable
+import com.example.data.CleanupStatsEntity
+import com.example.data.MediaAccessLevel
+import com.example.data.MonthStampEntity
+import com.example.data.PhotoItemEntity
+
+enum class MediaFilter(val label: String) {
+    ALL("全部"),
+    PHOTOS("照片"),
+    VIDEOS("视频")
+}
+
+@Immutable
+data class YearbookSummary(
+    val year: Int,
+    val coverPhoto: PhotoItemEntity?,
+    val totalPhotos: Int,
+    val videoCount: Int,
+    val unreviewedCount: Int,
+    val keptCount: Int,
+    val trashedCount: Int,
+    val cleanedMonthsCount: Int,
+    val totalMonthsCount: Int,
+    val reclaimableBytes: Long,
+    val editionIndex: Int
+) {
+    val progressFraction: Float
+        get() = if (totalPhotos == 0) 1f else ((totalPhotos - unreviewedCount).toFloat() / totalPhotos.toFloat()).coerceIn(0f, 1f)
+}
+
+data class MonthPageModel(
+    val year: Int,
+    val month: Int,
+    val photos: List<PhotoItemEntity>,
+    val photosByDay: Map<Int, List<PhotoItemEntity>>,
+    val cleanedDays: Set<Int>,
+    val totalPhotos: Int,
+    val videoCount: Int,
+    val unreviewedCount: Int,
+    val keptCount: Int,
+    val trashedCount: Int,
+    val burstGroupCount: Int,
+    val reclaimableBytes: Long,
+    val stamp: MonthStampEntity?,
+    val coverPhoto: PhotoItemEntity?
+) {
+    val isCleaned: Boolean
+        get() = stamp != null || (totalPhotos > 0 && unreviewedCount == 0)
+}
+
+@Immutable
+sealed interface CleanupCardItem {
+    val stableKey: String
+    val primaryPhoto: PhotoItemEntity
+    val totalBytes: Long
+
+    @Immutable
+    data class SinglePhoto(
+        val photo: PhotoItemEntity
+    ) : CleanupCardItem {
+        override val stableKey: String = "single_${photo.id}"
+        override val primaryPhoto: PhotoItemEntity = photo
+        override val totalBytes: Long = photo.fileSizeBytes
+    }
+
+    @Immutable
+    data class BurstStack(
+        val groupId: String,
+        val photos: List<PhotoItemEntity>,
+        val bestPhoto: PhotoItemEntity
+    ) : CleanupCardItem {
+        override val stableKey: String = "burst_$groupId"
+        override val primaryPhoto: PhotoItemEntity = bestPhoto
+        override val totalBytes: Long = photos.sumOf { it.fileSizeBytes }
+        val nonBestBytes: Long
+            get() = photos.filter { it.id != bestPhoto.id }.sumOf { it.fileSizeBytes }
+    }
+}
+
+@Immutable
+data class LocationCluster(
+    val locationName: String,
+    val latitude: Double,
+    val longitude: Double,
+    val photos: List<PhotoItemEntity>,
+    val coverPhoto: PhotoItemEntity,
+    val unreviewedCount: Int,
+    val totalBytes: Long
+)
+
+data class UndoSnapshot(
+    val photoStates: List<PhotoStateBackup>,
+    val description: String
+)
+
+data class PhotoStateBackup(
+    val photoId: Long,
+    val year: Int,
+    val month: Int,
+    val previousStatus: String,
+    val previousFavorite: Boolean,
+    val previousBucketName: String? = null,
+    val restoreLocation: Boolean = false,
+    val previousLocationName: String? = null,
+    val previousLatitude: Double? = null,
+    val previousLongitude: Double? = null,
+    val previousGpsScanned: Boolean = false
+)
+
+@Immutable
+sealed interface GalleryEntry {
+    val stableKey: String
+    val latestTimestamp: Long
+    val primaryPhoto: PhotoItemEntity
+
+    @Immutable
+    data class Single(
+        val photo: PhotoItemEntity
+    ) : GalleryEntry {
+        override val stableKey: String = "gal_single_${photo.id}"
+        override val latestTimestamp: Long = photo.takenAtMillis
+        override val primaryPhoto: PhotoItemEntity = photo
+    }
+
+    @Immutable
+    data class Burst(
+        val groupId: String,
+        val photos: List<PhotoItemEntity>,
+        val bestPhoto: PhotoItemEntity
+    ) : GalleryEntry {
+        override val stableKey: String = "gal_burst_$groupId"
+        override val latestTimestamp: Long = photos.maxOf { it.takenAtMillis }
+        override val primaryPhoto: PhotoItemEntity = bestPhoto
+        val totalBytes: Long = photos.sumOf { it.fileSizeBytes }
+        val nonBestBytes: Long = photos.filter { it.id != bestPhoto.id }.sumOf { it.fileSizeBytes }
+        val spanSeconds: Long = ((photos.maxOf { it.takenAtMillis } - photos.minOf { it.takenAtMillis }) / 1000L).coerceAtLeast(1L)
+    }
+}
+
+const val UNLOCATED_LOCATION_KEY = "__UNLOCATED__"
+
+@Immutable
+data class FlipYearUiState(
+    val isLoading: Boolean = true,
+    val isScanningDevice: Boolean = false,
+    val isIndexingGps: Boolean = false,
+    val gpsIndexedCount: Int = 0,
+    val gpsTotalCount: Int = 0,
+    val mediaAccessLevel: MediaAccessLevel = MediaAccessLevel.NONE,
+    val hasMediaLocationPermission: Boolean = true,
+    val mediaFilter: MediaFilter = MediaFilter.ALL,
+    val allPhotos: List<PhotoItemEntity> = emptyList(),
+    val galleryEntries: List<GalleryEntry> = emptyList(),
+    val yearbooks: List<YearbookSummary> = emptyList(),
+    val monthStamps: Map<String, MonthStampEntity> = emptyMap(),
+    val trashedPhotos: List<PhotoItemEntity> = emptyList(),
+    val locationClusters: List<LocationCluster> = emptyList(),
+    val unlocatedPhotos: List<PhotoItemEntity> = emptyList(),
+    val stats: CleanupStatsEntity = CleanupStatsEntity(),
+    val totalImageCount: Int = 0,
+    val totalVideoCount: Int = 0,
+    val hasDeviceMedia: Boolean = false,
+    val pendingTrashBytes: Long = 0L,
+    val undoStackDepth: Int = 0,
+    val feedbackBanner: String? = null,
+    val recentlyStampedMonthKey: String? = null,
+    val batchTaskMessage: String? = null,
+    val batchTaskProcessed: Int = 0,
+    val batchTaskTotal: Int = 0
+)

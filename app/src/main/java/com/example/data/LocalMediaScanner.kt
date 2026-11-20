@@ -1,0 +1,512 @@
+package com.example.data
+
+import android.Manifest
+import android.app.PendingIntent
+import android.content.ContentUris
+import android.content.Context
+import android.content.pm.PackageManager
+import android.location.Geocoder
+import android.media.MediaMetadataRetriever
+import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import androidx.core.content.ContextCompat
+import androidx.exifinterface.media.ExifInterface
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.util.Calendar
+import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
+
+enum class MediaAccessLevel {
+    NONE,
+    PARTIAL,
+    FULL
+}
+
+data class ResolvedGeoLocation(
+    val latitude: Double,
+    val longitude: Double,
+    val locationName: String
+)
+
+class LocalMediaScanner(private val context: Context) {
+
+    // Thread-safe ~13km grid cache so Geocoder is queried at most once per city/district
+    private val geocodeCache = ConcurrentHashMap<String, String>()
+
+    fun requiredPermissions(): Array<String> {
+        return when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> arrayOf(
+                Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.READ_MEDIA_VIDEO,
+                Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+                Manifest.permission.ACCESS_MEDIA_LOCATION
+            )
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> arrayOf(
+                Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.READ_MEDIA_VIDEO,
+                Manifest.permission.ACCESS_MEDIA_LOCATION
+            )
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> arrayOf(
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.ACCESS_MEDIA_LOCATION
+            )
+            else -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+    }
+
+    fun checkMediaAccess(): MediaAccessLevel {
+        val hasImages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+        } else {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        }
+        val hasVideos = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
+        } else {
+            hasImages
+        }
+
+        if (hasImages && hasVideos) return MediaAccessLevel.FULL
+        if (hasImages || hasVideos) return MediaAccessLevel.PARTIAL
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val selectedGranted = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+            ) == PackageManager.PERMISSION_GRANTED
+            if (selectedGranted) return MediaAccessLevel.PARTIAL
+        }
+        return MediaAccessLevel.NONE
+    }
+
+    fun hasMediaLocationAccess(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_MEDIA_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+    }
+
+    suspend fun scanAllLocalPhotosAndVideos(): List<PhotoItemEntity> = withContext(Dispatchers.IO) {
+        if (checkMediaAccess() == MediaAccessLevel.NONE) return@withContext emptyList()
+
+        val rawImages = queryImages()
+        val rawVideos = queryVideos()
+
+        val groupedImages = assignBurstGroups(rawImages)
+        (groupedImages + rawVideos).sortedByDescending { it.takenAtMillis }
+    }
+
+    /**
+     * Resolves EXIF GPS (for photos) or ISO-6709 container metadata (for videos) for any device item,
+     * with cached reverse-geocoding for readable city/district names and safe coordinate fallback.
+     */
+    suspend fun resolveLocationForItem(item: PhotoItemEntity): ResolvedGeoLocation? = withContext(Dispatchers.IO) {
+        if (item.isSample) return@withContext null
+        val uriStr = item.contentUri?.takeIf { it.isNotBlank() } ?: return@withContext null
+        val uri = runCatching { Uri.parse(uriStr) }.getOrNull() ?: return@withContext null
+
+        val coords = if (item.isVideo) {
+            readVideoGps(uri)
+        } else {
+            readExifGps(uri)
+        } ?: return@withContext null
+
+        val label = resolveLocationLabel(item.bucketName, coords.first, coords.second)
+        ResolvedGeoLocation(
+            latitude = coords.first,
+            longitude = coords.second,
+            locationName = label
+        )
+    }
+
+    private fun queryImages(): List<PhotoItemEntity> {
+        val results = mutableListOf<PhotoItemEntity>()
+        val projection = buildList {
+            add(MediaStore.Images.Media._ID)
+            add(MediaStore.Images.Media.DISPLAY_NAME)
+            add(MediaStore.Images.Media.DATE_TAKEN)
+            add(MediaStore.Images.Media.DATE_ADDED)
+            add(MediaStore.Images.Media.SIZE)
+            add(MediaStore.Images.Media.WIDTH)
+            add(MediaStore.Images.Media.HEIGHT)
+            add(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+            @Suppress("DEPRECATION")
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                add(MediaStore.Images.Media.LATITUDE)
+                add(MediaStore.Images.Media.LONGITUDE)
+            }
+        }.toTypedArray()
+
+        val sortOrder = "${MediaStore.Images.Media.DATE_TAKEN} DESC, ${MediaStore.Images.Media.DATE_ADDED} DESC"
+
+        runCatching {
+            context.contentResolver.query(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                null,
+                null,
+                sortOrder
+            )?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+                val takenCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_TAKEN)
+                val addedCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+                val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
+                val widthCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.WIDTH)
+                val heightCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.HEIGHT)
+                val bucketCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+                @Suppress("DEPRECATION")
+                val latCol = cursor.getColumnIndex(MediaStore.Images.Media.LATITUDE)
+                @Suppress("DEPRECATION")
+                val lonCol = cursor.getColumnIndex(MediaStore.Images.Media.LONGITUDE)
+
+                val cal = Calendar.getInstance()
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idCol)
+                    val contentUri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+                    val name = cursor.getString(nameCol).orEmpty().substringBeforeLast('.')
+                    val rawTaken = cursor.getLong(takenCol)
+                    val dateAddedSec = cursor.getLong(addedCol)
+                    val takenAt = when {
+                        rawTaken > 0L -> rawTaken
+                        dateAddedSec > 0L -> dateAddedSec * 1000L
+                        else -> System.currentTimeMillis()
+                    }
+                    val size = cursor.getLong(sizeCol).coerceAtLeast(1L)
+                    val width = cursor.getInt(widthCol).coerceAtLeast(0)
+                    val height = cursor.getInt(heightCol).coerceAtLeast(0)
+                    val bucket = cursor.getString(bucketCol)
+
+                    cal.timeInMillis = takenAt
+
+                    var lat: Double? = null
+                    var lon: Double? = null
+                    var locationLabel: String? = null
+
+                    // Zero-IO legacy MediaStore GPS columns on Android < 10
+                    var hasLegacyGps = false
+                    if (latCol >= 0 && lonCol >= 0 && !cursor.isNull(latCol) && !cursor.isNull(lonCol)) {
+                        val cLat = cursor.getDouble(latCol)
+                        val cLon = cursor.getDouble(lonCol)
+                        if (isValidCoordinates(cLat, cLon)) {
+                            lat = cLat
+                            lon = cLon
+                            locationLabel = resolveLocationLabel(bucket, cLat, cLon)
+                            hasLegacyGps = true
+                        }
+                    }
+
+                    val mp = (width.toLong() * height.toLong()) / 1_000_000.0
+                    val quality = ((mp * 3.2).toInt().coerceIn(45, 68) +
+                        ((size / 1_000_000.0) * 5.5).toInt().coerceIn(8, 28)).coerceIn(58, 98)
+
+                    results += PhotoItemEntity(
+                        mediaStoreKey = "img_$id",
+                        mediaType = MediaType.IMAGE.name,
+                        durationMs = 0L,
+                        year = cal.get(Calendar.YEAR),
+                        month = cal.get(Calendar.MONTH) + 1,
+                        day = cal.get(Calendar.DAY_OF_MONTH),
+                        takenAtMillis = takenAt,
+                        fileSizeBytes = size,
+                        widthPx = width,
+                        heightPx = height,
+                        drawableName = null,
+                        contentUri = contentUri.toString(),
+                        status = PhotoStatus.UNREVIEWED.name,
+                        isFavorite = false,
+                        burstGroupId = null,
+                        qualityScore = quality,
+                        isBestInStack = false,
+                        visualVariant = "CRISP",
+                        caption = name.ifBlank { "本地照片" },
+                        bucketName = bucket,
+                        locationName = locationLabel,
+                        latitude = lat,
+                        longitude = lon,
+                        isSample = false,
+                        gpsScanned = hasLegacyGps
+                    )
+                }
+            }
+        }
+        return results
+    }
+
+    private fun queryVideos(): List<PhotoItemEntity> {
+        val results = mutableListOf<PhotoItemEntity>()
+        val projection = buildList {
+            add(MediaStore.Video.Media._ID)
+            add(MediaStore.Video.Media.DISPLAY_NAME)
+            add(MediaStore.Video.Media.DATE_TAKEN)
+            add(MediaStore.Video.Media.DATE_ADDED)
+            add(MediaStore.Video.Media.SIZE)
+            add(MediaStore.Video.Media.WIDTH)
+            add(MediaStore.Video.Media.HEIGHT)
+            add(MediaStore.Video.Media.DURATION)
+            add(MediaStore.Video.Media.BUCKET_DISPLAY_NAME)
+            @Suppress("DEPRECATION")
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                add(MediaStore.Video.Media.LATITUDE)
+                add(MediaStore.Video.Media.LONGITUDE)
+            }
+        }.toTypedArray()
+
+        val sortOrder = "${MediaStore.Video.Media.DATE_TAKEN} DESC, ${MediaStore.Video.Media.DATE_ADDED} DESC"
+
+        runCatching {
+            context.contentResolver.query(
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                null,
+                null,
+                sortOrder
+            )?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+                val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+                val takenCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_TAKEN)
+                val addedCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
+                val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
+                val widthCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.WIDTH)
+                val heightCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.HEIGHT)
+                val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
+                val bucketCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.BUCKET_DISPLAY_NAME)
+                @Suppress("DEPRECATION")
+                val latCol = cursor.getColumnIndex(MediaStore.Video.Media.LATITUDE)
+                @Suppress("DEPRECATION")
+                val lonCol = cursor.getColumnIndex(MediaStore.Video.Media.LONGITUDE)
+
+                val cal = Calendar.getInstance()
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idCol)
+                    val contentUri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
+                    val name = cursor.getString(nameCol).orEmpty().substringBeforeLast('.')
+                    val rawTaken = cursor.getLong(takenCol)
+                    val dateAddedSec = cursor.getLong(addedCol)
+                    val takenAt = when {
+                        rawTaken > 0L -> rawTaken
+                        dateAddedSec > 0L -> dateAddedSec * 1000L
+                        else -> System.currentTimeMillis()
+                    }
+                    val size = cursor.getLong(sizeCol).coerceAtLeast(1L)
+                    val width = cursor.getInt(widthCol).coerceAtLeast(0)
+                    val height = cursor.getInt(heightCol).coerceAtLeast(0)
+                    val duration = cursor.getLong(durationCol).coerceAtLeast(0L)
+                    val bucket = cursor.getString(bucketCol)
+
+                    cal.timeInMillis = takenAt
+
+                    var lat: Double? = null
+                    var lon: Double? = null
+                    var locationLabel: String? = null
+
+                    var hasLegacyGps = false
+                    if (latCol >= 0 && lonCol >= 0 && !cursor.isNull(latCol) && !cursor.isNull(lonCol)) {
+                        val cLat = cursor.getDouble(latCol)
+                        val cLon = cursor.getDouble(lonCol)
+                        if (isValidCoordinates(cLat, cLon)) {
+                            lat = cLat
+                            lon = cLon
+                            locationLabel = resolveLocationLabel(bucket, cLat, cLon)
+                            hasLegacyGps = true
+                        }
+                    }
+
+                    results += PhotoItemEntity(
+                        mediaStoreKey = "vid_$id",
+                        mediaType = MediaType.VIDEO.name,
+                        durationMs = duration,
+                        year = cal.get(Calendar.YEAR),
+                        month = cal.get(Calendar.MONTH) + 1,
+                        day = cal.get(Calendar.DAY_OF_MONTH),
+                        takenAtMillis = takenAt,
+                        fileSizeBytes = size,
+                        widthPx = width,
+                        heightPx = height,
+                        drawableName = null,
+                        contentUri = contentUri.toString(),
+                        status = PhotoStatus.UNREVIEWED.name,
+                        isFavorite = false,
+                        burstGroupId = null,
+                        qualityScore = 90,
+                        isBestInStack = false,
+                        visualVariant = "CRISP",
+                        caption = name.ifBlank { "本地视频" },
+                        bucketName = bucket,
+                        locationName = locationLabel,
+                        latitude = lat,
+                        longitude = lon,
+                        isSample = false,
+                        gpsScanned = hasLegacyGps
+                    )
+                }
+            }
+        }
+        return results
+    }
+
+    private fun readExifGps(uri: Uri): Pair<Double, Double>? {
+        val candidateUris = buildCandidateUris(uri)
+        for (targetUri in candidateUris) {
+            val coords = runCatching {
+                context.contentResolver.openInputStream(targetUri)?.use { input ->
+                    val exif = ExifInterface(input)
+                    val latLong = exif.latLong
+                    if (latLong != null && isValidCoordinates(latLong[0], latLong[1])) {
+                        latLong[0] to latLong[1]
+                    } else {
+                        null
+                    }
+                }
+            }.getOrNull()
+            if (coords != null) return coords
+        }
+        return null
+    }
+
+    /**
+     * Reads ISO-6709 GPS coordinates embedded in MP4/MOV video metadata via MediaMetadataRetriever.
+     */
+    private fun readVideoGps(uri: Uri): Pair<Double, Double>? {
+        val candidateUris = buildCandidateUris(uri)
+        for (targetUri in candidateUris) {
+            val coords = runCatching {
+                val retriever = MediaMetadataRetriever()
+                try {
+                    retriever.setDataSource(context, targetUri)
+                    val isoLocation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LOCATION)
+                    parseIso6709Location(isoLocation)
+                } finally {
+                    runCatching { retriever.release() }
+                }
+            }.getOrNull()
+            if (coords != null) return coords
+        }
+        return null
+    }
+
+    private fun buildCandidateUris(uri: Uri): List<Uri> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && hasMediaLocationAccess()) {
+            listOfNotNull(
+                runCatching { MediaStore.setRequireOriginal(uri) }.getOrNull(),
+                uri
+            )
+        } else {
+            listOf(uri)
+        }
+    }
+
+    private fun parseIso6709Location(raw: String?): Pair<Double, Double>? {
+        if (raw.isNullOrBlank()) return null
+        val match = ISO_6709_REGEX.find(raw.trim()) ?: return null
+        val lat = match.groupValues[1].toDoubleOrNull() ?: return null
+        val lon = match.groupValues[2].toDoubleOrNull() ?: return null
+        return if (isValidCoordinates(lat, lon)) lat to lon else null
+    }
+
+    private fun isValidCoordinates(lat: Double, lon: Double): Boolean {
+        return lat.isFinite() &&
+            lon.isFinite() &&
+            lat in -85.0..85.0 &&
+            lon in -180.0..180.0 &&
+            (abs(lat) > 0.0001 || abs(lon) > 0.0001)
+    }
+
+    private fun resolveLocationLabel(bucket: String?, lat: Double, lon: Double): String {
+        val gridLat = kotlin.math.round(lat * 8.0) / 8.0
+        val gridLon = kotlin.math.round(lon * 8.0) / 8.0
+        val cacheKey = String.format(Locale.US, "%.3f,%.3f", gridLat, gridLon)
+
+        geocodeCache[cacheKey]?.let { return it }
+
+        val geocoded = reverseGeocodeCity(lat, lon)
+        if (!geocoded.isNullOrBlank()) {
+            geocodeCache[cacheKey] = geocoded
+            return geocoded
+        }
+
+        val normalized = bucket?.trim().orEmpty()
+        val isGenericBucket = normalized.isBlank() || normalized.lowercase(Locale.US) in GENERIC_CAMERA_BUCKETS
+        val fallback = if (!isGenericBucket) {
+            normalized
+        } else {
+            val ns = if (gridLat >= 0) "N" else "S"
+            val ew = if (gridLon >= 0) "E" else "W"
+            String.format(Locale.US, "%.1f°%s %.1f°%s", abs(gridLat), ns, abs(gridLon), ew)
+        }
+        geocodeCache[cacheKey] = fallback
+        return fallback
+    }
+
+    @Suppress("DEPRECATION")
+    private fun reverseGeocodeCity(lat: Double, lon: Double): String? {
+        if (!Geocoder.isPresent()) return null
+        return runCatching {
+            val geocoder = Geocoder(context, Locale.getDefault())
+            val addresses = geocoder.getFromLocation(lat, lon, 1)
+            val addr = addresses?.firstOrNull() ?: return@runCatching null
+            val city = addr.locality ?: addr.subAdminArea ?: addr.adminArea
+            val district = addr.subLocality?.takeIf { it != city }
+            when {
+                !city.isNullOrBlank() && !district.isNullOrBlank() -> "$city · $district"
+                !city.isNullOrBlank() -> city
+                !addr.countryName.isNullOrBlank() -> addr.countryName
+                else -> null
+            }
+        }.getOrNull()
+    }
+
+    private fun assignBurstGroups(images: List<PhotoItemEntity>): List<PhotoItemEntity> {
+        if (images.size < 2) return images
+        val sorted = images.sortedBy { it.takenAtMillis }
+        val result = mutableListOf<PhotoItemEntity>()
+        var i = 0
+        while (i < sorted.size) {
+            var j = i + 1
+            while (j < sorted.size &&
+                sorted[j].bucketName == sorted[i].bucketName &&
+                abs(sorted[j].takenAtMillis - sorted[j - 1].takenAtMillis) <= BURST_WINDOW_MS
+            ) {
+                j++
+            }
+            val cluster = sorted.subList(i, j)
+            if (cluster.size >= 2) {
+                val groupId = "burst_ms_${cluster.first().mediaStoreKey}"
+                val bestIdx = cluster.indices.maxByOrNull { cluster[it].qualityScore } ?: 0
+                cluster.forEachIndexed { idx, item ->
+                    result += item.copy(
+                        burstGroupId = groupId,
+                        isBestInStack = idx == bestIdx
+                    )
+                }
+            } else {
+                result += cluster.first()
+            }
+            i = j
+        }
+        return result
+    }
+
+    fun buildSystemTrashPendingIntent(uris: List<Uri>): PendingIntent? {
+        if (uris.isEmpty() || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        return runCatching {
+            MediaStore.createTrashRequest(context.contentResolver, uris, true)
+        }.getOrNull()
+    }
+
+    companion object {
+        private const val BURST_WINDOW_MS = 10_000L
+        private val ISO_6709_REGEX = Regex("""([+-]\d+(?:\.\d+)?)([+-]\d+(?:\.\d+)?)""")
+        private val GENERIC_CAMERA_BUCKETS = setOf(
+            "camera", "dcim", "pictures", "screenshots", "download", "downloads",
+            "weixin", "wechat", "qq", "photos", "movies", "video", "0"
+        )
+    }
+}
