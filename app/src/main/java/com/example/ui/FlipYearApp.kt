@@ -76,6 +76,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -933,6 +934,13 @@ private fun FloatingGalleryDock(
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
+                    .drawBehind {
+                        // 选中金下划线画在标签自身宽度的底边；宽随文字，四签等高
+                        if (selected) {
+                            val y = size.height - 0.5.dp.toPx()
+                            drawLine(gold, Offset(0f, y), Offset(size.width, y), strokeWidth = 1.dp.toPx())
+                        }
+                    }
                     .clip(RoundedCornerShape(3.dp))
                     .clickable(role = Role.Tab) { onSelectTab(tab.route) }
                     .semantics(mergeDescendants = true) {
@@ -967,14 +975,7 @@ private fun FloatingGalleryDock(
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(2.dp))
-                // 选中金下划线 1dp；未选中透明同高占位，四签高度一致
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(if (selected) gold else Color.Transparent)
-                )
+                Spacer(modifier = Modifier.height(3.dp))
             }
         }
     }
