@@ -179,12 +179,13 @@ internal fun BurstComparisonSheet(
         }
 
         val freedIfConfirmed = stack.photos.filter { it.id != selectedPhoto.id }.sumOf { it.fileSizeBytes }
-        GalleryActionButton(
-            text = "确认仅保留选中项 · 其余 ${stack.photos.size - 1} 张移入回收站 (${formatStorageSize(freedIfConfirmed)})",
+        com.example.ui.components.GallerySculptedHeroButton(
+            title = "确认仅保留此张",
+            badgeText = "移走 ${stack.photos.size - 1} 张 · ${formatStorageSize(freedIfConfirmed)}",
             onClick = { onConfirmKeepBest(selectedPhoto) },
             tone = GalleryButtonTone.OBSIDIAN,
             leadingIcon = Icons.Filled.CheckCircle,
-            height = 50.dp,
+            height = 52.dp,
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("confirm_burst_selection_button")

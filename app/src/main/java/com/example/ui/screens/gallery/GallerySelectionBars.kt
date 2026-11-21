@@ -15,8 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Compress
@@ -98,124 +101,109 @@ internal fun GalleryMoreBatchActionsSheet(
                 color = InkPrimary
             )
 
-            Surface(
-                onClick = { if (compressibleCount > 0) onCompress() },
-                shape = RoundedCornerShape(16.dp),
-                color = SurfaceMuted.copy(alpha = if (compressibleCount > 0) 0.7f else 0.35f),
-                border = BorderStroke(1.dp, HairlineBorder),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 56.dp)
-                    .testTag("bulk_compress_button")
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Compress,
-                        contentDescription = null,
-                        tint = if (compressibleCount > 0) EmeraldKeep else InkSecondary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (compressibleCount > 0) {
-                                "${stringResource(R.string.action_batch_compress)}（$compressibleCount 张照片）"
-                            } else {
-                                "批量压缩（当前所选无照片）"
-                            },
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (compressibleCount > 0) InkPrimary else InkSecondary
-                        )
-                        Text(
-                            text = "另存压缩新图，原图安全暂存回收站",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = InkSecondary
-                        )
-                    }
-                }
-            }
+            BatchActionSheetRow(
+                icon = Icons.Filled.Compress,
+                accentColor = EmeraldKeep,
+                title = if (compressibleCount > 0) {
+                    "${stringResource(R.string.action_batch_compress)}（$compressibleCount 张照片）"
+                } else {
+                    "批量压缩（当前所选无照片）"
+                },
+                subtitle = "另存压缩新图，原图安全暂存回收站",
+                enabled = compressibleCount > 0,
+                onClick = onCompress,
+                modifier = Modifier.testTag("bulk_compress_button")
+            )
 
-            Surface(
+            BatchActionSheetRow(
+                icon = Icons.Filled.EditLocationAlt,
+                accentColor = SolarAmber,
+                title = if (missingLocationCount > 0) {
+                    "${stringResource(R.string.action_batch_location)}（含 $missingLocationCount 项缺定位）"
+                } else {
+                    stringResource(R.string.action_batch_location)
+                },
+                subtitle = "按同日足迹推断或手动搜索地点补全定位",
+                enabled = true,
                 onClick = onEditLocation,
-                shape = RoundedCornerShape(16.dp),
-                color = SurfaceMuted.copy(alpha = 0.7f),
-                border = BorderStroke(1.dp, HairlineBorder),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 56.dp)
-                    .testTag("bulk_location_button")
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.EditLocationAlt,
-                        contentDescription = null,
-                        tint = SolarAmber,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (missingLocationCount > 0) {
-                                "${stringResource(R.string.action_batch_location)}（含 $missingLocationCount 项缺定位）"
-                            } else {
-                                stringResource(R.string.action_batch_location)
-                            },
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = InkPrimary
-                        )
-                        Text(
-                            text = "按同日足迹推断或手动搜索地点补全定位",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = InkSecondary
-                        )
-                    }
-                }
-            }
+                modifier = Modifier.testTag("bulk_location_button")
+            )
 
-            Surface(
+            BatchActionSheetRow(
+                icon = Icons.AutoMirrored.Filled.DriveFileMove,
+                accentColor = CobaltPrimary,
+                title = "移动至相册 / 归档年月",
+                subtitle = "归类到自定义相册或重新指定年度月份",
+                enabled = true,
                 onClick = onMove,
-                shape = RoundedCornerShape(16.dp),
-                color = SurfaceMuted.copy(alpha = 0.7f),
-                border = BorderStroke(1.dp, HairlineBorder),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 56.dp)
-                    .testTag("bulk_move_button")
+                modifier = Modifier.testTag("bulk_move_button")
+            )
+        }
+    }
+}
+
+@Composable
+private fun BatchActionSheetRow(
+    icon: ImageVector,
+    accentColor: Color,
+    title: String,
+    subtitle: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = { if (enabled) onClick() },
+        shape = RoundedCornerShape(18.dp),
+        color = SurfaceMuted.copy(alpha = if (enabled) 0.62f else 0.32f),
+        border = BorderStroke(0.85.dp, HairlineBorder),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 60.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = if (enabled) accentColor.copy(alpha = 0.14f) else SurfaceMuted,
+                border = BorderStroke(0.75.dp, if (enabled) accentColor.copy(alpha = 0.28f) else HairlineBorder),
+                modifier = Modifier.size(40.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+                Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.DriveFileMove,
+                        imageVector = icon,
                         contentDescription = null,
-                        tint = CobaltPrimary,
-                        modifier = Modifier.size(22.dp)
+                        tint = if (enabled) accentColor else InkSecondary,
+                        modifier = Modifier.size(20.dp)
                     )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "移动至相册 / 归档年月",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = InkPrimary
-                        )
-                        Text(
-                            text = "归类到自定义相册或重新指定年度月份",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = InkSecondary
-                        )
-                    }
                 }
             }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (enabled) InkPrimary else InkSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = InkSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = InkSecondary.copy(alpha = if (enabled) 0.72f else 0.30f),
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
@@ -229,33 +217,31 @@ internal fun GallerySelectionTopBar(
     onToggleSelectAll: () -> Unit
 ) {
     FrostedGlassCard(
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(20.dp),
         borderAccent = CobaltPrimary,
-        shadowElevation = 10.dp,
+        shadowElevation = 4.dp,
         enableAmbientBlur = true,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 10.dp)
+            .padding(horizontal = 20.dp, vertical = 8.dp)
             .testTag("gallery_selection_top_bar")
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            IconButton(
+            com.example.ui.components.GalleryHeaderOrbButton(
                 onClick = onCancel,
-                modifier = Modifier
-                    .size(48.dp)
-                    .testTag("gallery_selection_cancel")
+                modifier = Modifier.testTag("gallery_selection_cancel")
             ) {
                 Icon(
                     imageVector = Icons.Filled.Close,
                     contentDescription = stringResource(R.string.cd_exit_selection),
                     tint = InkPrimary,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(19.dp)
                 )
             }
 

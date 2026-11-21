@@ -54,62 +54,119 @@ import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.VioletVideo
 
 /**
- * Compact frosted-glass telemetry bar freeing up vertical height for the 3D Bookshelf stage.
+ * On-demand storage ledger sheet opened from the Bookshelf's compact header summary,
+ * keeping the hero viewport calm while preserving full deletion vs compression accounting.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-internal fun CompactStudioMetricsBar(
+internal fun BookshelfStorageLedgerSheet(
     purgedBytes: Long,
+    purgedCount: Int,
     compressedSavedBytes: Long,
+    compressedCount: Int,
     pendingTrashBytes: Long,
+    pendingTrashCount: Int,
     onOpenVault: () -> Unit,
-    modifier: Modifier = Modifier
+    onDismiss: () -> Unit
 ) {
-    FrostedGlassCard(
-        shape = RoundedCornerShape(18.dp),
-        shadowElevation = 4.dp,
-        enableAmbientBlur = true,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
+    val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = com.example.ui.theme.SurfacePure,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        modifier = Modifier.testTag("bookshelf_storage_ledger_sheet")
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 7.dp, horizontal = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 22.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            CompactMetricSlot(
-                label = "已释放",
-                value = formatStorageSize(purgedBytes),
-                accent = CobaltPrimary,
-                modifier = Modifier.weight(1f)
-            )
-            VerticalDivider(
-                modifier = Modifier.height(22.dp),
-                thickness = 1.dp,
-                color = HairlineBorder.copy(alpha = 0.7f)
-            )
-            CompactMetricSlot(
-                label = "压缩省",
-                value = formatStorageSize(compressedSavedBytes),
-                accent = EmeraldKeep,
-                modifier = Modifier.weight(1f)
-            )
-            VerticalDivider(
-                modifier = Modifier.height(22.dp),
-                thickness = 1.dp,
-                color = HairlineBorder.copy(alpha = 0.7f)
-            )
-            CompactMetricSlot(
-                label = "回收站",
-                value = formatStorageSize(pendingTrashBytes),
-                accent = CoralDanger,
-                onClick = if (pendingTrashBytes > 0L) onOpenVault else null,
-                showChevron = pendingTrashBytes > 0L,
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("bookshelf_vault_metric")
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    text = "空间释放账本",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = InkPrimary
+                )
+                Text(
+                    text = "删除释放与批量压缩节省分开统计，回收站中的媒体可随时还原",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = InkSecondary
+                )
+            }
+
+            FrostedGlassCard(
+                shape = RoundedCornerShape(20.dp),
+                shadowElevation = 2.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 14.dp, horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CompactMetricSlot(
+                        label = "删除已释放",
+                        value = formatStorageSize(purgedBytes),
+                        subLabel = "$purgedCount 项",
+                        accent = CobaltPrimary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    VerticalDivider(
+                        modifier = Modifier.height(34.dp),
+                        thickness = 1.dp,
+                        color = HairlineBorder.copy(alpha = 0.7f)
+                    )
+                    CompactMetricSlot(
+                        label = "压缩共节省",
+                        value = formatStorageSize(compressedSavedBytes),
+                        subLabel = "$compressedCount 张",
+                        accent = EmeraldKeep,
+                        modifier = Modifier.weight(1f)
+                    )
+                    VerticalDivider(
+                        modifier = Modifier.height(34.dp),
+                        thickness = 1.dp,
+                        color = HairlineBorder.copy(alpha = 0.7f)
+                    )
+                    CompactMetricSlot(
+                        label = "回收站待清",
+                        value = formatStorageSize(pendingTrashBytes),
+                        subLabel = "$pendingTrashCount 项",
+                        accent = CoralDanger,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("bookshelf_vault_metric")
+                    )
+                }
+            }
+
+            if (pendingTrashCount > 0) {
+                GalleryActionButton(
+                    text = "去回收站释放空间 (${formatStorageSize(pendingTrashBytes)})",
+                    tone = GalleryButtonTone.DANGER,
+                    height = 48.dp,
+                    onClick = {
+                        onDismiss()
+                        onOpenVault()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("ledger_open_vault_button")
+                )
+            } else {
+                GalleryActionButton(
+                    text = "知道了",
+                    tone = GalleryButtonTone.GLASS,
+                    height = 48.dp,
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 }
@@ -118,57 +175,38 @@ internal fun CompactStudioMetricsBar(
 private fun CompactMetricSlot(
     label: String,
     value: String,
+    subLabel: String,
     accent: Color,
-    onClick: (() -> Unit)? = null,
-    showChevron: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .then(
-                if (onClick != null) {
-                    Modifier.clickable(
-                        onClickLabel = stringResource(R.string.cd_open_vault_metric),
-                        onClick = onClick
-                    )
-                } else {
-                    Modifier
-                }
-            )
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+        modifier = modifier.padding(horizontal = 6.dp, vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(1.dp)
+        verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(1.dp)
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                fontSize = 10.5.sp,
-                color = InkTertiary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (showChevron) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = accent.copy(alpha = 0.85f),
-                    modifier = Modifier.size(12.dp)
-                )
-            }
-        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 11.sp,
+            color = InkTertiary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
         Text(
             text = value,
             fontFamily = JetBrainsMonoFontFamily,
             fontWeight = FontWeight.Bold,
-            fontSize = 12.5.sp,
+            fontSize = 14.sp,
             color = accent,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = subLabel,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 10.5.sp,
+            color = InkSecondary,
+            maxLines = 1
         )
     }
 }
@@ -235,7 +273,7 @@ internal fun EmptyLibraryPermissionCard(
                 val desc = when {
                     isScanning -> "正在按年份和月份自动整理您的相册与连拍组。"
                     activeFilter != MediaFilter.ALL -> "切换回“全部”即可查看您的完整年度影集。"
-                    accessLevel == MediaAccessLevel.NONE -> "授权后，FlipYear 将自动在设备本地扫描全部照片和视频，生成 3D 年度影集并智能识别相似连拍，数据全程不上传云端。"
+                    accessLevel == MediaAccessLevel.NONE -> "授权后，SwipePP 将自动在设备本地扫描全部照片和视频，生成 3D 年度影集并智能识别相似连拍，数据全程不上传云端。"
                     else -> "您可以先拍照/录屏后点击重新扫描，或加载精选示例影集（含 4K 视频与连拍）立即体验全部功能。"
                 }
 

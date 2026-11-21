@@ -446,7 +446,7 @@ class BatchMediaEditor(private val context: Context) {
             val finalH = workingBitmap.height
 
             // 3. Compress into a temporary cache file so we can preserve EXIF & check exact final byte size
-            val tempFile = File.createTempFile("flipyear_cmp_${photo.id}_", ".jpg", context.cacheDir)
+            val tempFile = File.createTempFile("swipepp_cmp_${photo.id}_", ".jpg", context.cacheDir)
             try {
                 FileOutputStream(tempFile).use { fos ->
                     val ok = workingBitmap.compress(Bitmap.CompressFormat.JPEG, preset.jpegQuality, fos)
@@ -479,7 +479,7 @@ class BatchMediaEditor(private val context: Context) {
                     .substringBeforeLast('.')
                     .replace(Regex("[^A-Za-z0-9_\\-\u4e00-\u9fa5]"), "_")
                     .take(32)
-                    .ifBlank { "FlipYear_${photo.id}" }
+                    .ifBlank { "SwipePP_${photo.id}" }
                 val displayName = "${safeBaseName}_cmp_${System.currentTimeMillis() % 100000}.jpg"
                 val values = ContentValues().apply {
                     put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
@@ -488,7 +488,7 @@ class BatchMediaEditor(private val context: Context) {
                     put(MediaStore.Images.Media.WIDTH, finalW)
                     put(MediaStore.Images.Media.HEIGHT, finalH)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        val targetFolder = photo.bucketName?.takeIf { it.isNotBlank() } ?: "FlipYear"
+                        val targetFolder = photo.bucketName?.takeIf { it.isNotBlank() } ?: "SwipePP"
                         put(
                             MediaStore.Images.Media.RELATIVE_PATH,
                             "${Environment.DIRECTORY_PICTURES}/$targetFolder"

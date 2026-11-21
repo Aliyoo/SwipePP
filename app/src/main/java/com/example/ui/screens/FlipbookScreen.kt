@@ -86,12 +86,14 @@ import com.example.ui.components.BurstGalleryGrid
 import com.example.ui.components.CleanedCompletionBadge
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
-import com.example.ui.components.GallerySelectableChip
+import com.example.ui.components.GalleryHeaderOrbButton
+import com.example.ui.components.GallerySculptedHeroButton
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.PhotoDetailLightbox
 import com.example.ui.components.formatStorageSize
 import com.example.ui.components.monthChineseName
 import com.example.ui.components.monthEnglishName
+import com.example.ui.theme.GlassSpecularRimStart
 import com.example.ui.theme.CobaltDark
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CobaltSoft
@@ -156,41 +158,47 @@ fun FlipbookScreen(
                 .widthIn(max = 640.dp)
                 .align(Alignment.TopCenter)
         ) {
-            // Top Navigation Bar
+            // Top Navigation Bar — unified 38dp frosted glass orb + restrained mode pill
+            val cleanedMonthCount = remember(monthPages) { monthPages.count { it.isCleaned } }
+            val populatedMonthCount = remember(monthPages) { monthPages.count { it.totalPhotos > 0 } }
+            val isDarkTop = LocalIsDarkTheme.current
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    IconButton(
+                    GalleryHeaderOrbButton(
                         onClick = onBack,
                         modifier = Modifier.testTag("flipbook_back_button")
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.cd_back),
-                            tint = InkPrimary
+                            tint = InkPrimary,
+                            modifier = Modifier.size(19.dp)
                         )
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "$year 年度影集",
-                            style = MaterialTheme.typography.headlineMedium,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
                             color = InkPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = if (showGalleryMode) {
-                                "左右滑动翻页 · 展开管理连拍组"
+                                "${populatedMonthCount} 个活跃月 · 展开管理连拍"
                             } else {
-                                "左右滑动翻页 · ${stringResource(R.string.calendar_day_jump_hint)}"
+                                "已归档 $cleanedMonthCount/$populatedMonthCount 月 · 轻触日期直达"
                             },
                             style = MaterialTheme.typography.labelSmall,
                             color = InkSecondary,
@@ -200,11 +208,12 @@ fun FlipbookScreen(
                     }
                 }
 
-                // Calendar vs Burst Gallery View Mode Switcher
+                // Frosted Hairline Calendar vs Gallery Switcher
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = SurfaceMuted,
-                    border = BorderStroke(1.dp, HairlineBorder)
+                    color = if (isDarkTop) SurfacePure.copy(alpha = 0.68f) else SurfacePure.copy(alpha = 0.84f),
+                    border = BorderStroke(0.85.dp, if (isDarkTop) HairlineBorder else GlassSpecularRimStart),
+                    shadowElevation = if (isDarkTop) 2.dp else 3.dp
                 ) {
                     Row(
                         modifier = Modifier.padding(3.dp),
@@ -216,8 +225,7 @@ fun FlipbookScreen(
                                 showGalleryMode = false
                             },
                             shape = RoundedCornerShape(50),
-                            color = if (!showGalleryMode) SurfacePure else Color.Transparent,
-                            shadowElevation = if (!showGalleryMode) 1.dp else 0.dp,
+                            color = if (!showGalleryMode) InkPrimary else Color.Transparent,
                             modifier = Modifier.testTag("flipbook_mode_calendar")
                         ) {
                             Row(
@@ -228,14 +236,14 @@ fun FlipbookScreen(
                                 Icon(
                                     imageVector = Icons.Filled.CalendarMonth,
                                     contentDescription = "月历视图",
-                                    tint = if (!showGalleryMode) CobaltPrimary else InkSecondary,
-                                    modifier = Modifier.size(14.dp)
+                                    tint = if (!showGalleryMode) SolarAmber else InkSecondary,
+                                    modifier = Modifier.size(13.dp)
                                 )
                                 Text(
                                     text = "月历",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (!showGalleryMode) InkPrimary else InkSecondary,
+                                    color = if (!showGalleryMode) SurfacePure else InkSecondary,
                                     maxLines = 1,
                                     softWrap = false
                                 )
@@ -247,8 +255,7 @@ fun FlipbookScreen(
                                 showGalleryMode = true
                             },
                             shape = RoundedCornerShape(50),
-                            color = if (showGalleryMode) SurfacePure else Color.Transparent,
-                            shadowElevation = if (showGalleryMode) 1.dp else 0.dp,
+                            color = if (showGalleryMode) InkPrimary else Color.Transparent,
                             modifier = Modifier.testTag("flipbook_mode_gallery")
                         ) {
                             Row(
@@ -259,14 +266,14 @@ fun FlipbookScreen(
                                 Icon(
                                     imageVector = Icons.Filled.GridView,
                                     contentDescription = "连拍画廊视图",
-                                    tint = if (showGalleryMode) CobaltPrimary else InkSecondary,
-                                    modifier = Modifier.size(14.dp)
+                                    tint = if (showGalleryMode) SolarAmber else InkSecondary,
+                                    modifier = Modifier.size(13.dp)
                                 )
                                 Text(
                                     text = "画廊",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (showGalleryMode) InkPrimary else InkSecondary,
+                                    color = if (showGalleryMode) SurfacePure else InkSecondary,
                                     maxLines = 1,
                                     softWrap = false
                                 )
@@ -419,38 +426,83 @@ fun FlipbookScreen(
                     }
                 }
 
-                // Bottom Month Selector Pills (auto-scrolls with active month page)
-                LazyRow(
-                    state = monthPillListState,
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                // Frameless Watchmaker Precision Month Scale (mirrors Bookshelf's year dial)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp, bottom = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    itemsIndexed(monthPages) { index, monthModel ->
-                        val selected = pagerState.currentPage == index
-                        GallerySelectableChip(
-                            selected = selected,
-                            onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
-                            shape = RoundedCornerShape(14.dp),
-                            unselectedTint = if (monthModel.isCleaned) EmeraldSoft else null,
-                            unselectedBorderAccent = if (monthModel.isCleaned) EmeraldKeep else null,
-                            modifier = Modifier.testTag("month_pill_${monthModel.month}")
-                        ) {
-                            Text(
-                                text = monthChineseName(monthModel.month),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = when {
-                                    selected -> Color.White
-                                    monthModel.isCleaned -> EmeraldKeep
-                                    else -> InkPrimary
+                    LazyRow(
+                        state = monthPillListState,
+                        contentPadding = PaddingValues(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        itemsIndexed(monthPages) { index, monthModel ->
+                            val selected = pagerState.currentPage == index
+                            val hasMedia = monthModel.totalPhotos > 0
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                                modifier = Modifier
+                                    .heightIn(min = 48.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        scope.launch { pagerState.animateScrollToPage(index) }
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .testTag("month_pill_${monthModel.month}")
+                            ) {
+                                // Subtle watchmaker tick above month numeral
+                                Box(
+                                    modifier = Modifier
+                                        .width(if (selected) 2.dp else 1.dp)
+                                        .height(if (selected) 6.dp else 4.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            when {
+                                                selected -> CobaltPrimary
+                                                monthModel.isCleaned -> EmeraldKeep
+                                                hasMedia -> InkTertiary.copy(alpha = 0.45f)
+                                                else -> InkTertiary.copy(alpha = 0.20f)
+                                            }
+                                        )
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Text(
+                                        text = monthChineseName(monthModel.month),
+                                        fontFamily = if (selected) OutfitFontFamily else JetBrainsMonoFontFamily,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                        fontSize = if (selected) 14.sp else 12.sp,
+                                        color = when {
+                                            selected -> InkPrimary
+                                            monthModel.isCleaned -> EmeraldKeep
+                                            hasMedia -> InkSecondary
+                                            else -> InkTertiary.copy(alpha = 0.50f)
+                                        }
+                                    )
+                                    if (monthModel.isCleaned) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(5.dp)
+                                                .clip(CircleShape)
+                                                .background(if (selected) SolarAmber else EmeraldKeep)
+                                        )
+                                    }
                                 }
-                            )
-                            if (monthModel.isCleaned) {
-                                Icon(
-                                    imageVector = Icons.Filled.Star,
-                                    contentDescription = "已整理",
-                                    tint = SolarAmber,
-                                    modifier = Modifier.size(13.dp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .width(if (selected) 20.dp else 0.dp)
+                                        .height(2.dp)
+                                        .clip(CircleShape)
+                                        .background(if (selected) InkPrimary else Color.Transparent)
                                 )
                             }
                         }
@@ -537,10 +589,10 @@ private fun ModernCalendarBookPage(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 22.dp, end = 18.dp, top = 20.dp, bottom = 18.dp),
+                .padding(start = 22.dp, end = 18.dp, top = 16.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Editorial Magazine Spread Month Header (Giant Serif Numeral + Monospace Folio)
+            // Clean Editorial Month Header (Giant Serif Numeral + Single-Line Month · Year)
             Box(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.align(Alignment.TopStart)) {
                     Row(
@@ -551,96 +603,49 @@ private fun ModernCalendarBookPage(
                             text = page.month.toString().padStart(2, '0'),
                             fontFamily = EditorialSerifFontFamily,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 42.sp,
-                            lineHeight = 42.sp,
+                            fontSize = 38.sp,
+                            lineHeight = 38.sp,
                             color = InkPrimary
                         )
-                        Column(modifier = Modifier.padding(bottom = 4.dp)) {
-                            Text(
-                                text = "${page.year} · ${monthEnglishName(page.month)}",
-                                fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 10.sp,
-                                letterSpacing = 1.5.sp,
-                                color = InkTertiary
-                            )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(bottom = 5.dp)
+                        ) {
                             Text(
                                 text = monthChineseName(page.month),
                                 fontFamily = OutfitFontFamily,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
+                                fontSize = 17.sp,
                                 color = InkPrimary
                             )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    HorizontalDivider(thickness = 0.8.dp, color = HairlineBorder)
-                    Spacer(modifier = Modifier.height(7.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = SurfaceMuted
-                        ) {
                             Text(
-                                text = "共 ${page.totalPhotos} 项",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = InkSecondary,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                text = "· ${page.year}",
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = 12.sp,
+                                color = InkTertiary
                             )
                         }
-                        if (page.videoCount > 0) {
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = VioletVideoSoft
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Videocam,
-                                        contentDescription = null,
-                                        tint = VioletVideo,
-                                        modifier = Modifier.size(11.dp)
-                                    )
-                                    Text(
-                                        text = "${page.videoCount} 视频",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = VioletVideo,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                            }
-                        }
-                        if (page.burstGroupCount > 0) {
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = SolarAmberSoft
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.FilterNone,
-                                        contentDescription = null,
-                                        tint = SolarAmber,
-                                        modifier = Modifier.size(11.dp)
-                                    )
-                                    Text(
-                                        text = "${page.burstGroupCount} 组连拍",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = InkPrimary,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                            }
+                    }
+                    Spacer(modifier = Modifier.height(5.dp))
+                    HorizontalDivider(thickness = 0.8.dp, color = HairlineBorder)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    val editorialMetaLine = remember(page.totalPhotos, page.videoCount, page.burstGroupCount) {
+                        buildString {
+                            append("共 ${page.totalPhotos} 项")
+                            if (page.videoCount > 0) append(" · ${page.videoCount} 视频")
+                            if (page.burstGroupCount > 0) append(" · ${page.burstGroupCount} 组连拍")
                         }
                     }
+                    Text(
+                        text = editorialMetaLine,
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = InkSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
                 if (page.isCleaned) {
@@ -723,51 +728,26 @@ private fun ModernCalendarBookPage(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Footer CTA
+            // Footer CTA — sculpted satin hero button with embedded telemetry badge
             if (page.totalPhotos > 0) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (page.unreviewedCount > 0) {
-                                "剩余 ${page.unreviewedCount} 项待整理"
-                            } else {
-                                "已精选归档 ${page.keptCount} 项回忆"
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = InkPrimary
-                        )
-                        Text(
-                            text = if (page.unreviewedCount > 0) {
-                                "共 ${formatStorageSize(page.reclaimableBytes)}"
-                            } else {
-                                "已释放 ${formatStorageSize(page.stamp?.freedBytes ?: 0L)}"
-                            },
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (page.unreviewedCount > 0) CoralDanger else EmeraldKeep
-                        )
-                    }
-
-                    GalleryActionButton(
-                        text = if (page.unreviewedCount > 0) {
-                            "整理 ${monthChineseName(page.month)} · 进入弧形时光轴"
-                        } else {
-                            "重温 ${monthChineseName(page.month)} 回忆"
-                        },
-                        leadingIcon = if (page.unreviewedCount > 0) Icons.Filled.CleaningServices else Icons.Filled.AutoAwesome,
-                        tone = GalleryButtonTone.OBSIDIAN,
-                        onClick = onCleanClick,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("clean_month_button_${page.month}")
-                    )
+                val monthName = monthChineseName(page.month)
+                val isCleanup = page.unreviewedCount > 0
+                val badge = if (isCleanup) {
+                    "待清 ${page.unreviewedCount} · ${formatStorageSize(page.reclaimableBytes)}"
+                } else {
+                    "已归档 ${page.keptCount}"
                 }
+                GallerySculptedHeroButton(
+                    title = if (isCleanup) "直接开始 ${monthName}清理" else "重温 ${monthName}回忆",
+                    leadingIcon = if (isCleanup) Icons.Filled.CleaningServices else Icons.Filled.AutoAwesome,
+                    badgeText = badge,
+                    tone = GalleryButtonTone.OBSIDIAN,
+                    height = 52.dp,
+                    onClick = onCleanClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("clean_month_button_${page.month}")
+                )
             } else {
                 Text(
                     text = "本月无媒体记录",
@@ -878,12 +858,12 @@ private fun CalendarDaySlot(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(if (hasPhoto) InkPrimary else SurfaceMuted.copy(alpha = 0.72f))
+            .background(if (hasPhoto) InkPrimary else SurfaceSubtle.copy(alpha = 0.50f))
             .then(
-                if (isCleanedStar) {
-                    Modifier.border(1.6.dp, SolarAmber, RoundedCornerShape(10.dp))
-                } else {
-                    Modifier
+                when {
+                    isCleanedStar -> Modifier.border(1.5.dp, SolarAmber, RoundedCornerShape(10.dp))
+                    !hasPhoto -> Modifier.border(0.65.dp, HairlineBorder.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+                    else -> Modifier
                 }
             )
             .semantics(mergeDescendants = true) { contentDescription = dayDesc }
@@ -902,7 +882,7 @@ private fun CalendarDaySlot(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.24f))
+                    .background(Color.Black.copy(alpha = 0.22f))
             )
         }
 
@@ -911,7 +891,7 @@ private fun CalendarDaySlot(
             fontFamily = JetBrainsMonoFontFamily,
             fontSize = 11.sp,
             fontWeight = if (hasPhoto) FontWeight.Bold else FontWeight.Normal,
-            color = if (hasPhoto) Color.White else InkTertiary,
+            color = if (hasPhoto) Color.White else InkTertiary.copy(alpha = 0.72f),
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(4.dp)
@@ -952,13 +932,14 @@ private fun CalendarDaySlot(
                     .align(Alignment.BottomEnd)
                     .padding(3.dp)
                     .clip(RoundedCornerShape(5.dp))
-                    .background(CobaltPrimary)
+                    .background(Color(0xB80E121D))
+                    .border(0.5.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(5.dp))
                     .padding(horizontal = 4.dp, vertical = 1.dp)
             ) {
                 Text(
                     text = "$itemsCount",
                     fontFamily = JetBrainsMonoFontFamily,
-                    fontSize = 8.sp,
+                    fontSize = 8.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     maxLines = 1,

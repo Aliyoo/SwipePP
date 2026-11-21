@@ -228,8 +228,8 @@ fun FootprintMapScreen(
                 .widthIn(max = 640.dp)
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
-                .padding(top = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(top = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier
@@ -240,35 +240,36 @@ fun FootprintMapScreen(
             ) {
                 FrostedGlassCard(
                     shape = RoundedCornerShape(18.dp),
-                    shadowElevation = 8.dp,
+                    shadowElevation = 4.dp,
                     enableAmbientBlur = true,
                     modifier = Modifier.weight(1f, fill = false)
                 ) {
                     Column(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        modifier = Modifier.padding(start = 12.dp, end = if (uiState.hasDeviceMedia) 4.dp else 12.dp, top = 6.dp, bottom = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(7.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Explore,
                                 contentDescription = null,
                                 tint = CobaltPrimary,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(18.dp)
                             )
-                            Column {
+                            Column(modifier = Modifier.weight(1f, fill = false)) {
                                 Text(
                                     text = "足迹地图",
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
                                     color = InkPrimary
                                 )
                                 val subtitle = when {
                                     uiState.isIndexingGps && uiState.gpsTotalCount > 0 ->
-                                        "正在全量解析照片/视频定位 (${uiState.gpsIndexedCount}/${uiState.gpsTotalCount})"
+                                        "正在解析定位 (${uiState.gpsIndexedCount}/${uiState.gpsTotalCount})"
                                     totalVisibleCount > 0 ->
-                                        "${clusters.size} 个足迹 · 已定位 $locatedCount / 共 $totalVisibleCount 项"
+                                        "${clusters.size} 个足迹 · 已定位 $locatedCount / $totalVisibleCount 项"
                                     else -> "暂无带 GPS 信息的照片"
                                 }
                                 Text(
@@ -278,6 +279,21 @@ fun FootprintMapScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
+                            }
+                            if (uiState.hasDeviceMedia) {
+                                IconButton(
+                                    onClick = { onTriggerGpsBackfill(true) },
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .testTag("map_rescan_gps_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Refresh,
+                                        contentDescription = "重新解析全量照片定位",
+                                        tint = InkSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
 
@@ -289,6 +305,7 @@ fun FootprintMapScreen(
                                 trackColor = HairlineBorder.copy(alpha = 0.6f),
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .padding(end = if (uiState.hasDeviceMedia) 8.dp else 0.dp)
                                     .height(3.dp)
                                     .clip(CircleShape)
                             )
@@ -304,25 +321,26 @@ fun FootprintMapScreen(
                         mapStyleName = next.name
                     },
                     shape = RoundedCornerShape(16.dp),
-                    shadowElevation = 8.dp,
+                    shadowElevation = 6.dp,
                     modifier = Modifier
                         .padding(start = 8.dp)
                         .testTag("map_layer_toggle")
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Layers,
                             contentDescription = stringResource(R.string.cd_map_layer),
                             tint = CobaltPrimary,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                         Text(
                             text = mapStyle.label,
-                            style = MaterialTheme.typography.labelLarge,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
                             color = InkPrimary
                         )
                     }
@@ -557,20 +575,19 @@ fun FootprintMapScreen(
             animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
             label = "map_controls_clearance"
         )
-        Column(
+        // Unified single right-side frosted map control rail (Zoom + Fit-All)
+        Box(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(
                     end = 14.dp,
                     bottom = controlsBottomPadding
                 )
-                .pointerInput(Unit) {},
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .pointerInput(Unit) {}
         ) {
             FrostedGlassCard(
-                shape = RoundedCornerShape(16.dp),
-                shadowElevation = 8.dp
+                shape = RoundedCornerShape(18.dp),
+                shadowElevation = 5.dp
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     IconButton(
@@ -582,12 +599,13 @@ fun FootprintMapScreen(
                         Icon(
                             imageVector = Icons.Filled.Add,
                             contentDescription = stringResource(R.string.cd_map_zoom_in),
-                            tint = InkPrimary
+                            tint = InkPrimary,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                     HorizontalDivider(
-                        modifier = Modifier.width(28.dp),
-                        thickness = 1.dp,
+                        modifier = Modifier.width(24.dp),
+                        thickness = 0.8.dp,
                         color = HairlineBorder.copy(alpha = 0.7f)
                     )
                     IconButton(
@@ -599,48 +617,29 @@ fun FootprintMapScreen(
                         Icon(
                             imageVector = Icons.Filled.Remove,
                             contentDescription = stringResource(R.string.cd_map_zoom_out),
-                            tint = InkPrimary
+                            tint = InkPrimary,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
-                }
-            }
-
-            if (clusters.isNotEmpty()) {
-                FrostedGlassCard(
-                    shape = RoundedCornerShape(16.dp),
-                    shadowElevation = 8.dp
-                ) {
-                    IconButton(
-                        onClick = { cameraState.fitClusters(scope, clusters) },
-                        modifier = Modifier
-                            .size(48.dp)
-                            .testTag("map_fit_all_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.CenterFocusStrong,
-                            contentDescription = stringResource(R.string.cd_map_fit_all),
-                            tint = CobaltPrimary
+                    if (clusters.isNotEmpty()) {
+                        HorizontalDivider(
+                            modifier = Modifier.width(24.dp),
+                            thickness = 0.8.dp,
+                            color = HairlineBorder.copy(alpha = 0.7f)
                         )
-                    }
-                }
-            }
-
-            if (uiState.hasDeviceMedia) {
-                FrostedGlassCard(
-                    shape = RoundedCornerShape(16.dp),
-                    shadowElevation = 8.dp
-                ) {
-                    IconButton(
-                        onClick = { onTriggerGpsBackfill(true) },
-                        modifier = Modifier
-                            .size(48.dp)
-                            .testTag("map_rescan_gps_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Refresh,
-                            contentDescription = "重新解析全量照片定位",
-                            tint = InkPrimary
-                        )
+                        IconButton(
+                            onClick = { cameraState.fitClusters(scope, clusters) },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .testTag("map_fit_all_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CenterFocusStrong,
+                                contentDescription = stringResource(R.string.cd_map_fit_all),
+                                tint = CobaltPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }

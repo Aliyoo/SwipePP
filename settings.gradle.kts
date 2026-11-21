@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "FlipYear"
+rootProject.name = "SwipePP"
 
 include(":app")

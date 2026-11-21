@@ -306,4 +306,49 @@ class BookshelfFilterSwitchRobolectricTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("yearbook_card_2026").assertIsDisplayed()
     }
+
+    @Test
+    fun redesignedBookshelfHero_declutteredCoverAndOnDemandLedger_works() {
+        composeRule.mainClock.autoAdvance = false
+
+        val allItems = listOf(
+            sampleItem(1, 2026, 5, isVideo = false),
+            sampleItem(2, 2026, 4, isVideo = true),
+            sampleItem(3, 2025, 11, isVideo = false)
+        )
+        var openedFlipbookYear: Int? = null
+        var startedCleanupYear: Int? = null
+
+        composeRule.setContent {
+            FlipYearTheme(themeMode = AppThemeMode.LIGHT) {
+                BookshelfScreen(
+                    uiState = buildState(allItems, MediaFilter.ALL).copy(
+                        pendingTrashBytes = 12_000_000L
+                    ),
+                    onOpenYearbook = { openedFlipbookYear = it },
+                    onStartYearCleanup = { year, _ -> startedCleanupYear = year },
+                    onRequestMediaPermission = {},
+                    onRescanDeviceMedia = {},
+                    onSelectFilter = {},
+                    onLoadDemoArchive = {}
+                )
+            }
+        }
+
+        pumpFrames()
+        // Cover tap opens flipbook directly; redundant flipbook button is removed
+        composeRule.onNodeWithTag("open_flipbook_button").assertDoesNotExist()
+        composeRule.onNodeWithTag("yearbook_card_2026").assertIsDisplayed().performClick()
+        pumpFrames()
+        assert(openedFlipbookYear == 2026)
+
+        composeRule.onNodeWithTag("open_yearbook_button").assertIsDisplayed().performClick()
+        pumpFrames()
+        assert(startedCleanupYear == 2026)
+
+        // Tapping header storage summary opens on-demand ledger sheet
+        composeRule.onNodeWithTag("bookshelf_storage_summary").assertIsDisplayed().performClick()
+        pumpFrames()
+        composeRule.onNodeWithTag("bookshelf_storage_ledger_sheet").assertIsDisplayed()
+    }
 }

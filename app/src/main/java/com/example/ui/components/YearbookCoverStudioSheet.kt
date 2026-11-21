@@ -635,118 +635,126 @@ private fun MiniBookCoverPreview(
     currentIndex: Int,
     modifier: Modifier = Modifier
 ) {
-    val bookShape = RoundedCornerShape(topStart = 5.dp, bottomStart = 5.dp, topEnd = 14.dp, bottomEnd = 14.dp)
+    val bookShape = RoundedCornerShape(topStart = 5.dp, bottomStart = 5.dp, topEnd = 13.dp, bottomEnd = 13.dp)
     val activePhoto = slides.getOrNull(currentIndex.coerceIn(0, (slides.size - 1).coerceAtLeast(0)))
+    val isDark = LocalIsDarkTheme.current
+    val miniShadowColor = if (isDark) Color.Black.copy(alpha = 0.56f) else InkPrimary.copy(alpha = 0.28f)
 
-    val miniShadowColor = if (LocalIsDarkTheme.current) Color.Black.copy(alpha = 0.52f) else InkPrimary.copy(alpha = 0.28f)
-
-    Box(
-        modifier = modifier
-            .shadow(12.dp, bookShape, spotColor = miniShadowColor)
-            .clip(bookShape)
-            .background(editionColor)
-    ) {
-        Crossfade(
-            targetState = activePhoto,
-            animationSpec = tween(durationMillis = 650),
-            label = "mini_cover_preview",
-            modifier = Modifier.fillMaxSize()
-        ) { photo ->
-            if (photo != null) {
-                PhotoArtwork(
-                    photo = photo,
-                    contentDescription = null,
-                    showVideoBadge = false,
-                    downsampleTier = ImageDownsampleTier.PREVIEW_CARD,
-                    targetSizePx = 384,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
+    Box(modifier = modifier) {
+        // Miniature physical paper page-edge stack peeking along the right edge
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 4.dp, bottom = 4.dp, start = 4.dp)
+                .clip(RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 13.dp, bottomEnd = 13.dp))
+                .background(if (isDark) Color(0xFF282E3D) else Color(0xFFEBE8E0))
+                .border(0.6.dp, HairlineBorder.copy(alpha = 0.7f), RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 13.dp, bottomEnd = 13.dp))
+        )
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0.0f to editionColor.copy(alpha = 0.62f),
-                        0.45f to Color.Transparent,
-                        1.0f to editionColor.copy(alpha = 0.78f)
-                    )
-                )
-        )
-
-        // Left spine shadow
-        Box(
-            modifier = Modifier
-                .width(9.dp)
-                .fillMaxHeight()
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            Color.Black.copy(alpha = 0.45f),
-                            Color.White.copy(alpha = 0.16f),
-                            Color.Transparent
-                        )
-                    )
-                )
-        )
-
-        // Mini slide indicators at top
-        if (slides.size > 1) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .padding(start = 12.dp, end = 8.dp, top = 7.dp),
-                horizontalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                slides.indices.forEach { idx ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(2.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (idx == currentIndex) Color.White else Color.White.copy(alpha = 0.34f)
-                            )
+                .padding(end = 4.dp)
+                .shadow(10.dp, bookShape, spotColor = miniShadowColor)
+                .clip(bookShape)
+                .background(editionColor)
+                .border(0.8.dp, Color.White.copy(alpha = 0.20f), bookShape)
+        ) {
+            Crossfade(
+                targetState = activePhoto,
+                animationSpec = tween(durationMillis = 650),
+                label = "mini_cover_preview",
+                modifier = Modifier.fillMaxSize()
+            ) { photo ->
+                if (photo != null) {
+                    PhotoArtwork(
+                        photo = photo,
+                        contentDescription = null,
+                        showVideoBadge = false,
+                        downsampleTier = ImageDownsampleTier.PREVIEW_CARD,
+                        targetSizePx = 384,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             }
-        }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 13.dp, top = if (slides.size > 1) 14.dp else 10.dp)
-        ) {
-            Text(
-                text = "ED // ${year % 100}",
-                fontFamily = JetBrainsMonoFontFamily,
-                fontSize = 6.5.sp,
-                color = Color.White.copy(alpha = 0.8f)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0.0f to editionColor.copy(alpha = 0.48f),
+                            0.42f to Color.Transparent,
+                            1.0f to editionColor.copy(alpha = 0.84f)
+                        )
+                    )
             )
-            Text(
-                text = year.toString(),
-                fontFamily = EditorialSerifFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp,
-                lineHeight = 24.sp,
-                color = Color.White
-            )
-        }
 
-        if (activePhoto != null) {
-            Text(
-                text = "${activePhoto.month}月",
-                fontFamily = JetBrainsMonoFontFamily,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = SolarAmber,
+            // Debossed left spine hinge groove
+            Box(
+                modifier = Modifier
+                    .width(9.dp)
+                    .fillMaxHeight()
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                Color.Black.copy(alpha = 0.50f),
+                                Color.Black.copy(alpha = 0.16f),
+                                Color.White.copy(alpha = 0.22f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
+            // Mini slide indicators at top
+            if (slides.size > 1) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .padding(start = 12.dp, end = 7.dp, top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    slides.indices.forEach { idx ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(2.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (idx == currentIndex) Color.White else Color.White.copy(alpha = 0.34f)
+                                )
+                        )
+                    }
+                }
+            }
+
+            // Bottom-aligned editorial year monograph (matches Bookshelf 3D cover)
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = 13.dp, bottom = 8.dp)
-            )
+                    .padding(start = 11.dp, end = 6.dp, bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(1.dp)
+            ) {
+                if (activePhoto != null) {
+                    Text(
+                        text = "${activePhoto.month}月",
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = SolarAmber
+                    )
+                }
+                Text(
+                    text = year.toString(),
+                    fontFamily = EditorialSerifFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 21.sp,
+                    lineHeight = 22.sp,
+                    color = Color.White
+                )
+            }
         }
     }
 }

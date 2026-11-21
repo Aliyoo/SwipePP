@@ -171,60 +171,31 @@ fun <T> Adaptive3DBookshelfCarousel(
     ) {
         // Adaptive book dimensions respecting both container width AND available height
         val isWideScreen = maxWidth >= 520.dp
-        val maxCardWidthByHeight = ((maxHeight - 36.dp).coerceAtLeast(180.dp) * 0.70f)
-        val widthFraction = if (isWideScreen) 0.46f else 0.66f
+        val maxCardWidthByHeight = ((maxHeight - 20.dp).coerceAtLeast(180.dp) * 0.70f)
+        val widthFraction = if (isWideScreen) 0.46f else 0.72f
         val bookCardWidth = (maxWidth * widthFraction)
             .coerceAtMost(maxCardWidthByHeight)
-            .coerceIn(196.dp, 286.dp)
-        val horizontalPad = ((maxWidth - bookCardWidth) / 2f).coerceAtLeast(24.dp)
+            .coerceIn(210.dp, 312.dp)
+        val horizontalPad = ((maxWidth - bookCardWidth) / 2f).coerceAtLeast(22.dp)
         val adaptiveSpacing = if (isWideScreen) 22.dp else 14.dp
 
-        // 1) Performance-guarded GPU-blurred ambient cover wash (updates only on settledPage!)
-        Box(
-            modifier = Modifier
-                .size(bookCardWidth * 1.48f)
-                .clip(CircleShape)
-        ) {
-            BlurredAmbientPhotoBackdrop(
-                photo = settledCoverPhoto,
-                alpha = lerp(0.22f, 0.30f, speedFactor),
-                blurRadius = 38.dp,
-                modifier = Modifier.fillMaxSize()
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                StudioCanvas.copy(alpha = 0.62f),
-                                StudioCanvas
-                            )
-                        )
-                    )
-            )
-        }
-
-        // 2) Kinetic Gallery Spotlight Halo — gently expands as scroll velocity accelerates
+        // 1) Whisper-soft full-bleed radial ambient spotlight (no hard circular edge)
         val isDark = LocalIsDarkTheme.current
         val haloChampagne = SkylightChampagneGlow
         val haloSapphire = SkylightSapphireGlow
-        val railCobalt = CobaltPrimary
-        val railAmber = SolarAmber
         val pedestalShadowInk = if (isDark) Color.Black else InkPrimary
 
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val haloRadius = (size.minDimension * lerp(0.56f, 0.66f, speedFactor)).coerceAtLeast(1f)
+            val haloRadius = (size.maxDimension * lerp(0.54f, 0.62f, speedFactor)).coerceAtLeast(1f)
             val centerPt = Offset(
-                x = size.width * 0.5f - signedVelocity * size.width * 0.06f,
-                y = size.height * 0.47f
+                x = size.width * 0.5f - signedVelocity * size.width * 0.05f,
+                y = size.height * 0.46f
             )
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        haloChampagne.copy(alpha = lerp(0.28f, 0.38f, speedFactor)),
-                        haloSapphire.copy(alpha = lerp(0.14f, 0.24f, speedFactor)),
+                        haloChampagne.copy(alpha = lerp(0.16f, 0.24f, speedFactor)),
+                        haloSapphire.copy(alpha = lerp(0.07f, 0.14f, speedFactor)),
                         Color.Transparent
                     ),
                     center = centerPt,
@@ -235,53 +206,29 @@ fun <T> Adaptive3DBookshelfCarousel(
             )
         }
 
-        // 3) Dynamic Pedestal Contact Shadow + Subtle Kinetic Depth Focus Indicator
+        // 2) Subtle grounding contact shadow directly beneath the monograph spine
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 14.dp)
-                .width(bookCardWidth * lerp(0.88f, 1.02f, speedFactor))
-                .height(18.dp)
+                .padding(bottom = 8.dp)
+                .width(bookCardWidth * lerp(0.84f, 0.96f, speedFactor))
+                .height(14.dp)
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            pedestalShadowInk.copy(alpha = lerp(if (isDark) 0.52f else 0.22f, if (isDark) 0.26f else 0.11f, speedFactor)),
+                            pedestalShadowInk.copy(
+                                alpha = lerp(
+                                    if (isDark) 0.46f else 0.16f,
+                                    if (isDark) 0.22f else 0.08f,
+                                    speedFactor
+                                )
+                            ),
                             Color.Transparent
                         )
                     )
                 )
         )
-
-        // Subtle optical depth-of-field focus rail along the pedestal base (reacts smoothly to speed)
-        Canvas(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 4.dp)
-                .width(bookCardWidth * 0.58f)
-                .height(4.dp)
-        ) {
-            val centerX = size.width * 0.5f
-            val activeHalfSpan = size.width * lerp(0.24f, 0.48f, speedFactor)
-            if (activeHalfSpan > 0.5f) {
-                drawLine(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            railCobalt.copy(alpha = lerp(0.28f, 0.65f, speedFactor)),
-                            railAmber.copy(alpha = lerp(0.45f, 0.85f, speedFactor)),
-                            railCobalt.copy(alpha = lerp(0.28f, 0.65f, speedFactor)),
-                            Color.Transparent
-                        ),
-                        startX = centerX - activeHalfSpan,
-                        endX = centerX + activeHalfSpan
-                    ),
-                    start = Offset(centerX - activeHalfSpan, size.height * 0.5f),
-                    end = Offset(centerX + activeHalfSpan, size.height * 0.5f),
-                    strokeWidth = 2.dp.toPx()
-                )
-            }
-        }
 
         // 4) Adaptive 3D Horizontal Pager with Scroll-Velocity Perspective & Optical Depth of Field
         // Avoid HorizontalPager(key = ...) which triggers a Compose Foundation 1.7 crash in

@@ -446,14 +446,15 @@ fun GalleryScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 20.dp, vertical = 10.dp),
+                                    .padding(horizontal = 20.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = stringResource(R.string.nav_gallery),
-                                        style = MaterialTheme.typography.headlineLarge,
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.Bold,
                                         color = InkPrimary
                                     )
                                     Text(
@@ -462,7 +463,7 @@ fun GalleryScreen(
                                         } else {
                                             "共 ${displayedEntries.size} 项 · 长按可多选"
                                         },
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        style = MaterialTheme.typography.bodySmall,
                                         color = InkSecondary,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -470,11 +471,14 @@ fun GalleryScreen(
                                 }
 
                                 if (displayedEntries.isNotEmpty()) {
+                                    val isFilteredView = selectedAlbumFilter != null ||
+                                        smartFilter != GallerySmartFilter.ALL ||
+                                        searchQuery.isActive
                                     Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        // One-tap Gallery -> ArcCleaner bridge for current filtered/visible entries
+                                        // One-tap Gallery -> ArcCleaner bridge with clear context-aware label
                                         FrostedGlassCard(
                                             onClick = {
                                                 hapticEngine.pageFlipLift()
@@ -496,24 +500,24 @@ fun GalleryScreen(
                                             },
                                             shape = RoundedCornerShape(50),
                                             borderAccent = SolarAmber,
-                                            shadowElevation = 4.dp,
+                                            shadowElevation = 2.dp,
                                             modifier = Modifier
-                                                .heightIn(min = 44.dp)
+                                                .heightIn(min = 38.dp)
                                                 .testTag("gallery_swipe_clean_button")
                                         ) {
                                             Row(
-                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                horizontalArrangement = Arrangement.spacedBy(5.dp)
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Filled.CleaningServices,
-                                                    contentDescription = "滑动清理",
+                                                    contentDescription = null,
                                                     tint = SolarAmber,
-                                                    modifier = Modifier.size(15.dp)
+                                                    modifier = Modifier.size(14.dp)
                                                 )
                                                 Text(
-                                                    text = "滑动理",
+                                                    text = if (isFilteredView) "整理当前结果" else "滑动整理",
                                                     style = MaterialTheme.typography.labelLarge,
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold,
@@ -522,37 +526,19 @@ fun GalleryScreen(
                                             }
                                         }
 
-                                        FrostedGlassCard(
+                                        com.example.ui.components.GalleryHeaderOrbButton(
                                             onClick = {
                                                 hapticEngine.bookshelfDetent()
                                                 explicitSelectionMode = true
                                             },
-                                            shape = RoundedCornerShape(50),
-                                            borderAccent = CobaltPrimary,
-                                            shadowElevation = 4.dp,
-                                            modifier = Modifier
-                                                .heightIn(min = 44.dp)
-                                                .testTag("gallery_enter_multiselect_button")
+                                            modifier = Modifier.testTag("gallery_enter_multiselect_button")
                                         ) {
-                                            Row(
-                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.CheckBox,
-                                                    contentDescription = null,
-                                                    tint = CobaltPrimary,
-                                                    modifier = Modifier.size(15.dp)
-                                                )
-                                                Text(
-                                                    text = stringResource(R.string.action_enter_multiselect),
-                                                    style = MaterialTheme.typography.labelLarge,
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = CobaltDark
-                                                )
-                                            }
+                                            Icon(
+                                                imageVector = Icons.Filled.CheckBox,
+                                                contentDescription = stringResource(R.string.action_enter_multiselect),
+                                                tint = CobaltPrimary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
                                         }
                                     }
                                 }

@@ -21,8 +21,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -119,7 +119,7 @@ fun ThemeAppearanceSheet(
             ) {
                 ThemePreviewCard(
                     mode = AppThemeMode.SYSTEM,
-                    icon = Icons.Filled.BrightnessAuto,
+                    icon = Icons.Filled.Contrast,
                     selected = currentMode == AppThemeMode.SYSTEM,
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -153,36 +153,6 @@ fun ThemeAppearanceSheet(
                         .weight(1f)
                         .testTag("theme_option_dark")
                 )
-            }
-
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = CobaltSoft,
-                border = BorderStroke(0.9.dp, CobaltPrimary.copy(alpha = 0.24f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Icon(
-                        imageVector = when (currentMode) {
-                            AppThemeMode.SYSTEM -> Icons.Filled.BrightnessAuto
-                            AppThemeMode.LIGHT -> Icons.Filled.LightMode
-                            AppThemeMode.DARK -> Icons.Filled.DarkMode
-                        },
-                        contentDescription = null,
-                        tint = CobaltPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = "${currentMode.label} · ${currentMode.subtitle}",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                        color = InkPrimary
-                    )
-                }
             }
         }
     }

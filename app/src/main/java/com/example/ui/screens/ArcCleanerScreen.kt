@@ -8,12 +8,14 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -88,16 +90,25 @@ import com.example.sensor.ShakeDetector
 import com.example.sensor.rememberHapticEngine
 import com.example.ui.CleanerEntrySource
 import com.example.ui.CleanupCardItem
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import com.example.ui.components.ArcTimeScaleScrubber
 import com.example.ui.components.ArtisticGalleryBackdrop
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
+import com.example.ui.components.GalleryHeaderOrbButton
 import com.example.ui.components.GalleryTactileOrbButton
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.PhotoDetailLightbox
+import com.example.ui.components.activeChromeSatinBrush
 import com.example.ui.components.formatPhotoDateTime
 import com.example.ui.components.formatStorageSize
 import com.example.ui.components.formatVideoDuration
+import com.example.ui.theme.GlassSpecularRimStart
+import com.example.ui.theme.LocalFlipYearPalette
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.screens.cleaner.BurstComparisonSheet
 import com.example.ui.screens.cleaner.CleanupCompletedCelebration
 import com.example.ui.screens.cleaner.ModernArcSwipeCard
@@ -313,32 +324,36 @@ fun ArcCleanerScreen(
                 .align(Alignment.TopCenter),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top Bar
+            // Top Bar — unified frosted glass orbs + glowing coral telemetry pill
+            val isDarkHeader = LocalIsDarkTheme.current
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    IconButton(
+                    GalleryHeaderOrbButton(
                         onClick = onBack,
                         modifier = Modifier.testTag("cleaner_back_button")
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.cd_back),
-                            tint = InkPrimary
+                            tint = InkPrimary,
+                            modifier = Modifier.size(19.dp)
                         )
                     }
                     Column {
                         Text(
                             text = title,
                             style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
                             color = InkPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -359,37 +374,43 @@ fun ArcCleanerScreen(
                     }
                 }
 
-                // Dynamic Session Reclaimable Storage Pill
+                // Dynamic Session Reclaimable Storage Micro-Pill (aligned with Bookshelf ledger pill)
+                val hasTrashedInSession = sessionTrashedBytes > 0L
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = CoralSoft,
-                    border = BorderStroke(1.dp, CoralDanger.copy(alpha = 0.35f)),
+                    color = if (isDarkHeader) SurfacePure.copy(alpha = 0.72f) else SurfacePure.copy(alpha = 0.90f),
+                    border = BorderStroke(
+                        0.85.dp,
+                        if (hasTrashedInSession) CoralDanger.copy(alpha = 0.42f)
+                        else if (isDarkHeader) HairlineBorder else GlassSpecularRimStart
+                    ),
+                    shadowElevation = if (isDarkHeader) 2.dp else 3.dp,
                     modifier = Modifier.testTag("dynamic_storage_counter")
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.DeleteOutline,
-                            contentDescription = null,
-                            tint = CoralDanger,
-                            modifier = Modifier.size(15.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(if (hasTrashedInSession) CoralDanger else InkTertiary.copy(alpha = 0.45f))
                         )
                         Text(
                             text = formatStorageSize(sessionTrashedBytes),
                             fontFamily = JetBrainsMonoFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp,
-                            color = CoralDanger
+                            color = if (hasTrashedInSession) CoralDanger else InkSecondary
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.width(4.dp))
 
-                IconButton(
+                GalleryHeaderOrbButton(
                     onClick = {
                         if (performSessionUndo(triggeredByShake = false)) {
                             haptics.undoPulse()
@@ -401,7 +422,8 @@ fun ArcCleanerScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Undo,
                         contentDescription = stringResource(R.string.cd_undo),
-                        tint = if (undoStackDepth > 0) CobaltPrimary else InkTertiary.copy(alpha = 0.45f)
+                        tint = if (undoStackDepth > 0) CobaltPrimary else InkTertiary.copy(alpha = 0.45f),
+                        modifier = Modifier.size(19.dp)
                     )
                 }
             }
@@ -538,52 +560,42 @@ fun ArcCleanerScreen(
                         }
                 }
 
-                // Live Active Date Stamp & Optional Single-Day Isolation Pill
+                // Frameless Live Date Status Strip & Optional Single-Day Isolation Toggle
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 4.dp),
+                        .padding(horizontal = 20.dp, vertical = 2.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = SurfacePure.copy(alpha = 0.86f),
-                        border = BorderStroke(1.dp, HairlineBorder),
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
                         modifier = Modifier
+                            .padding(vertical = 4.dp)
                             .semantics(mergeDescendants = true) {}
                             .testTag("cleaner_active_date_pill")
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.CalendarToday,
-                                contentDescription = null,
-                                tint = CobaltPrimary,
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Text(
-                                text = "${activeItem.primaryPhoto.month}月${activeItem.primaryPhoto.day}日 · ${safePage + 1}/${displayedQueue.size}",
-                                fontFamily = JetBrainsMonoFontFamily,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 11.sp,
-                                color = InkPrimary
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Filled.CalendarToday,
+                            contentDescription = null,
+                            tint = CobaltPrimary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Text(
+                            text = "${activeItem.primaryPhoto.month}月${activeItem.primaryPhoto.day}日 · ${safePage + 1}/${displayedQueue.size}",
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 11.5.sp,
+                            color = InkSecondary
+                        )
                     }
 
                     if (initialFocusDay != null && (focusedDayCount > 0 || onlyFocusedDay)) {
                         Surface(
                             onClick = { onlyFocusedDay = !onlyFocusedDay },
                             shape = RoundedCornerShape(50),
-                            color = if (onlyFocusedDay) CobaltPrimary else CobaltSoft,
-                            border = BorderStroke(
-                                1.dp,
-                                if (onlyFocusedDay) CobaltPrimary else CobaltPrimary.copy(alpha = 0.28f)
-                            ),
+                            color = if (onlyFocusedDay) CobaltPrimary else CobaltSoft.copy(alpha = 0.72f),
                             modifier = Modifier.testTag("cleaner_day_filter_toggle")
                         ) {
                             Row(
@@ -595,7 +607,7 @@ fun ArcCleanerScreen(
                                     imageVector = Icons.Filled.FilterList,
                                     contentDescription = null,
                                     tint = if (onlyFocusedDay) Color.White else CobaltPrimary,
-                                    modifier = Modifier.size(13.dp)
+                                    modifier = Modifier.size(12.dp)
                                 )
                                 Text(
                                     text = if (onlyFocusedDay) {
@@ -773,23 +785,44 @@ fun ArcCleanerScreen(
                                         .padding(horizontal = 20.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Surface(
-                                        onClick = {
-                                            haptics.swipeDeleteConfirm()
-                                            handleKeepBestInStack(current, current.bestPhoto)
-                                        },
-                                        shape = RoundedCornerShape(18.dp),
-                                        color = InkPrimary,
-                                        shadowElevation = 6.dp,
+                                    // Sculpted Satin Obsidian primary CTA with best-frame preview & savings pill
+                                    val palette = LocalFlipYearPalette.current
+                                    val satinBrush = activeChromeSatinBrush()
+                                    val burstShape = RoundedCornerShape(18.dp)
+                                    val burstBorder = remember(palette) {
+                                        Brush.linearGradient(
+                                            listOf(
+                                                palette.activeChromeBorderStart,
+                                                Color.White.copy(alpha = 0.14f),
+                                                palette.activeChromeBorderEnd
+                                            )
+                                        )
+                                    }
+                                    Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(54.dp)
+                                            .shadow(10.dp, burstShape, spotColor = InkPrimary.copy(alpha = 0.30f))
+                                            .clip(burstShape)
+                                            .drawBehind {
+                                                drawRect(brush = satinBrush)
+                                                drawLine(
+                                                    color = Color.White.copy(alpha = 0.26f),
+                                                    start = Offset(0f, 0.8.dp.toPx()),
+                                                    end = Offset(size.width, 0.8.dp.toPx()),
+                                                    strokeWidth = 1.dp.toPx()
+                                                )
+                                            }
+                                            .border(1.dp, burstBorder, burstShape)
+                                            .clickable {
+                                                haptics.swipeDeleteConfirm()
+                                                handleKeepBestInStack(current, current.bestPhoto)
+                                            }
+                                            .padding(horizontal = 10.dp)
                                             .testTag("keep_best_burst_button")
                                     ) {
                                         Row(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .padding(horizontal = 10.dp),
+                                            modifier = Modifier.fillMaxSize(),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                                         ) {
@@ -810,27 +843,36 @@ fun ArcCleanerScreen(
                                             }
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = "仅保留最佳 (画质 ${current.bestPhoto.qualityScore})",
-                                                    style = MaterialTheme.typography.labelLarge,
+                                                    text = "仅保留最佳帧",
+                                                    style = MaterialTheme.typography.titleSmall,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = SurfacePure,
+                                                    color = Color.White,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                                 Text(
-                                                    text = "其余 ${current.photos.size - 1} 张移入回收站 (${formatStorageSize(current.nonBestBytes)})",
+                                                    text = "画质 ${current.bestPhoto.qualityScore} · 其余 ${current.photos.size - 1} 张进回收站",
                                                     style = MaterialTheme.typography.labelSmall,
-                                                    color = SurfacePure.copy(alpha = 0.78f),
+                                                    color = Color.White.copy(alpha = 0.74f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                             }
-                                            Icon(
-                                                imageVector = Icons.Filled.AutoAwesome,
-                                                contentDescription = null,
-                                                tint = SolarAmber,
-                                                modifier = Modifier.size(18.dp)
-                                            )
+                                            Surface(
+                                                shape = RoundedCornerShape(50),
+                                                color = Color.White.copy(alpha = 0.14f),
+                                                border = BorderStroke(0.75.dp, Color.White.copy(alpha = 0.24f))
+                                            ) {
+                                                Text(
+                                                    text = "省 ${formatStorageSize(current.nonBestBytes)}",
+                                                    fontFamily = JetBrainsMonoFontFamily,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    fontSize = 11.sp,
+                                                    color = Color(0xFFFDE68A),
+                                                    maxLines = 1,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                                )
+                                            }
                                         }
                                     }
 
@@ -839,7 +881,7 @@ fun ArcCleanerScreen(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         GalleryActionButton(
-                                            text = "保留全部",
+                                            text = "全部保留",
                                             onClick = {
                                                 haptics.swipeKeepConfirm()
                                                 handleKeepEntireStack(current, false)
@@ -864,7 +906,7 @@ fun ArcCleanerScreen(
                                                 .testTag("compare_burst_button")
                                         )
                                         GalleryActionButton(
-                                            text = "整组移走",
+                                            text = "整组回收",
                                             onClick = {
                                                 haptics.swipeDeleteConfirm()
                                                 handleTrashEntireStack(current)
@@ -885,15 +927,17 @@ fun ArcCleanerScreen(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 24.dp),
+                                        .padding(horizontal = 28.dp),
                                     horizontalArrangement = Arrangement.SpaceEvenly,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     GalleryTactileOrbButton(
                                         icon = Icons.Filled.DeleteOutline,
-                                        label = "移入回收站",
+                                        label = "回收",
                                         accentColor = CoralDanger,
                                         tintSurface = CoralSoft,
+                                        orbSize = 64.dp,
+                                        iconSize = 27.dp,
                                         onClick = {
                                             haptics.swipeDeleteConfirm()
                                             handleTrashSingle(current.photo)
@@ -903,9 +947,11 @@ fun ArcCleanerScreen(
 
                                     GalleryTactileOrbButton(
                                         icon = if (current.photo.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                        label = "收藏保留",
+                                        label = "收藏",
                                         accentColor = SolarAmber,
                                         tintSurface = SolarAmberSoft,
+                                        orbSize = 54.dp,
+                                        iconSize = 23.dp,
                                         onClick = {
                                             haptics.swipeKeepConfirm()
                                             handleKeepSingle(current.photo, true)
@@ -915,9 +961,11 @@ fun ArcCleanerScreen(
 
                                     GalleryTactileOrbButton(
                                         icon = Icons.Filled.Check,
-                                        label = "保留入册",
+                                        label = "保留",
                                         accentColor = EmeraldKeep,
                                         tintSurface = EmeraldSoft,
+                                        orbSize = 64.dp,
+                                        iconSize = 27.dp,
                                         onClick = {
                                             haptics.swipeKeepConfirm()
                                             handleKeepSingle(current.photo, false)
@@ -930,24 +978,32 @@ fun ArcCleanerScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    modifier = Modifier.padding(bottom = 8.dp)
+                // Auto-fading gesture hint: smoothly retracts after 2 decisions to give the card stage maximum room
+                AnimatedVisibility(
+                    visible = sessionHistory.size < 2,
+                    enter = fadeIn(tween(220)),
+                    exit = fadeOut(tween(260)) + shrinkVertically(tween(260))
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.SwipeUp,
-                        contentDescription = null,
-                        tint = InkTertiary,
-                        modifier = Modifier.size(13.dp)
-                    )
-                    Text(
-                        text = "上滑回收 · 下滑保留 · 双击收藏 · ${stringResource(R.string.shake_hint)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = InkTertiary
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.SwipeUp,
+                            contentDescription = null,
+                            tint = InkTertiary,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            text = "上滑回收 · 下滑保留 · 摇一摇撤销",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = InkTertiary
+                        )
+                    }
+                }
+                if (sessionHistory.size >= 2) {
+                    Spacer(modifier = Modifier.height(6.dp))
                 }
             }
         }

@@ -672,44 +672,56 @@ private fun LightboxBottomHud(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
+                        val hasLocation = !photo.locationName.isNullOrBlank()
                         val editorialTitle = remember(photo.id, photo.caption, photo.locationName, photo.takenAtMillis) {
                             formatEditorialPhotoTitle(photo)
                         }
-                        Text(
-                            text = editorialTitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        val showRawFilename = photo.caption.isNotBlank() && isMachineGeneratedFilename(photo.caption)
-                        if (!photo.locationName.isNullOrBlank() || showRawFilename) {
+                        if (hasLocation) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                if (!photo.locationName.isNullOrBlank()) {
-                                    Icon(
-                                        imageVector = Icons.Filled.LocationOn,
-                                        contentDescription = null,
-                                        tint = Color(0xFF7FA6FF),
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                }
-                                val subLabel = buildString {
-                                    if (!photo.locationName.isNullOrBlank()) {
-                                        append(photo.locationName)
-                                    }
-                                    if (showRawFilename) {
-                                        if (isNotEmpty()) append(" · ")
-                                        append(photo.caption)
-                                    }
-                                }
+                                Icon(
+                                    imageVector = Icons.Filled.LocationOn,
+                                    contentDescription = null,
+                                    tint = Color(0xFF8FB0FF),
+                                    modifier = Modifier.size(14.dp)
+                                )
                                 Text(
-                                    text = subLabel,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = Color.White.copy(alpha = 0.78f),
+                                    text = photo.locationName.orEmpty(),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            if (photo.caption.isNotBlank()) {
+                                Text(
+                                    text = photo.caption,
+                                    fontFamily = if (isMachineGeneratedFilename(photo.caption)) JetBrainsMonoFontFamily else null,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White.copy(alpha = 0.56f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = editorialTitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            val showRawFilename = photo.caption.isNotBlank() && isMachineGeneratedFilename(photo.caption)
+                            if (showRawFilename) {
+                                Text(
+                                    text = photo.caption,
+                                    fontFamily = JetBrainsMonoFontFamily,
+                                    fontSize = 10.5.sp,
+                                    color = Color.White.copy(alpha = 0.50f),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -768,9 +780,10 @@ private fun LightboxBottomHud(
                                         LightboxActionPill(
                                             icon = Icons.Filled.Restore,
                                             label = "还原至影集",
-                                            containerColor = CobaltPrimary.copy(alpha = 0.28f),
-                                            contentColor = Color(0xFFC7D7FF),
-                                            borderColor = CobaltPrimary.copy(alpha = 0.55f),
+                                            containerColor = CobaltPrimary.copy(alpha = 0.22f),
+                                            iconTint = Color(0xFF9FB8FF),
+                                            labelColor = Color.White,
+                                            borderColor = CobaltPrimary.copy(alpha = 0.44f),
                                             onClick = onRestore,
                                             modifier = Modifier
                                                 .weight(1f)
@@ -781,9 +794,10 @@ private fun LightboxBottomHud(
                                             LightboxActionPill(
                                                 icon = Icons.Filled.DeleteOutline,
                                                 label = "移入回收站",
-                                                containerColor = CoralDanger.copy(alpha = 0.22f),
-                                                contentColor = Color(0xFFFF8E9E),
-                                                borderColor = CoralDanger.copy(alpha = 0.42f),
+                                                containerColor = Color.White.copy(alpha = 0.08f),
+                                                iconTint = Color(0xFFFF7A8A),
+                                                labelColor = Color.White.copy(alpha = 0.92f),
+                                                borderColor = Color.White.copy(alpha = 0.14f),
                                                 onClick = onTrash,
                                                 modifier = Modifier
                                                     .weight(1.15f)
@@ -794,9 +808,18 @@ private fun LightboxBottomHud(
                                             LightboxActionPill(
                                                 icon = if (photo.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                                 label = if (photo.isFavorite) "已收藏" else "收藏",
-                                                containerColor = SolarAmber.copy(alpha = if (photo.isFavorite) 0.28f else 0.18f),
-                                                contentColor = Color(0xFFFDE047),
-                                                borderColor = SolarAmber.copy(alpha = if (photo.isFavorite) 0.52f else 0.36f),
+                                                containerColor = if (photo.isFavorite) {
+                                                    SolarAmber.copy(alpha = 0.20f)
+                                                } else {
+                                                    Color.White.copy(alpha = 0.08f)
+                                                },
+                                                iconTint = if (photo.isFavorite) Color(0xFFFDE047) else Color(0xFFFCD34D),
+                                                labelColor = if (photo.isFavorite) Color(0xFFFDE68A) else Color.White.copy(alpha = 0.92f),
+                                                borderColor = if (photo.isFavorite) {
+                                                    SolarAmber.copy(alpha = 0.45f)
+                                                } else {
+                                                    Color.White.copy(alpha = 0.14f)
+                                                },
                                                 onClick = onFavorite,
                                                 modifier = Modifier
                                                     .weight(1f)
@@ -807,9 +830,10 @@ private fun LightboxBottomHud(
                                             LightboxActionPill(
                                                 icon = Icons.Filled.Check,
                                                 label = "保留",
-                                                containerColor = EmeraldKeep.copy(alpha = 0.22f),
-                                                contentColor = Color(0xFF6EE7B7),
-                                                borderColor = EmeraldKeep.copy(alpha = 0.42f),
+                                                containerColor = Color.White.copy(alpha = 0.08f),
+                                                iconTint = Color(0xFF6EE7B7),
+                                                labelColor = Color.White.copy(alpha = 0.92f),
+                                                borderColor = Color.White.copy(alpha = 0.14f),
                                                 onClick = onKeep,
                                                 modifier = Modifier
                                                     .weight(0.95f)
@@ -832,7 +856,8 @@ private fun LightboxActionPill(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     containerColor: Color,
-    contentColor: Color,
+    iconTint: Color,
+    labelColor: Color,
     borderColor: Color = Color.Transparent,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -841,7 +866,7 @@ private fun LightboxActionPill(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
         color = containerColor,
-        border = if (borderColor != Color.Transparent) BorderStroke(0.9.dp, borderColor) else null,
+        border = if (borderColor != Color.Transparent) BorderStroke(0.85.dp, borderColor) else null,
         modifier = modifier.height(48.dp)
     ) {
         Row(
@@ -854,16 +879,16 @@ private fun LightboxActionPill(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = contentColor,
+                tint = iconTint,
                 modifier = Modifier.size(18.dp)
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(5.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = contentColor,
+                color = labelColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

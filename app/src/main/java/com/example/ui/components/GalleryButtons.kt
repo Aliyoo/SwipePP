@@ -350,7 +350,9 @@ fun GalleryTactileOrbButton(
     accentColor: Color,
     tintSurface: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    orbSize: Dp = 62.dp,
+    iconSize: Dp = 26.dp
 ) {
     val isDark = LocalIsDarkTheme.current
     val interactionSource = remember { MutableInteractionSource() }
@@ -393,12 +395,12 @@ fun GalleryTactileOrbButton(
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = modifier
-                .size(62.dp)
+                .size(orbSize)
                 .graphicsLayer {
                     scaleX = pressScale
                     scaleY = pressScale
@@ -424,7 +426,7 @@ fun GalleryTactileOrbButton(
                 imageVector = icon,
                 contentDescription = label,
                 tint = accentColor,
-                modifier = Modifier.size(26.dp)
+                modifier = Modifier.size(iconSize)
             )
         }
         Text(
@@ -434,5 +436,197 @@ fun GalleryTactileOrbButton(
             fontSize = 11.sp,
             color = InkSecondary
         )
+    }
+}
+
+/**
+ * Tactile 38dp frosted circular glass orb wrapped in a 48dp accessible hit area for top header
+ * navigation and utility controls across SwipePP.
+ */
+@Composable
+fun GalleryHeaderOrbButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    val isDark = LocalIsDarkTheme.current
+    val surfacePure = com.example.ui.theme.SurfacePure
+    val hairline = com.example.ui.theme.HairlineBorder
+    val rimStart = GlassSpecularRimStart
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .clickable(enabled = enabled, onClick = onClick)
+    ) {
+        androidx.compose.material3.Surface(
+            shape = CircleShape,
+            color = if (isDark) surfacePure.copy(alpha = if (enabled) 0.72f else 0.40f)
+            else surfacePure.copy(alpha = if (enabled) 0.90f else 0.55f),
+            border = androidx.compose.foundation.BorderStroke(
+                0.85.dp,
+                if (isDark) hairline.copy(alpha = if (enabled) 1f else 0.45f)
+                else rimStart.copy(alpha = if (enabled) 1f else 0.55f)
+            ),
+            shadowElevation = if (!enabled) 0.dp else if (isDark) 2.dp else 3.dp,
+            modifier = Modifier.size(38.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                content()
+            }
+        }
+    }
+}
+
+/**
+ * Flagship sculpted satin full-width CTA pairing SwipePP's obsidian/danger sheen with a crisp
+ * leading icon, unmistakable title, and an optional embedded monospace telemetry badge.
+ */
+@Composable
+fun GallerySculptedHeroButton(
+    title: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    leadingIcon: ImageVector? = null,
+    badgeText: String? = null,
+    tone: GalleryButtonTone = GalleryButtonTone.OBSIDIAN,
+    height: Dp = 54.dp,
+    shape: Shape = RoundedCornerShape(18.dp),
+    enabled: Boolean = true
+) {
+    val isDark = LocalIsDarkTheme.current
+    val palette = LocalFlipYearPalette.current
+    val activeBrush = activeChromeSatinBrush()
+    val cobalt = CobaltPrimary
+    val cobaltDark = CobaltDark
+    val coral = CoralDanger
+    val inkPrimary = InkPrimary
+
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.975f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "sculpted_hero_scale"
+    )
+
+    val fillBrush = remember(tone, isDark, activeBrush, cobalt, cobaltDark, coral) {
+        when (tone) {
+            GalleryButtonTone.DANGER -> Brush.linearGradient(
+                colors = listOf(Color(0xFFF24B61), coral, Color(0xFFC42339))
+            )
+            GalleryButtonTone.SAPPHIRE -> if (isDark) {
+                Brush.linearGradient(colors = listOf(Color(0xFF4F76FF), Color(0xFF3457D9), Color(0xFF233DA6)))
+            } else {
+                Brush.linearGradient(colors = listOf(Color(0xFF395EF2), cobalt, cobaltDark))
+            }
+            else -> activeBrush
+        }
+    }
+    val borderBrush = remember(tone, palette, coral) {
+        when (tone) {
+            GalleryButtonTone.DANGER -> Brush.linearGradient(
+                colors = listOf(Color.White.copy(alpha = 0.40f), Color.White.copy(alpha = 0.12f), Color(0xFFFFA5B1).copy(alpha = 0.34f))
+            )
+            else -> Brush.linearGradient(
+                colors = listOf(
+                    palette.activeChromeBorderStart,
+                    Color.White.copy(alpha = 0.14f),
+                    palette.activeChromeBorderEnd
+                )
+            )
+        }
+    }
+    val shadowColor = when (tone) {
+        GalleryButtonTone.DANGER -> coral.copy(alpha = 0.36f)
+        else -> (if (isDark) cobalt else inkPrimary).copy(alpha = if (isDark) 0.40f else 0.30f)
+    }
+    val iconTint = when (tone) {
+        GalleryButtonTone.OBSIDIAN -> SolarAmber
+        else -> Color.White
+    }
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .heightIn(min = height)
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+                alpha = if (enabled) 1f else 0.50f
+            }
+            .shadow(
+                elevation = if (pressed) 5.dp else 11.dp,
+                shape = shape,
+                ambientColor = shadowColor,
+                spotColor = shadowColor
+            )
+            .clip(shape)
+            .drawBehind {
+                drawRect(brush = fillBrush)
+                drawLine(
+                    color = Color.White.copy(alpha = 0.26f),
+                    start = Offset(0f, 0.8.dp.toPx()),
+                    end = Offset(size.width, 0.8.dp.toPx()),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+            .border(width = 1.dp, brush = borderBrush, shape = shape)
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = ripple(color = Color.White),
+                onClick = onClick
+            )
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (leadingIcon != null) {
+                Icon(
+                    imageVector = leadingIcon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.5.sp,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = badgeText != null)
+            )
+            if (!badgeText.isNullOrBlank()) {
+                androidx.compose.material3.Surface(
+                    shape = RoundedCornerShape(50),
+                    color = Color.White.copy(alpha = if (tone == GalleryButtonTone.DANGER) 0.18f else 0.14f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        0.75.dp,
+                        Color.White.copy(alpha = 0.24f)
+                    )
+                ) {
+                    Text(
+                        text = badgeText,
+                        fontFamily = com.example.ui.theme.JetBrainsMonoFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 11.sp,
+                        color = if (tone == GalleryButtonTone.OBSIDIAN) Color(0xFFFDE68A) else Color.White,
+                        maxLines = 1,
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
+                    )
+                }
+            }
+        }
     }
 }

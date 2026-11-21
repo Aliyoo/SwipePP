@@ -136,10 +136,11 @@ class OverhaulVerificationTest {
         composeRule.onNodeWithTag("arc_trash_button").performClick()
         composeRule.waitForIdle()
 
-        // Completion screen displays session-scoped stats and Footprint-specific back label
+        // Completion screen displays 3-column session-scoped telemetry dashboard and Footprint-specific back label
         composeRule.onNodeWithTag("completion_session_stats")
-            .assertTextContains("保留 1", substring = true)
-            .assertTextContains("移入回收站 1", substring = true)
+            .assertTextContains("保留", substring = true)
+            .assertTextContains("移入回收站", substring = true)
+            .assertTextContains("1 项待清", substring = true)
         composeRule.onNodeWithText("返回足迹", substring = true).assertIsDisplayed()
         composeRule.onNodeWithTag("completion_open_vault_button").assertIsDisplayed()
         composeRule.onNodeWithTag("completion_open_vault_button").performClick()

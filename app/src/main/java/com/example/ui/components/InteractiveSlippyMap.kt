@@ -352,7 +352,7 @@ fun rememberSlippyMapCameraState(
 private const val MOBILE_BROWSER_UA =
     "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
 private const val OSM_APP_UA =
-    "FlipYearAndroid/1.0 (PhotoFootprintMap; +https://flipyear.app)"
+    "SwipePPAndroid/1.0 (PhotoFootprintMap; +https://swipepp.app)"
 
 private fun buildTileCandidates(style: FootprintMapStyle, z: Int, x: Int, y: Int): List<TileCandidate> {
     val sub = ((x + y) and 3)

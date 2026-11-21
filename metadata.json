@@ -1,6 +1,6 @@
 {
-  "name": "FlipYear",
-  "description": "3D Photo Cleaner & Yearbook Memory Atlas with tactile 3D bookshelf, flipbook monthly calendars, chronological arc swiping, smart burst stacking, shake-to-undo, and Google Maps photo footprints.",
+  "name": "SwipePP",
+  "description": "SwipePP — 3D Photo & Video Cleaner and Yearbook Memory Atlas with tactile 3D bookshelf, flipbook monthly calendars, chronological arc swiping, smart burst stacking, shake-to-undo, and photo footprints.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

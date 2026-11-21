@@ -183,72 +183,78 @@ internal fun ModernYearbook3DCard(
             }
         }
 
-        // Cinematic Editorial Vignette for crisp legibility at top & bottom while preserving center photo clarity
+        // Editorial Vignette: whisper-light at top, rich soft falloff only at bottom for typography legibility
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        0.0f to coverColor.copy(alpha = 0.72f),
-                        0.34f to coverColor.copy(alpha = 0.12f),
-                        0.66f to coverColor.copy(alpha = 0.18f),
-                        1.0f to coverColor.copy(alpha = 0.86f)
+                        0.0f to coverColor.copy(alpha = 0.32f),
+                        0.22f to Color.Transparent,
+                        0.58f to Color.Transparent,
+                        0.82f to coverColor.copy(alpha = 0.58f),
+                        1.0f to coverColor.copy(alpha = 0.90f)
                     )
                 )
         )
 
-        // Tactile Woven Book Spine Crease on Left Edge
-        Box(
-            modifier = Modifier
-                .width(16.dp)
-                .fillMaxHeight()
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.44f),
-                            Color.White.copy(alpha = 0.15f),
-                            Color.Black.copy(alpha = 0.14f),
-                            Color.Transparent
-                        )
-                    )
-                )
-        )
-
-        // Subtle dark right-edge contour falloff
+        // Physical Paper Page-Edge Stack along right edge (gives tactile hardcover monograph depth)
         Box(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .width(10.dp)
+                .width(5.dp)
                 .fillMaxHeight()
+                .padding(vertical = 3.dp)
                 .background(
                     Brush.horizontalGradient(
                         colors = listOf(
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.22f)
+                            Color.Black.copy(alpha = 0.28f),
+                            Color(0xFFF6F2EA).copy(alpha = 0.34f),
+                            Color.Black.copy(alpha = 0.16f),
+                            Color(0xFFF6F2EA).copy(alpha = 0.46f),
+                            Color.Black.copy(alpha = 0.24f)
                         )
                     )
                 )
         )
 
-        // Outer Luminous Glass Contour Rim
+        // Tactile Debossed Linen Book Spine & Hinge Groove on Left Edge
+        Box(
+            modifier = Modifier
+                .width(17.dp)
+                .fillMaxHeight()
+                .background(
+                    Brush.horizontalGradient(
+                        0.0f to Color.Black.copy(alpha = 0.48f),
+                        0.32f to Color.White.copy(alpha = 0.14f),
+                        0.66f to Color.Black.copy(alpha = 0.30f),
+                        0.78f to Color.White.copy(alpha = 0.22f),
+                        1.0f to Color.Transparent
+                    )
+                )
+        )
+
+        // Outer Luminous Glass & Foil Contour Rim
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .border(width = 1.dp, brush = rimBrush, shape = bookShape)
         )
 
-        // Editorial Monograph Typography & Telemetry Overlay
+        // Minimalist Editorial Cover Overlay: center photography stays completely unobstructed
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 22.dp, end = 16.dp, top = if (slides.size > 1) 12.dp else 18.dp, bottom = 16.dp),
+                .padding(start = 24.dp, end = 16.dp, top = 12.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
+            // Top: Ultra-thin slideshow progress bars + refined frosted glass change-cover orb
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (slides.size > 1) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .padding(end = 2.dp)
                             .testTag("cover_carousel_bars_${summary.year}"),
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
@@ -256,9 +262,9 @@ internal fun ModernYearbook3DCard(
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(2.5.dp)
+                                    .height(2.dp)
                                     .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.26f))
+                                    .background(Color.White.copy(alpha = 0.24f))
                             ) {
                                 val segmentFill = when {
                                     idx < safeSlideIndex -> 1f
@@ -271,7 +277,7 @@ internal fun ModernYearbook3DCard(
                                             .fillMaxHeight()
                                             .fillMaxWidth(segmentFill)
                                             .clip(CircleShape)
-                                            .background(Color.White.copy(alpha = if (idx == safeSlideIndex) 0.96f else 0.72f))
+                                            .background(Color.White.copy(alpha = if (idx == safeSlideIndex) 0.95f else 0.62f))
                                     )
                                 }
                             }
@@ -282,246 +288,188 @@ internal fun ModernYearbook3DCard(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(
-                            text = "EDITION // ${summary.year % 100}",
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 9.sp,
-                            letterSpacing = 1.5.sp,
-                            color = Color.White.copy(alpha = 0.78f)
-                        )
-                        Text(
-                            text = summary.year.toString(),
-                            fontFamily = EditorialSerifFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 44.sp,
-                            lineHeight = 46.sp,
-                            letterSpacing = (-1.0).sp,
-                            color = Color.White
-                        )
-                    }
-
                     if (summary.unreviewedCount == 0 && summary.totalPhotos > 0) {
                         Surface(
                             shape = CircleShape,
-                            color = EmeraldKeep,
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
+                            color = EmeraldKeep.copy(alpha = 0.92f),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.44f))
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.CheckCircle,
                                 contentDescription = "年度已整理",
                                 tint = Color.White,
                                 modifier = Modifier
-                                    .padding(5.dp)
-                                    .size(16.dp)
+                                    .padding(4.dp)
+                                    .size(15.dp)
                             )
                         }
                     } else {
-                        ObsidianGlassPill {
-                            Text(
-                                text = "${summary.unreviewedCount} 待理",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Bottom Frosted Obsidian Glass Archive Plate + Live Slide Context & Cover Customizer
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(modifier = Modifier.weight(1f, fill = false)) {
-                        if (slides.size > 1 && displayedPhoto != null) {
-                            ObsidianGlassPill {
-                                AnimatedContent(
-                                    targetState = displayedPhoto to safeSlideIndex,
-                                    transitionSpec = { fadeIn(tween(320)) togetherWith fadeOut(tween(220)) },
-                                    label = "cover_slide_meta"
-                                ) { (slidePhoto, idx) ->
-                                    val locationSuffix = slidePhoto.locationName?.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()
-                                    val slideLabel = if (locationSuffix.isNotEmpty()) {
-                                        "${slidePhoto.month}月$locationSuffix"
-                                    } else {
-                                        "${slidePhoto.month}月精选 · ${idx + 1}/${slides.size}"
-                                    }
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.AutoAwesome,
-                                            contentDescription = null,
-                                            tint = SolarAmber,
-                                            modifier = Modifier.size(11.dp)
-                                        )
-                                        Text(
-                                            text = slideLabel,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontSize = 10.5.sp,
-                                            color = Color.White,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                            }
-                        } else if (summary.videoCount > 0) {
-                            ObsidianGlassPill {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Videocam,
-                                        contentDescription = null,
-                                        tint = SolarAmber,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Text(
-                                        text = "${summary.videoCount} 视频",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White
-                                    )
-                                }
-                            }
-                        }
+                        Spacer(modifier = Modifier.size(1.dp))
                     }
 
                     if (isFocused) {
-                        Spacer(modifier = Modifier.width(6.dp))
                         Box(
-                            contentAlignment = Alignment.CenterEnd,
+                            contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                                .clip(RoundedCornerShape(50))
+                                .clip(CircleShape)
                                 .clickable(
                                     onClickLabel = stringResource(R.string.cd_customize_cover),
                                     onClick = onCustomizeCover
                                 )
                                 .testTag("customize_cover_button_${summary.year}")
                         ) {
-                            ObsidianGlassPill {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color(0x660C1018),
+                                border = BorderStroke(0.9.dp, Color.White.copy(alpha = 0.34f)),
+                                shadowElevation = 4.dp,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = Icons.Filled.PhotoLibrary,
                                         contentDescription = stringResource(R.string.cd_customize_cover),
-                                        tint = SolarAmber,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Text(
-                                        text = stringResource(R.string.action_customize_cover),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
+                                        tint = Color.White.copy(alpha = 0.94f),
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
                             }
                         }
                     }
                 }
+            }
 
-                ObsidianGlassCard(
-                    shape = RoundedCornerShape(14.dp),
-                    topColor = Color(0x88141720),
-                    bottomColor = Color(0xA60E1016),
-                    modifier = Modifier.fillMaxWidth()
+            // Bottom: Museum Monograph Foil Typography directly over soft gradient (zero nested cards)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(end = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 11.dp, vertical = 9.dp),
-                        verticalArrangement = Arrangement.spacedBy(7.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "${summary.cleanedMonthsCount}/${summary.totalMonthsCount} 月归档",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.88f)
+                    Text(
+                        text = summary.year.toString(),
+                        style = MaterialTheme.typography.displayLarge.copy(
+                            fontFamily = EditorialSerifFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 52.sp,
+                            lineHeight = 50.sp,
+                            letterSpacing = (-1.4).sp,
+                            shadow = androidx.compose.ui.graphics.Shadow(
+                                color = Color.Black.copy(alpha = 0.42f),
+                                offset = androidx.compose.ui.geometry.Offset(0f, 3f),
+                                blurRadius = 10f
                             )
-                            Text(
-                                text = "${summary.totalPhotos} ITEMS",
-                                fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.8.sp,
-                                color = SolarAmber
-                            )
-                        }
+                        ),
+                        color = Color.White
+                    )
 
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(3.5.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.24f))
-                        ) {
-                            val animatedProgress by animateFloatAsState(
-                                targetValue = summary.progressFraction,
-                                animationSpec = spring(),
-                                label = "book_progress"
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .fillMaxWidth(animatedProgress)
-                                    .clip(CircleShape)
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            colors = listOf(Color.White, SolarAmber)
-                                        )
-                                    )
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                    if (summary.videoCount > 0) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color.Black.copy(alpha = 0.30f),
+                            border = BorderStroke(0.7.dp, Color.White.copy(alpha = 0.22f)),
+                            modifier = Modifier.padding(bottom = 6.dp)
                         ) {
                             Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Filled.AutoStories,
+                                    imageVector = Icons.Filled.Videocam,
                                     contentDescription = null,
-                                    tint = Color.White.copy(alpha = 0.78f),
-                                    modifier = Modifier.size(12.dp)
+                                    tint = SolarAmber,
+                                    modifier = Modifier.size(11.dp)
                                 )
                                 Text(
-                                    text = stringResource(R.string.cover_tap_flip_hint),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 10.sp,
-                                    color = Color.White.copy(alpha = 0.82f)
+                                    text = "${summary.videoCount}",
+                                    fontFamily = JetBrainsMonoFontFamily,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White.copy(alpha = 0.92f)
                                 )
                             }
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = Color.White.copy(alpha = 0.78f),
-                                modifier = Modifier.size(14.dp)
-                            )
                         }
                     }
+                }
+
+                // Hairline editorial rule separating year title from archive progress
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(0.75.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.36f),
+                                    Color.White.copy(alpha = 0.14f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val archiveSummary = buildString {
+                        append("${summary.totalPhotos} 项")
+                        if (summary.totalMonthsCount > 0) {
+                            append(" · 已归档 ${summary.cleanedMonthsCount}/${summary.totalMonthsCount} 月")
+                        }
+                    }
+                    Text(
+                        text = archiveSummary,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontSize = 12.sp,
+                        letterSpacing = 0.2.sp,
+                        color = Color.White.copy(alpha = 0.88f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.72f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                // Hairline archive progress bar with luminous champagne-amber tip
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.5.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.20f))
+                ) {
+                    val animatedProgress by animateFloatAsState(
+                        targetValue = summary.progressFraction,
+                        animationSpec = spring(),
+                        label = "book_progress"
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(animatedProgress)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.horizontalGradient(
+                                    colors = listOf(Color.White, SolarAmber)
+                                )
+                            )
+                    )
                 }
             }
         }

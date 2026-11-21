@@ -189,7 +189,8 @@ class RefactoringVerificationTest {
 
         composeRule.mainClock.advanceTimeBy(250L)
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("open_flipbook_button").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("open_flipbook_button").assertDoesNotExist()
+        composeRule.onNodeWithTag("yearbook_card_2026").assertIsDisplayed().performClick()
         composeRule.onNodeWithTag("open_yearbook_button").assertIsDisplayed().performClick()
         composeRule.mainClock.advanceTimeBy(250L)
         composeRule.waitForIdle()

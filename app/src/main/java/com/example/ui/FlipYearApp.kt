@@ -875,20 +875,20 @@ private fun FloatingGalleryDock(
     }
 
     FrostedGlassCard(
-        shape = RoundedCornerShape(32.dp),
-        topColor = if (isDark) Color(0xEB1C2230) else Color(0xDEFFFFFF),
-        bottomColor = if (isDark) Color(0xDE131722) else Color(0xCCF7F5F0),
-        shadowElevation = 18.dp,
+        shape = RoundedCornerShape(28.dp),
+        topColor = if (isDark) Color(0xEB1C2230) else Color(0xE0FFFFFF),
+        bottomColor = if (isDark) Color(0xDE131722) else Color(0xCEF7F5F0),
+        shadowElevation = 12.dp,
         enableAmbientBlur = true,
         modifier = Modifier
-            .widthIn(max = 396.dp)
+            .widthIn(max = 392.dp)
             .fillMaxWidth()
             .testTag("floating_gallery_dock")
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 5.dp),
+                .padding(horizontal = 5.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -911,8 +911,8 @@ private fun FloatingGalleryDock(
                     verticalArrangement = Arrangement.Center,
                     modifier = Modifier
                         .weight(1f)
-                        .height(50.dp)
-                        .clip(RoundedCornerShape(25.dp))
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(24.dp))
                         .then(
                             if (selected) {
                                 Modifier
@@ -925,7 +925,7 @@ private fun FloatingGalleryDock(
                                             strokeWidth = 0.9.dp.toPx()
                                         )
                                     }
-                                    .border(width = 1.dp, brush = activeRimBrush, shape = RoundedCornerShape(25.dp))
+                                    .border(width = 1.dp, brush = activeRimBrush, shape = RoundedCornerShape(24.dp))
                             } else {
                                 Modifier
                             }
