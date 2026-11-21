@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -72,44 +73,55 @@ import com.example.data.PhotoItemEntity
 import com.example.data.PhotoStatus
 import com.example.ui.GalleryEntry
 import kotlinx.coroutines.launch
-import com.example.ui.theme.CobaltDark
-import com.example.ui.theme.CobaltPrimary
-import com.example.ui.theme.CobaltSoft
-import com.example.ui.theme.CoralDanger
-import com.example.ui.theme.CoralSoft
-import com.example.ui.theme.EmeraldKeep
-import com.example.ui.theme.GlassLightBottom
-import com.example.ui.theme.GlassLightTop
-import com.example.ui.theme.HairlineBorder
-import com.example.ui.theme.InkPrimary
-import com.example.ui.theme.InkSecondary
-import com.example.ui.theme.InkTertiary
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.EditorialSerifFontFamily
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.LocalFlipYearPalette
 import com.example.ui.theme.LocalIsDarkTheme
-import com.example.ui.theme.ObsidianOverlayBorder
-import com.example.ui.theme.ObsidianOverlayGlass
-import com.example.ui.theme.ObsidianOverlayOrb
-import com.example.ui.theme.SolarAmber
-import com.example.ui.theme.SurfaceMuted
-import com.example.ui.theme.SurfacePure
 
 // Hoisted static shapes & invariant overlay colors to guarantee zero per-tile allocations during high-FPS scrolling
-private val TileShape = RoundedCornerShape(14.dp)
-private val FrameCardShape = RoundedCornerShape(16.dp)
-private val FrameImageShape = RoundedCornerShape(11.dp)
-private val TrayShape = RoundedCornerShape(22.dp)
-private val SmallButtonShape = RoundedCornerShape(10.dp)
+// 摩登画报造型语法：画片圆角 2~4dp（弃 10~22dp 大圆角）
+private val TileShape = RoundedCornerShape(3.dp)
+private val FrameCardShape = RoundedCornerShape(4.dp)
+private val FrameImageShape = RoundedCornerShape(2.dp)
+private val TrayShape = RoundedCornerShape(4.dp)
+private val SmallButtonShape = RoundedCornerShape(3.dp)
 private val PillShape = RoundedCornerShape(50)
 
 private val BurstBottomScrimBrush = Brush.verticalGradient(
     colors = listOf(Color.Transparent, Color(0xAD000000))
 )
-private val ObsidianPillBg = ObsidianOverlayGlass
-private val ObsidianPillBorder = ObsidianOverlayBorder
-private val SequencePillBg = ObsidianOverlayOrb
+// 朱红小签边（纸黄 25%）与深墨序号签底：纸黄只压照片暗部 / 朱红底（可读性红线）
+private val DecoBadgeBorder = Color(0x40EFE3C8)
+private val SequencePillBg = Color(0x8C000000)
 private val UnselectedCheckBg = Color(0x47000000)
-private val UnselectedCheckBorder = Color(0xEBFFFFFF)
-private val BestActiveBorder = Color(0x3DFFFFFF)
+private val UnselectedCheckBorder = Color(0xEBEFE3C8)
+// 最优签边框：主题金 40%（与相邻 decoGold 派生编码一致，弃 0x66C9A24A 固定暗金写法）
+private val BestActiveBorder: Color
+    @Composable get() = DecoGold.copy(alpha = 0.40f)
+
+// 干支纪年（2026 丙午 / 2025 乙巳 / 2024 甲辰 / 2023 癸卯 / 2022 壬寅 —— 通式推算）
+private val DecoStems = listOf("甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸")
+private val DecoBranches = listOf("子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥")
+
+private fun decoGanZhi(year: Int): String =
+    DecoStems[(year - 4).mod(10)] + DecoBranches[(year - 4).mod(12)]
+
+private fun decoChineseMonth(month: Int): String = when (month) {
+    1 -> "一月"
+    2 -> "二月"
+    3 -> "三月"
+    4 -> "四月"
+    5 -> "五月"
+    6 -> "六月"
+    7 -> "七月"
+    8 -> "八月"
+    9 -> "九月"
+    10 -> "十月"
+    11 -> "十一月"
+    else -> "十二月"
+}
 
 /**
  * High-FPS interactive Gallery Grid supporting collapsible/expandable Burst Stacks.
@@ -178,8 +190,8 @@ fun BurstGalleryGrid(
                 state = gridState,
                 columns = GridCells.Fixed(columns),
                 contentPadding = contentPadding,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(
@@ -208,7 +220,7 @@ fun BurstGalleryGrid(
                             val monthPhotos = monthPhotosMap[item.cluster.yearMonthKey].orEmpty()
                             val isMonthAllSelected = isSelectionMode && monthPhotos.isNotEmpty() &&
                                 monthPhotos.all { it.id in selectedPhotoIds }
-                            MonthlyClusterHeaderStamp(
+                            DecoMonthClusterHeader(
                                 cluster = item.cluster,
                                 isSelectionMode = isSelectionMode,
                                 isMonthAllSelected = isMonthAllSelected,
@@ -258,8 +270,8 @@ fun BurstGalleryGrid(
         state = gridState,
         columns = GridCells.Fixed(columns),
         contentPadding = contentPadding,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = modifier
     ) {
         items(
@@ -398,13 +410,13 @@ private fun SingleGalleryTile(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(0.92f)
+            .aspectRatio(0.86f)
             .then(selectionScaleModifier)
             .clip(TileShape)
-            .background(SurfaceMuted)
+            .background(LocalFlipYearPalette.current.decoMat)
             .border(
                 width = if (isSelected) 2.5.dp else 1.dp,
-                color = if (isSelected) CobaltPrimary else HairlineBorder,
+                color = if (isSelected) LocalFlipYearPalette.current.decoVerm else LocalFlipYearPalette.current.decoGold.copy(alpha = 0.45f),
                 shape = TileShape
             )
             .combinedClickable(
@@ -415,16 +427,45 @@ private fun SingleGalleryTile(
         PhotoArtwork(
             photo = photo,
             contentDescription = photo.caption,
+            showVideoBadge = false,
             downsampleTier = ImageDownsampleTier.GRID_THUMB,
             targetSizePx = thumbSizePx,
             modifier = Modifier.fillMaxSize()
         )
 
+        // 深墨视频小签（压照片暗部 + 纸黄字，deco-app.html 画廊屏视频签）
+        if (photo.isVideo) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(SequencePillBg)
+                    .border(0.75.dp, DecoBadgeBorder, RoundedCornerShape(2.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Videocam,
+                    contentDescription = null,
+                    tint = DecoPaperCream,
+                    modifier = Modifier.size(11.dp)
+                )
+                Text(
+                    text = "视频",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DecoPaperCream
+                )
+            }
+        }
+
         if (isSelected) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(CobaltPrimary.copy(alpha = 0.18f))
+                    .background(LocalFlipYearPalette.current.decoVerm.copy(alpha = 0.16f))
             )
         }
 
@@ -436,38 +477,40 @@ private fun SingleGalleryTile(
                     .padding(6.dp)
             )
         } else if (photo.photoStatus == PhotoStatus.KEPT) {
+            // 已保留 = 金印章（金底 + 内衬字）
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(6.dp)
                     .size(18.dp)
                     .clip(CircleShape)
-                    .background(EmeraldKeep),
+                    .background(LocalFlipYearPalette.current.decoGold),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Filled.CheckCircle,
                     contentDescription = "已保留",
-                    tint = Color.White,
+                    tint = LocalFlipYearPalette.current.decoMat,
                     modifier = Modifier.size(13.dp)
                 )
             }
         }
 
         if (photo.isFavorite) {
+            // 收藏 = 朱红小签章（朱底 + 纸黄星，压照片暗部）
             Box(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(6.dp)
                     .size(18.dp)
                     .clip(CircleShape)
-                    .background(SolarAmber),
+                    .background(LocalFlipYearPalette.current.decoVerm),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Filled.Star,
                     contentDescription = "收藏",
-                    tint = Color.White,
+                    tint = DecoPaperCream,
                     modifier = Modifier.size(12.dp)
                 )
             }
@@ -487,14 +530,14 @@ private fun SelectionCheckIndicator(
                 modifier = modifier
                     .size(23.dp)
                     .clip(CircleShape)
-                    .background(CobaltPrimary)
-                    .border(1.8.dp, Color.White, CircleShape),
+                    .background(LocalFlipYearPalette.current.decoVerm)
+                    .border(1.8.dp, UnselectedCheckBorder, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Filled.Check,
                     contentDescription = "已选中",
-                    tint = Color.White,
+                    tint = DecoPaperCream,
                     modifier = Modifier.size(14.dp)
                 )
             }
@@ -504,8 +547,8 @@ private fun SelectionCheckIndicator(
             Box(
                 modifier = modifier
                     .clip(PillShape)
-                    .background(CobaltPrimary)
-                    .border(1.5.dp, Color.White, PillShape)
+                    .background(LocalFlipYearPalette.current.decoVerm)
+                    .border(1.5.dp, UnselectedCheckBorder, PillShape)
                     .padding(horizontal = 6.dp, vertical = 2.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -513,8 +556,8 @@ private fun SelectionCheckIndicator(
                     text = partialCountText,
                     fontFamily = JetBrainsMonoFontFamily,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 9.5.sp,
-                    color = Color.White
+                    fontSize = 12.sp,
+                    color = DecoPaperCream
                 )
             }
         }
@@ -618,20 +661,22 @@ private fun CollapsedBurstStackTile(
     }
 
     val isDark = LocalIsDarkTheme.current
-    val backCardDeepFill = if (isDark) Color(0xFF1C2230) else Color(0xFFD6DAE3)
-    val backCardMidFill = if (isDark) Color(0xFF242B3D) else Color(0xFFE4E7EE)
+    val deco = LocalFlipYearPalette.current
+    // 画报纸叠：纸面层色取内衬/地面系，纸边描弱金线
+    val backCardDeepFill = if (isDark) Color(0xFF0F241F) else Color(0xFFDCD8CC)
+    val backCardMidFill = if (isDark) Color(0xFF1B382F) else Color(0xFFE8E4D8)
     val backCardShadowTint = if (isDark) Color(0x45000000) else Color(0x1612141B)
     val frontCardShadowTint = if (isDark) Color(0x58000000) else Color(0x1C12141B)
-    val backCardRimBorder = if (isDark) Color(0xFF36405A) else Color(0xFFFDFCF9)
-    val frontIdleBorder = if (isDark) Color(0xFF3F4A66) else Color.White
+    val backCardRimBorder = deco.decoGold.copy(alpha = 0.45f)
+    val frontIdleBorder = deco.decoGold.copy(alpha = 0.60f)
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(0.92f)
+            .aspectRatio(0.86f)
             .then(selectionScaleModifier)
             .drawBehind {
-                val corner = CornerRadius(13.dp.toPx(), 13.dp.toPx())
+                val corner = CornerRadius(4.dp.toPx(), 4.dp.toPx())
                 val rimStroke = Stroke(width = 1.6.dp.toPx())
                 val padX3 = 6.dp.toPx()
                 val padX2 = 3.5.dp.toPx()
@@ -708,7 +753,7 @@ private fun CollapsedBurstStackTile(
                     color = frontCardShadowTint,
                     topLeft = Offset(1.dp.toPx(), topFront + 2.5.dp.toPx()),
                     size = Size(size.width - 2.dp.toPx(), size.height - topFront),
-                    cornerRadius = CornerRadius(14.dp.toPx(), 14.dp.toPx())
+                    cornerRadius = CornerRadius(5.dp.toPx(), 5.dp.toPx())
                 )
             }
             .combinedClickable(
@@ -717,16 +762,16 @@ private fun CollapsedBurstStackTile(
             )
             .testTag("burst_collapsed_tile_${burst.groupId}")
     ) {
-        // Front Top Card (Gallery Print Cover with Crisp Rim or Cobalt Selection Rim)
+        // Front Top Card (Gallery Print Cover with Deco Gold Rim or Vermilion Selection Rim)
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = 8.dp)
                 .clip(TileShape)
-                .background(SurfacePure)
+                .background(deco.decoMat)
                 .border(
                     width = if (anySelected) 2.5.dp else 1.8.dp,
-                    color = if (anySelected) CobaltPrimary else frontIdleBorder,
+                    color = if (anySelected) deco.decoVerm else frontIdleBorder,
                     shape = TileShape
                 )
         ) {
@@ -743,7 +788,7 @@ private fun CollapsedBurstStackTile(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(CobaltPrimary.copy(alpha = 0.18f))
+                        .background(deco.decoVerm.copy(alpha = 0.16f))
                 )
             }
 
@@ -756,34 +801,7 @@ private fun CollapsedBurstStackTile(
                     .background(BurstBottomScrimBrush)
             )
 
-            // Lightweight Obsidian Burst Indicator Badge (Top-Left, no Material Surface overhead)
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(6.dp)
-                    .clip(PillShape)
-                    .background(ObsidianPillBg)
-                    .border(0.85.dp, ObsidianPillBorder, PillShape)
-                    .padding(horizontal = 7.dp, vertical = 3.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.BurstMode,
-                    contentDescription = null,
-                    tint = SolarAmber,
-                    modifier = Modifier.size(12.dp)
-                )
-                Text(
-                    text = "${burst.photos.size}",
-                    fontFamily = JetBrainsMonoFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 10.sp,
-                    color = Color.White
-                )
-            }
-
-            // Top-Right: Selection Check Badge in multi-select mode, else Best Shot Star Micro-Badge
+            // Top-Right: Selection Check Badge in multi-select mode, else Best Shot Gold Seal
             if (isSelectionMode) {
                 SelectionCheckIndicator(
                     isSelected = allSelected,
@@ -799,43 +817,61 @@ private fun CollapsedBurstStackTile(
                         .padding(6.dp)
                         .size(19.dp)
                         .clip(CircleShape)
-                        .background(SolarAmber),
+                        .background(deco.decoGold),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Star,
                         contentDescription = "最佳连拍",
-                        tint = Color.White,
+                        tint = deco.decoMat,
                         modifier = Modifier.size(12.dp)
                     )
                 }
             }
 
-            // Bottom "Expand Burst" or "Select Burst" visual cue
+            // Bottom cue: 朱红小签（连拍 N，压照片暗部）+ 展开/选组提示
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .padding(horizontal = 7.dp, vertical = 5.dp),
+                    .padding(horizontal = 5.dp, vertical = 5.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = if (isSelectionMode) {
-                        if (allSelected) "已选整组" else "点击选整组"
-                    } else {
-                        "连拍 · 展开"
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 9.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                if (!isSelectionMode) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(deco.decoVerm)
+                        .border(0.75.dp, DecoBadgeBorder, RoundedCornerShape(2.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.BurstMode,
+                        contentDescription = null,
+                        tint = DecoPaperCream,
+                        modifier = Modifier.size(11.dp)
+                    )
+                    Text(
+                        text = "连拍 ${burst.photos.size}",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DecoPaperCream
+                    )
+                }
+                if (isSelectionMode) {
+                    Text(
+                        text = if (allSelected) "已选整组" else "点击选整组",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DecoPaperCream
+                    )
+                } else {
                     Icon(
                         imageVector = Icons.Filled.ExpandMore,
                         contentDescription = stringResource(R.string.burst_expand),
-                        tint = Color.White,
+                        tint = DecoPaperCream,
                         modifier = Modifier.size(14.dp)
                     )
                 }
@@ -872,7 +908,7 @@ private fun ExpandedBurstStackTray(
     // Keep enableAmbientBlur = false and minimal shadowElevation inside scrolling LazyGrid items
     FrostedGlassCard(
         shape = TrayShape,
-        borderAccent = CobaltPrimary,
+        borderAccent = LocalFlipYearPalette.current.decoGold,
         shadowElevation = 2.dp,
         enableAmbientBlur = false,
         modifier = modifier
@@ -899,14 +935,14 @@ private fun ExpandedBurstStackTray(
                     Box(
                         modifier = Modifier
                             .clip(SmallButtonShape)
-                            .background(CobaltSoft)
+                            .background(LocalFlipYearPalette.current.decoGold.copy(alpha = 0.12f))
                             .padding(7.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Filled.BurstMode,
                             contentDescription = null,
-                            tint = CobaltPrimary,
+                            tint = LocalFlipYearPalette.current.decoGold,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -915,12 +951,13 @@ private fun ExpandedBurstStackTray(
                             text = "快速连拍组 · ${burst.photos.size} 张",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            color = InkPrimary
+                            color = LocalFlipYearPalette.current.decoInkOnGround
                         )
                         Text(
                             text = headerSubtitle,
                             style = MaterialTheme.typography.labelSmall,
-                            color = InkSecondary,
+                            fontSize = 12.sp,
+                            color = LocalFlipYearPalette.current.decoInkOnGround.copy(alpha = 0.65f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -931,8 +968,8 @@ private fun ExpandedBurstStackTray(
                 Surface(
                     onClick = onCollapse,
                     shape = PillShape,
-                    color = SurfaceMuted,
-                    border = BorderStroke(1.dp, HairlineBorder),
+                    color = LocalFlipYearPalette.current.decoMat,
+                    border = BorderStroke(1.dp, LocalFlipYearPalette.current.decoGold.copy(alpha = 0.40f)),
                     modifier = Modifier.testTag("burst_collapse_button_${burst.groupId}")
                 ) {
                     Row(
@@ -943,14 +980,14 @@ private fun ExpandedBurstStackTray(
                         Icon(
                             imageVector = Icons.Filled.UnfoldLess,
                             contentDescription = stringResource(R.string.burst_collapse),
-                            tint = InkPrimary,
+                            tint = LocalFlipYearPalette.current.decoInkOnGround,
                             modifier = Modifier.size(15.dp)
                         )
                         Text(
                             text = "收起",
                             style = MaterialTheme.typography.labelLarge,
                             fontSize = 12.sp,
-                            color = InkPrimary
+                            color = LocalFlipYearPalette.current.decoInkOnGround
                         )
                     }
                 }
@@ -996,7 +1033,7 @@ private fun ExpandedBurstStackTray(
                 GalleryActionButton(
                     text = keepBestLabel,
                     leadingIcon = Icons.Filled.AutoAwesome,
-                    tone = GalleryButtonTone.OBSIDIAN,
+                    tone = GalleryButtonTone.IMMERSIVE,
                     height = 44.dp,
                     shape = TileShape,
                     onClick = { onKeepBest(burst.bestPhoto) },
@@ -1024,11 +1061,13 @@ private fun BurstFrameCard(
     onLongClick: () -> Unit
 ) {
     val highlight = isSelected || isBest
+    val deco = LocalFlipYearPalette.current
     val containerColor = when {
-        isSelected -> CobaltSoft.copy(alpha = 0.78f)
-        isBest -> CobaltSoft.copy(alpha = 0.55f)
-        else -> SurfaceMuted.copy(alpha = 0.65f)
+        isSelected -> deco.decoVerm.copy(alpha = 0.16f)
+        isBest -> deco.decoGold.copy(alpha = 0.16f)
+        else -> deco.decoGold.copy(alpha = 0.06f)
     }
+    val highlightColor = if (isSelected) deco.decoVerm else deco.decoGold
 
     Column(
         modifier = Modifier
@@ -1037,7 +1076,7 @@ private fun BurstFrameCard(
             .background(containerColor)
             .border(
                 width = if (highlight) 2.2.dp else 1.dp,
-                color = if (highlight) CobaltPrimary else HairlineBorder,
+                color = if (highlight) highlightColor else deco.decoGold.copy(alpha = 0.45f),
                 shape = FrameCardShape
             )
             .padding(6.dp)
@@ -1066,11 +1105,11 @@ private fun BurstFrameCard(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(CobaltPrimary.copy(alpha = 0.18f))
+                        .background(deco.decoVerm.copy(alpha = 0.16f))
                 )
             }
 
-            // Sequence + Time Delta Pill (Top-Left)
+            // Sequence + Time Delta Pill (Top-Left, 深墨底 + 纸黄字压照片暗部)
             Box(
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -1082,12 +1121,12 @@ private fun BurstFrameCard(
                 Text(
                     text = "#${index + 1} +${deltaSeconds}s",
                     fontFamily = JetBrainsMonoFontFamily,
-                    fontSize = 9.sp,
-                    color = Color.White
+                    fontSize = 12.sp,
+                    color = DecoPaperCream
                 )
             }
 
-            // Selection Indicator (Top-Right) in selection mode, else Best Star Badge
+            // Selection Indicator (Top-Right) in selection mode, else Best vermilion tag
             if (isSelectionMode) {
                 SelectionCheckIndicator(
                     isSelected = isSelected,
@@ -1100,8 +1139,9 @@ private fun BurstFrameCard(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(5.dp)
-                        .clip(PillShape)
-                        .background(SolarAmber)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(deco.decoVerm)
+                        .border(0.75.dp, DecoBadgeBorder, RoundedCornerShape(2.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
@@ -1109,15 +1149,15 @@ private fun BurstFrameCard(
                     Icon(
                         imageVector = Icons.Filled.Star,
                         contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(10.dp)
+                        tint = DecoPaperCream,
+                        modifier = Modifier.size(11.dp)
                     )
                     Text(
                         text = "最佳",
                         style = MaterialTheme.typography.labelSmall,
-                        fontSize = 9.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = DecoPaperCream
                     )
                 }
             }
@@ -1133,25 +1173,28 @@ private fun BurstFrameCard(
             Text(
                 text = "画质 ${photo.qualityScore}",
                 fontFamily = JetBrainsMonoFontFamily,
-                fontSize = 10.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isBest) CobaltDark else InkSecondary
+                color = deco.decoInkOnGround.copy(alpha = if (isBest) 0.95f else 0.78f)
             )
             Text(
                 text = formatStorageSize(photo.fileSizeBytes),
                 fontFamily = JetBrainsMonoFontFamily,
-                fontSize = 10.sp,
-                color = InkTertiary
+                fontSize = 12.sp,
+                color = deco.decoInkOnGround.copy(alpha = 0.55f)
             )
         }
 
         Spacer(modifier = Modifier.height(6.dp))
 
         val bestActiveBrush = activeChromeSatinBrush()
-        val glassTop = GlassLightTop
-        val glassBottom = GlassLightBottom
-        val bestIdleBrush = remember(glassTop, glassBottom) {
-            Brush.verticalGradient(colors = listOf(glassTop, glassBottom))
+        val bestIdleBrush = remember(deco) {
+            Brush.verticalGradient(
+                colors = listOf(
+                    deco.decoGold.copy(alpha = 0.12f),
+                    deco.decoGold.copy(alpha = 0.06f)
+                )
+            )
         }
 
         Row(
@@ -1168,7 +1211,7 @@ private fun BurstFrameCard(
                     .background(if (isBest) bestActiveBrush else bestIdleBrush)
                     .border(
                         1.dp,
-                        if (isBest) BestActiveBorder else HairlineBorder,
+                        if (isBest) BestActiveBorder else deco.decoGold.copy(alpha = 0.50f),
                         SmallButtonShape
                     )
                     .clickable(onClick = onSelectBest)
@@ -1176,9 +1219,9 @@ private fun BurstFrameCard(
                 Text(
                     text = if (isBest) "已选最佳" else "设为最佳",
                     style = MaterialTheme.typography.labelSmall,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (isBest) Color.White else InkPrimary
+                    color = if (isBest) deco.decoMat else deco.decoInkOnGround
                 )
             }
 
@@ -1186,19 +1229,128 @@ private fun BurstFrameCard(
                 Surface(
                     onClick = onTrash,
                     shape = SmallButtonShape,
-                    color = CoralSoft,
-                    border = BorderStroke(1.dp, CoralDanger.copy(alpha = 0.28f)),
+                    color = deco.decoVerm.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, deco.decoVerm.copy(alpha = 0.45f)),
                     modifier = Modifier.size(48.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Filled.DeleteOutline,
                             contentDescription = "移入回收站",
-                            tint = CoralDanger,
+                            tint = deco.decoVerm,
                             modifier = Modifier.size(18.dp)
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * 摩登画报 · 月头画报栏目线（deco-app.html 画廊屏月头）：
+ * 衬线月名 20sp + 金色干支纪年副标 12sp + 弱金通栏细线 + 计数与动作跳签。
+ * 功能等价迁移自 MonthlyClusterHeaderStamp：选本月 / 整理本月 / 已整理标记与 testTag 原样保留。
+ */
+@Composable
+private fun DecoMonthClusterHeader(
+    cluster: MonthlyClusterSummary,
+    isSelectionMode: Boolean = false,
+    isMonthAllSelected: Boolean = false,
+    onToggleSelectMonth: (() -> Unit)? = null,
+    onCleanMonth: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    val deco = LocalFlipYearPalette.current
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp, bottom = 4.dp)
+            .testTag("timeline_cluster_header_${cluster.yearMonthKey}"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // 画报月名 + 干支纪年副标
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = decoChineseMonth(cluster.month),
+                fontFamily = EditorialSerifFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                letterSpacing = 0.6.sp,
+                color = deco.decoInkOnGround
+            )
+            Text(
+                text = "${decoGanZhi(cluster.year)}年",
+                fontSize = 12.sp,
+                letterSpacing = 1.2.sp,
+                color = deco.decoGold
+            )
+        }
+
+        // 栏目细线
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(1.dp)
+                .background(deco.decoGold.copy(alpha = 0.45f))
+        )
+
+        // 计数 + 动作跳签（选本月 / 整理·重温 / 已整理）
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = cluster.compactSummaryText,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = deco.decoInkOnGround.copy(alpha = 0.62f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (isSelectionMode && onToggleSelectMonth != null) {
+                Surface(
+                    onClick = onToggleSelectMonth,
+                    shape = PillShape,
+                    color = if (isMonthAllSelected) deco.decoGold else Color.Transparent,
+                    border = BorderStroke(1.dp, deco.decoGold.copy(alpha = 0.55f)),
+                    modifier = Modifier.testTag("timeline_select_month_${cluster.yearMonthKey}")
+                ) {
+                    Text(
+                        text = if (isMonthAllSelected) "已选本月" else "选本月",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isMonthAllSelected) deco.decoMat else deco.decoGold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+            } else if (!isSelectionMode && onCleanMonth != null) {
+                Surface(
+                    onClick = onCleanMonth,
+                    shape = PillShape,
+                    color = if (cluster.isCleaned) deco.decoGold else Color.Transparent,
+                    border = BorderStroke(1.dp, deco.decoGold.copy(alpha = 0.55f)),
+                    modifier = Modifier.testTag("timeline_clean_month_${cluster.yearMonthKey}")
+                ) {
+                    Text(
+                        text = if (cluster.isCleaned) "重温" else "整理",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (cluster.isCleaned) deco.decoMat else deco.decoGold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+            } else if (cluster.isCleaned) {
+                Icon(
+                    imageVector = Icons.Filled.CheckCircle,
+                    contentDescription = stringResource(R.string.timeline_month_cleaned_tag),
+                    tint = deco.decoGold,
+                    modifier = Modifier.size(13.dp)
+                )
             }
         }
     }

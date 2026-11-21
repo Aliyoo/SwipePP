@@ -35,6 +35,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +46,8 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.CobaltDark
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CoralDanger
+import com.example.ui.theme.DecoInkDeep
+import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.GlassLightBottom
 import com.example.ui.theme.GlassLightTop
 import com.example.ui.theme.GlassSpecularRimEnd
@@ -70,7 +73,12 @@ enum class GalleryButtonTone {
     GLASS,
 
     /** Soft rose-tinted frosted glass for non-primary destructive actions */
-    DANGER_GLASS
+    DANGER_GLASS,
+
+    /**
+     * 摩登画报 Deco paper button: 浅象牙底 + 深墨字，浅暗主题同值（design-demos/deco-app.html 纸材）
+     */
+    IMMERSIVE
 }
 
 /**
@@ -86,7 +94,7 @@ fun GalleryActionButton(
     leadingIcon: ImageVector? = null,
     iconTint: Color? = null,
     height: Dp = 50.dp,
-    shape: Shape = RoundedCornerShape(16.dp),
+    shape: Shape? = null,
     enabled: Boolean = true
 ) {
     val isDark = LocalIsDarkTheme.current
@@ -101,6 +109,11 @@ fun GalleryActionButton(
     val cobaltDark = CobaltDark
     val coral = CoralDanger
     val inkPrimary = InkPrimary
+
+    // 未显式传 shape 时按分支取默认：IMMERSIVE 画报纸面 = 3dp（画片圆角语法），
+    // 其余 satin/glass 分支维持旧 16dp 胶囊
+    val resolvedShape = shape
+        ?: if (tone == GalleryButtonTone.IMMERSIVE) RoundedCornerShape(3.dp) else RoundedCornerShape(16.dp)
 
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -132,6 +145,8 @@ fun GalleryActionButton(
             } else {
                 Brush.verticalGradient(colors = listOf(Color(0xE8FFF2F4), Color(0xD4FDE5E9)))
             }
+            // 画报纸面：浅象牙平涂，浅暗主题同值
+            GalleryButtonTone.IMMERSIVE -> SolidColor(DecoPaperCream)
         }
     }
 
@@ -156,6 +171,10 @@ fun GalleryActionButton(
                     listOf(Color.White.copy(alpha = 0.85f), coral.copy(alpha = 0.34f), coral.copy(alpha = 0.22f))
                 }
             )
+            // 画报金描边（主题金，呼应金双线画框）
+            GalleryButtonTone.IMMERSIVE -> Brush.linearGradient(
+                colors = listOf(palette.decoGold.copy(alpha = 0.92f), palette.decoGold, palette.decoGold.copy(alpha = 0.72f))
+            )
         }
     }
 
@@ -163,6 +182,8 @@ fun GalleryActionButton(
         GalleryButtonTone.OBSIDIAN, GalleryButtonTone.SAPPHIRE, GalleryButtonTone.DANGER -> Color.White
         GalleryButtonTone.GLASS -> inkPrimary
         GalleryButtonTone.DANGER_GLASS -> coral
+        // 画报深墨字，浅暗主题同值
+        GalleryButtonTone.IMMERSIVE -> DecoInkDeep
     }
 
     val resolvedIconTint = iconTint ?: when (tone) {
@@ -170,6 +191,7 @@ fun GalleryActionButton(
         GalleryButtonTone.SAPPHIRE, GalleryButtonTone.DANGER -> Color.White
         GalleryButtonTone.GLASS -> cobalt
         GalleryButtonTone.DANGER_GLASS -> coral
+        GalleryButtonTone.IMMERSIVE -> DecoInkDeep
     }
 
     val shadowColor = when (tone) {
@@ -178,11 +200,13 @@ fun GalleryActionButton(
         GalleryButtonTone.DANGER -> coral.copy(alpha = 0.34f)
         GalleryButtonTone.GLASS -> (if (isDark) Color.Black else inkPrimary).copy(alpha = if (isDark) 0.42f else 0.12f)
         GalleryButtonTone.DANGER_GLASS -> coral.copy(alpha = 0.18f)
+        GalleryButtonTone.IMMERSIVE -> DecoInkDeep.copy(alpha = 0.22f)
     }
 
     val topSheenColor = when (tone) {
         GalleryButtonTone.GLASS, GalleryButtonTone.DANGER_GLASS ->
             Color.White.copy(alpha = if (isDark) 0.16f else 0.72f)
+        GalleryButtonTone.IMMERSIVE -> Color.Transparent // 画报纸面无高光
         else -> Color.White.copy(alpha = 0.24f)
     }
 
@@ -202,11 +226,11 @@ fun GalleryActionButton(
             }
             .shadow(
                 elevation = if (pressed) elevation * 0.5f else elevation,
-                shape = shape,
+                shape = resolvedShape,
                 ambientColor = shadowColor,
                 spotColor = shadowColor
             )
-            .clip(shape)
+            .clip(resolvedShape)
             .drawBehind {
                 drawRect(brush = fillBrush)
                 drawLine(
@@ -216,11 +240,17 @@ fun GalleryActionButton(
                     strokeWidth = 1.dp.toPx()
                 )
             }
-            .border(width = 1.dp, brush = borderBrush, shape = shape)
+            .border(width = 1.dp, brush = borderBrush, shape = resolvedShape)
             .clickable(
                 enabled = enabled,
                 interactionSource = interactionSource,
-                indication = ripple(color = if (tone == GalleryButtonTone.GLASS) inkPrimary else Color.White),
+                indication = ripple(
+                    color = when (tone) {
+                        GalleryButtonTone.IMMERSIVE -> DecoInkDeep
+                        GalleryButtonTone.GLASS -> inkPrimary
+                        else -> Color.White
+                    }
+                ),
                 onClick = onClick
             )
             .padding(horizontal = 18.dp, vertical = 10.dp)
@@ -514,7 +544,7 @@ fun GallerySculptedHeroButton(
     badgeText: String? = null,
     tone: GalleryButtonTone = GalleryButtonTone.OBSIDIAN,
     height: Dp = 54.dp,
-    shape: Shape = RoundedCornerShape(18.dp),
+    shape: Shape? = null,
     enabled: Boolean = true
 ) {
     val isDark = LocalIsDarkTheme.current
@@ -524,6 +554,11 @@ fun GallerySculptedHeroButton(
     val cobaltDark = CobaltDark
     val coral = CoralDanger
     val inkPrimary = InkPrimary
+
+    // 未显式传 shape 时按分支取默认：IMMERSIVE 画报纸面 = 3dp（画片圆角语法），
+    // 其余 satin 分支维持旧 18dp 胶囊
+    val resolvedShape = shape
+        ?: if (tone == GalleryButtonTone.IMMERSIVE) RoundedCornerShape(3.dp) else RoundedCornerShape(18.dp)
 
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -546,6 +581,8 @@ fun GallerySculptedHeroButton(
             } else {
                 Brush.linearGradient(colors = listOf(Color(0xFF395EF2), cobalt, cobaltDark))
             }
+            // 画报纸面：浅象牙平涂，浅暗主题同值
+            GalleryButtonTone.IMMERSIVE -> SolidColor(DecoPaperCream)
             else -> activeBrush
         }
     }
@@ -553,6 +590,10 @@ fun GallerySculptedHeroButton(
         when (tone) {
             GalleryButtonTone.DANGER -> Brush.linearGradient(
                 colors = listOf(Color.White.copy(alpha = 0.40f), Color.White.copy(alpha = 0.12f), Color(0xFFFFA5B1).copy(alpha = 0.34f))
+            )
+            // 画报金描边（主题金，呼应金双线画框）
+            GalleryButtonTone.IMMERSIVE -> Brush.linearGradient(
+                colors = listOf(palette.decoGold.copy(alpha = 0.92f), palette.decoGold, palette.decoGold.copy(alpha = 0.72f))
             )
             else -> Brush.linearGradient(
                 colors = listOf(
@@ -565,10 +606,13 @@ fun GallerySculptedHeroButton(
     }
     val shadowColor = when (tone) {
         GalleryButtonTone.DANGER -> coral.copy(alpha = 0.36f)
+        GalleryButtonTone.IMMERSIVE -> DecoInkDeep.copy(alpha = 0.22f)
         else -> (if (isDark) cobalt else inkPrimary).copy(alpha = if (isDark) 0.40f else 0.30f)
     }
+    val contentColor = if (tone == GalleryButtonTone.IMMERSIVE) DecoInkDeep else Color.White
     val iconTint = when (tone) {
         GalleryButtonTone.OBSIDIAN -> SolarAmber
+        GalleryButtonTone.IMMERSIVE -> DecoInkDeep
         else -> Color.White
     }
 
@@ -583,25 +627,25 @@ fun GallerySculptedHeroButton(
             }
             .shadow(
                 elevation = if (pressed) 5.dp else 11.dp,
-                shape = shape,
+                shape = resolvedShape,
                 ambientColor = shadowColor,
                 spotColor = shadowColor
             )
-            .clip(shape)
+            .clip(resolvedShape)
             .drawBehind {
                 drawRect(brush = fillBrush)
                 drawLine(
-                    color = Color.White.copy(alpha = 0.26f),
+                    color = if (tone == GalleryButtonTone.IMMERSIVE) Color.Transparent else Color.White.copy(alpha = 0.26f),
                     start = Offset(0f, 0.8.dp.toPx()),
                     end = Offset(size.width, 0.8.dp.toPx()),
                     strokeWidth = 1.dp.toPx()
                 )
             }
-            .border(width = 1.dp, brush = borderBrush, shape = shape)
+            .border(width = 1.dp, brush = borderBrush, shape = resolvedShape)
             .clickable(
                 enabled = enabled,
                 interactionSource = interactionSource,
-                indication = ripple(color = Color.White),
+                indication = ripple(color = contentColor),
                 onClick = onClick
             )
             .padding(horizontal = 16.dp, vertical = 10.dp)
@@ -623,7 +667,7 @@ fun GallerySculptedHeroButton(
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.5.sp,
-                color = Color.White,
+                color = contentColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = badgeText != null)
@@ -631,10 +675,12 @@ fun GallerySculptedHeroButton(
             if (!badgeText.isNullOrBlank()) {
                 androidx.compose.material3.Surface(
                     shape = RoundedCornerShape(50),
-                    color = Color.White.copy(alpha = if (tone == GalleryButtonTone.DANGER) 0.18f else 0.14f),
+                    color = if (tone == GalleryButtonTone.IMMERSIVE) DecoInkDeep.copy(alpha = 0.10f)
+                    else Color.White.copy(alpha = if (tone == GalleryButtonTone.DANGER) 0.18f else 0.14f),
                     border = androidx.compose.foundation.BorderStroke(
                         0.75.dp,
-                        Color.White.copy(alpha = 0.24f)
+                        if (tone == GalleryButtonTone.IMMERSIVE) DecoInkDeep.copy(alpha = 0.24f)
+                        else Color.White.copy(alpha = 0.24f)
                     )
                 ) {
                     Text(
@@ -642,7 +688,11 @@ fun GallerySculptedHeroButton(
                         fontFamily = com.example.ui.theme.JetBrainsMonoFontFamily,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 11.sp,
-                        color = if (tone == GalleryButtonTone.OBSIDIAN) Color(0xFFFDE68A) else Color.White,
+                        color = when (tone) {
+                            GalleryButtonTone.IMMERSIVE -> DecoInkDeep
+                            GalleryButtonTone.OBSIDIAN -> Color(0xFFFDE68A)
+                            else -> Color.White
+                        },
                         maxLines = 1,
                         modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
                     )

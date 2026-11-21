@@ -10,14 +10,28 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ripple
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
@@ -28,20 +42,39 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.platform.testTag
 import coil.compose.AsyncImage
 import com.example.data.FlipYearImageLoaders
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoGround
+import com.example.ui.theme.DecoGroundDeep
+import com.example.ui.theme.DecoInkDeep
+import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoMat
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoVerm
+import com.example.ui.theme.DecoVermShadowInk
+import com.example.ui.theme.EditorialSerifFontFamily
 import com.example.ui.theme.GlassDarkRimEnd
 import com.example.ui.theme.GlassDarkRimMid
 import com.example.ui.theme.GlassDarkRimStart
@@ -63,6 +96,11 @@ import com.example.ui.theme.GlassSpecularRimStart
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.SkylightChampagneGlow
 import com.example.ui.theme.SkylightSapphireGlow
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+
+// 朱红通栏投影墨色改走 theme/Color.kt 共享常量 DecoVermShadowInk（原型 rgba(122,26,15,0.45)）
 
 /**
  * Hardware-accelerated RenderEffect blur (`Modifier.blur`) is available on Android 12 (API 31+).
@@ -467,6 +505,304 @@ fun BlurredAmbientPhotoBackdrop(
                 alpha = alpha,
                 modifier = blurModifier
             )
+        }
+    }
+}
+
+// =====================================================================================
+// 摩登画报 (Modern Deco Pictorial) shared materials — deco-app.html 造型语法
+// 金双线画框 / 放射太阳纹 / 朱红通栏 / 画报纸面版面。色彩全部走 ui/theme Deco 令牌
+// （日光画廊 / 暗夜暗房 双套自适应），本文件不引入一次性硬编码色。
+// =====================================================================================
+
+/**
+ * 画报纸面版面（mat 内衬 + 金色发丝描边，2~4dp 小圆角）。
+ * 画报语言下一切信息卡 / 控制栏 / 详情卡的统一容器：平涂无玻璃高光。
+ */
+@Composable
+fun DecoPosterPanel(
+    modifier: Modifier = Modifier,
+    radius: Dp = 3.dp,
+    borderColor: Color? = null,
+    borderAlpha: Float = 0.45f,
+    shadowElevation: Dp = 6.dp,
+    onClick: (() -> Unit)? = null,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val mat = DecoMat
+    val gold = DecoGold
+    val isDark = LocalIsDarkTheme.current
+    val shadowInk = if (isDark) Color.Black else DecoInkDeep
+    val resolvedBorder = (borderColor ?: gold).copy(alpha = borderAlpha)
+
+    val containerModifier = modifier
+        .then(
+            if (shadowElevation > 0.dp) {
+                Modifier.shadow(
+                    elevation = shadowElevation,
+                    shape = RoundedCornerShape(radius),
+                    ambientColor = shadowInk.copy(alpha = 0.26f),
+                    spotColor = shadowInk.copy(alpha = 0.40f)
+                )
+            } else {
+                Modifier
+            }
+        )
+        .clip(RoundedCornerShape(radius))
+        .background(mat)
+        .border(width = 1.dp, color = resolvedBorder, shape = RoundedCornerShape(radius))
+        .then(
+            if (onClick != null) {
+                Modifier.clickable(onClick = onClick)
+            } else {
+                // Match Material 3 Surface: block pointer hit-testing from leaking through
+                // empty padding or inter-panel gaps to siblings behind this paper panel.
+                Modifier
+                    .semantics(mergeDescendants = false) { isTraversalGroup = true }
+                    .pointerInput(Unit) {}
+            }
+        )
+
+    Box(modifier = containerModifier, content = content)
+}
+
+/**
+ * 放射太阳纹：24 扇形放射（每 15° 一瓣、瓣宽约 6.5°），默认金 0.12~0.16 alpha。
+ * 造型语法规定 Canvas 实现，禁止位图。
+ */
+@Composable
+fun DecoSunburst(
+    modifier: Modifier = Modifier,
+    color: Color? = null,
+    opacity: Float = 0.14f
+) {
+    val rayColor = color ?: DecoGold
+    Canvas(modifier = modifier) {
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val radius = size.minDimension / 2f
+        val halfSweep = 3.25f * (PI.toFloat() / 180f)
+        val path = Path()
+        for (i in 0 until 24) {
+            val center = (i * 15f) * (PI.toFloat() / 180f)
+            val a1 = center - halfSweep
+            val a2 = center + halfSweep
+            path.rewind()
+            path.moveTo(cx, cy)
+            path.lineTo(cx + cos(a1) * radius, cy + sin(a1) * radius)
+            path.lineTo(cx + cos(a2) * radius, cy + sin(a2) * radius)
+            path.close()
+            drawPath(path = path, color = rayColor, alpha = opacity)
+        }
+    }
+}
+
+/**
+ * 朱红通栏双动作条：左主动作 20sp 纸黄 + 1dp 金渐变中缝 + 右次动作 17sp 纸黄(0.88)。
+ * 纸黄只压朱红底（可读性红线允许的组合），文字用 Editorial 衬线 + 0.14em 字距。
+ */
+@Composable
+fun DecoVermStrip(
+    leftLabel: String,
+    rightLabel: String,
+    onLeft: () -> Unit,
+    onRight: () -> Unit,
+    modifier: Modifier = Modifier,
+    height: Dp = 52.dp,
+    leftFlex: Float = 1.15f,
+    leftTestTag: String? = null,
+    rightTestTag: String? = null
+) {
+    val verm = DecoVerm
+    val gold = DecoGold
+    val cream = DecoPaperCream
+
+    Row(
+        modifier = modifier
+            .height(height)
+            .shadow(
+                elevation = 10.dp,
+                shape = RoundedCornerShape(3.dp),
+                ambientColor = DecoVermShadowInk.copy(alpha = 0.38f),
+                spotColor = DecoVermShadowInk.copy(alpha = 0.45f)
+            )
+            .clip(RoundedCornerShape(3.dp))
+            .background(verm)
+            .drawBehind {
+                // 顶缘纸黄发丝（朱红体的受光边，呼应原型 inset 顶光）
+                drawLine(
+                    color = cream.copy(alpha = 0.22f),
+                    start = Offset(0f, 0.75.dp.toPx()),
+                    end = Offset(size.width, 0.75.dp.toPx()),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .weight(leftFlex)
+                .fillMaxHeight()
+                .then(leftTestTag?.let { Modifier.testTag(it) } ?: Modifier)
+                .clickable(onClick = onLeft)
+        ) {
+            Text(
+                text = leftLabel,
+                fontFamily = EditorialSerifFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                letterSpacing = 2.8.sp,
+                color = cream,
+                maxLines = 1
+            )
+        }
+
+        // 中缝：1dp 金渐变（上下端透明淡出）
+        Box(
+            modifier = Modifier
+                .width(1.dp)
+                .fillMaxHeight()
+                .padding(vertical = 12.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(gold.copy(alpha = 0f), gold.copy(alpha = 0.80f), gold.copy(alpha = 0f))
+                    )
+                )
+        )
+
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .then(rightTestTag?.let { Modifier.testTag(it) } ?: Modifier)
+                .clickable(onClick = onRight)
+        ) {
+            Text(
+                text = rightLabel,
+                fontFamily = EditorialSerifFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                letterSpacing = 2.4.sp,
+                color = cream.copy(alpha = 0.88f),
+                maxLines = 1
+            )
+        }
+    }
+}
+
+/**
+ * 画报纸面地（原型 PaperGround）：decoGround → decoGroundDeep 纵向渐变 +
+ * 每 4dp 一条 ink 0.016 纸纹细线（原型 repeating-linear-gradient 3px/4px）。
+ * 共享组件：各屏纸地一律走这里，纸纹 alpha 统一 0.016。
+ */
+@Composable
+fun DecoPaperGround(
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val ground = DecoGround
+    val groundDeep = DecoGroundDeep
+    val ink = DecoInkOnGround
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(ground, groundDeep)))
+            .drawBehind {
+                val step = 4.dp.toPx()
+                var y = 0f
+                while (y < size.height) {
+                    drawLine(
+                        color = ink.copy(alpha = 0.016f),
+                        start = Offset(0f, y),
+                        end = Offset(size.width, y),
+                        strokeWidth = 1f
+                    )
+                    y += step
+                }
+            },
+        content = content
+    )
+}
+
+/**
+ * 方章按钮（原型 SealBtn）：38~42dp 正方、1.5dp 金描边、竖排两字，
+ * 视觉 ≥48dp 命中区（可及性红线），按压 0.92 缩放 + 金色涟漪。
+ * 金墨字走 Editorial 衬线；地面取色读主题 deco 令牌。
+ */
+@Composable
+fun DecoSealButton(
+    labelTop: String,
+    labelBottom: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    size: Dp = 38.dp,
+    fontSize: TextUnit = 15.sp,
+    testTag: String? = null,
+    contentDescriptionText: String? = null
+) {
+    val gold = DecoGold
+    val ground = DecoGround
+    val borderAlpha = if (enabled) 1f else 0.32f
+    val textAlpha = if (enabled) 1f else 0.4f
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.92f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "deco_seal_scale"
+    )
+    val hitSize = if (size < 48.dp) 48.dp else size
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(hitSize)
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
+            .clip(RoundedCornerShape(3.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = ripple(color = gold),
+                enabled = enabled,
+                onClick = onClick
+            )
+            .then(testTag?.let { Modifier.testTag(it) } ?: Modifier)
+            .then(
+                contentDescriptionText?.let {
+                    Modifier.semantics(mergeDescendants = true) { contentDescription = it }
+                } ?: Modifier
+            )
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(size)
+                .background(ground.copy(alpha = 0.55f))
+                .border(1.5.dp, gold.copy(alpha = borderAlpha), RoundedCornerShape(3.dp))
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = labelTop,
+                    fontFamily = EditorialSerifFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = fontSize,
+                    lineHeight = fontSize * 1.08f,
+                    letterSpacing = 0.5.sp,
+                    color = gold.copy(alpha = textAlpha)
+                )
+                Text(
+                    text = labelBottom,
+                    fontFamily = EditorialSerifFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = fontSize,
+                    lineHeight = fontSize * 1.08f,
+                    letterSpacing = 0.5.sp,
+                    color = gold.copy(alpha = textAlpha)
+                )
+            }
         }
     }
 }

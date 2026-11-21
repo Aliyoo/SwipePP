@@ -70,13 +70,10 @@ import coil.size.Size
 import com.example.data.FlipYearImageLoaders
 import com.example.data.ImageDownsampleTier
 import com.example.ui.LocationCluster
-import com.example.ui.theme.CobaltPrimary
-import com.example.ui.theme.CoralDanger
-import com.example.ui.theme.EmeraldKeep
-import com.example.ui.theme.InkPrimary
+import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.LocalFlipYearPalette
 import com.example.ui.theme.LocalIsDarkTheme
-import com.example.ui.theme.SurfacePure
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -577,23 +574,18 @@ fun InteractiveSlippyMap(
     }
 
     val isDark = LocalIsDarkTheme.current
-    val cobaltAccent = CobaltPrimary
+    val palette = LocalFlipYearPalette.current
+    // 摩登画报 · 山河图配色：地面为画报 ground 渐变，经纬网/陆块/航线全部从主题金派生
+    val goldAccent = palette.decoGold
     val reusableContinentPath = remember { Path() }
     val reusableArcPath = remember { Path() }
     val arcDashEffect = remember { PathEffect.dashPathEffect(floatArrayOf(12f, 9f), 0f) }
-    val oceanGradient = remember(isDark) {
-        if (isDark) {
-            Brush.verticalGradient(
-                colors = listOf(Color(0xFF0C1320), Color(0xFF111B2E), Color(0xFF0B111D))
-            )
-        } else {
-            Brush.verticalGradient(
-                colors = listOf(Color(0xFFDCE9F9), Color(0xFFE6F0FB), Color(0xFFDCE8F8))
-            )
-        }
+    val oceanGradient = remember(palette) {
+        Brush.verticalGradient(colors = listOf(palette.decoGround, palette.decoGroundDeep))
     }
-    val landFillColor = if (isDark) Color(0xFF1A253A) else Color(0xFFF6F8FC)
-    val landStrokeColor = if (isDark) Color(0xFF334769) else Color(0xFFBCCAE0)
+    // 陆块：暗房用弱金晕染（山河图墨绿底上的淡金大陆），画廊用 mat 纸面
+    val landFillColor = if (isDark) palette.decoGold.copy(alpha = 0.10f) else palette.decoMat
+    val landStrokeColor = palette.decoGold.copy(alpha = if (isDark) 0.42f else 0.58f)
     val tileColorFilter = if (isDark) NocturnalMapTileColorFilter else null
 
     BoxWithConstraints(
@@ -672,8 +664,9 @@ fun InteractiveSlippyMap(
                 }
         ) {
             // Layer 1: Always-ready Vector World Atlas (zero per-frame trig, reused Path)
+            // 摩登画报 · 金线网格底：经纬网全部为主题金细线（呼应 deco-app.html 山河图 0.28 网格）
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val gridColor = cobaltAccent.copy(alpha = if (isDark) 0.14f else 0.08f)
+                val gridColor = goldAccent.copy(alpha = if (isDark) 0.16f else 0.24f)
                 val stepDeg = when {
                     zoom < 3f -> 30
                     zoom < 5f -> 15
@@ -697,7 +690,7 @@ fun InteractiveSlippyMap(
                     val pt = projectToScreen(centerX, ny)
                     if (pt.y in -20f..(size.height + 20f)) {
                         drawLine(
-                            color = if (lat == 0) cobaltAccent.copy(alpha = if (isDark) 0.26f else 0.16f) else gridColor,
+                            color = if (lat == 0) goldAccent.copy(alpha = if (isDark) 0.32f else 0.40f) else gridColor,
                             start = Offset(0f, pt.y),
                             end = Offset(size.width, pt.y),
                             strokeWidth = if (lat == 0) 1.3.dp.toPx() else 1.dp.toPx()
@@ -864,11 +857,11 @@ fun InteractiveSlippyMap(
                                 reusableArcPath.rewind()
                                 reusableArcPath.moveTo(prev.x, prev.y)
                                 reusableArcPath.quadraticTo(midX, midY - lift, curr.x, curr.y)
-                                drawPath(
-                                    path = reusableArcPath,
-                                    color = cobaltAccent.copy(alpha = if (isDark) 0.36f else 0.24f),
-                                    style = strokeStyle
-                                )
+                            drawPath(
+                                path = reusableArcPath,
+                                color = goldAccent.copy(alpha = if (isDark) 0.40f else 0.28f),
+                                style = strokeStyle
+                            )
                             }
                         }
                         prev = curr
@@ -1090,6 +1083,14 @@ private fun FootprintPinMarker(
     mergedClustersCount: Int,
     isSelected: Boolean
 ) {
+    val palette = LocalFlipYearPalette.current
+    val gold = palette.decoGold
+    val mat = palette.decoMat
+    val inkOnGround = palette.decoInkOnGround
+    val verm = palette.decoVerm
+    // 纸黄永远只压朱红底 / 照片暗部（可读性红线）
+    val cream = DecoPaperCream
+
     val thumbSize by animateDpAsState(
         targetValue = if (isSelected) 42.dp else 32.dp,
         animationSpec = spring(
@@ -1098,9 +1099,9 @@ private fun FootprintPinMarker(
         ),
         label = "map_pin_thumb_size"
     )
-    val cornerRadius = if (isSelected) 11.dp else 9.dp
-    val innerCornerRadius = if (isSelected) 9.dp else 7.dp
-    val badgeColor = if (totalUnreviewedCount > 0) CoralDanger else EmeraldKeep
+    // 画片圆角 2~4dp（不用 22dp 大圆角）
+    val cornerRadius = 3.dp
+    val innerCornerRadius = 2.dp
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1108,7 +1109,20 @@ private fun FootprintPinMarker(
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.size(thumbSize + 8.dp)
+            modifier = Modifier
+                .size(thumbSize + 8.dp)
+                .then(
+                    if (isSelected) {
+                        // 选中印记：金 0.30 晕圈（deco-app.html 0 0 0 4px goldDim(0.3)）
+                        Modifier.border(
+                            width = 3.5.dp,
+                            color = gold.copy(alpha = 0.30f),
+                            shape = RoundedCornerShape(cornerRadius + 2.dp)
+                        )
+                    } else {
+                        Modifier
+                    }
+                )
         ) {
             // Subtle rotated back-card cue when multiple nearby footprints are stacked here
             if (mergedClustersCount > 1) {
@@ -1118,31 +1132,33 @@ private fun FootprintPinMarker(
                         .offset(x = 3.dp, y = (-2).dp)
                         .rotate(7f)
                         .clip(RoundedCornerShape(cornerRadius))
-                        .background(SurfacePure.copy(alpha = 0.85f))
+                        .background(mat.copy(alpha = 0.88f))
                         .border(
                             width = 1.dp,
-                            color = if (isSelected) CobaltPrimary.copy(alpha = 0.55f) else InkPrimary.copy(alpha = 0.16f),
+                            color = gold.copy(alpha = if (isSelected) 0.60f else 0.38f),
                             shape = RoundedCornerShape(cornerRadius)
                         )
                 )
             }
 
-            // Compact framed photo thumbnail
+            // 画片式照片印记：金双线感外框（金 1.5dp 描边 + mat 内衬），选中换主题墨色描边
             Box(
                 modifier = Modifier
                     .size(thumbSize)
                     .shadow(
                         elevation = if (isSelected) 9.dp else 3.5.dp,
-                        shape = RoundedCornerShape(cornerRadius)
+                        shape = RoundedCornerShape(cornerRadius),
+                        ambientColor = Color.Black.copy(alpha = 0.30f),
+                        spotColor = Color.Black.copy(alpha = 0.42f)
                     )
                     .clip(RoundedCornerShape(cornerRadius))
-                    .background(SurfacePure)
+                    .background(mat)
                     .border(
                         width = if (isSelected) 2.dp else 1.5.dp,
-                        color = if (isSelected) CobaltPrimary else SurfacePure,
+                        color = if (isSelected) inkOnGround else gold,
                         shape = RoundedCornerShape(cornerRadius)
                     )
-                    .padding(if (isSelected) 2.dp else 1.5.dp)
+                    .padding(2.dp)
             ) {
                 PhotoArtwork(
                     photo = cluster.coverPhoto,
@@ -1156,23 +1172,23 @@ private fun FootprintPinMarker(
                 )
             }
 
-            // Single ultra-compact count pill perched outside the top-end corner so photo remains unobstructed
+            // 朱红计数徽：压在印记右上角，纸黄描边 + 纸黄数字（原型 11px/17px 比例）
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .offset(x = 1.dp, y = 1.dp)
                     .clip(CircleShape)
-                    .background(badgeColor)
-                    .border(1.dp, Color.White, CircleShape)
-                    .padding(horizontal = 4.dp, vertical = 0.5.dp)
+                    .background(verm)
+                    .border(1.dp, cream.copy(alpha = 0.60f), CircleShape)
+                    .padding(horizontal = 5.dp, vertical = 1.dp)
             ) {
                 Text(
                     text = formatCompactPinCount(totalPhotosCount),
                     fontFamily = JetBrainsMonoFontFamily,
-                    fontSize = 8.5.sp,
-                    lineHeight = 10.sp,
+                    fontSize = 9.5.sp,
+                    lineHeight = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = cream
                 )
             }
         }
@@ -1182,8 +1198,8 @@ private fun FootprintPinMarker(
             modifier = Modifier
                 .size(if (isSelected) 7.dp else 5.5.dp)
                 .clip(CircleShape)
-                .background(if (isSelected) CobaltPrimary else InkPrimary)
-                .border(1.dp, Color.White, CircleShape)
+                .background(if (isSelected) gold else inkOnGround)
+                .border(1.dp, cream.copy(alpha = 0.80f), CircleShape)
         )
     }
 }

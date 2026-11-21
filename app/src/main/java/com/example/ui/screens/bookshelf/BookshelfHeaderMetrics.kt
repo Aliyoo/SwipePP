@@ -1,5 +1,7 @@
 package com.example.ui.screens.bookshelf
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,21 +14,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -38,26 +41,26 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.MediaAccessLevel
 import com.example.ui.MediaFilter
-import com.example.ui.components.FrostedGlassCard
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.formatStorageSize
-import com.example.ui.theme.CobaltPrimary
-import com.example.ui.theme.CobaltSoft
-import com.example.ui.theme.CoralDanger
-import com.example.ui.theme.EmeraldKeep
-import com.example.ui.theme.HairlineBorder
-import com.example.ui.theme.InkPrimary
-import com.example.ui.theme.InkSecondary
-import com.example.ui.theme.InkTertiary
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoMat
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoVerm
+import com.example.ui.theme.EditorialSerifFontFamily
 import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.VioletVideo
+import com.example.ui.theme.LocalFlipYearPalette
+
+private val DecoPanelShape = RoundedCornerShape(3.dp)
 
 /**
  * On-demand storage ledger sheet opened from the Bookshelf's compact header summary,
  * keeping the hero viewport calm while preserving full deletion vs compression accounting.
+ * 摩登画报重绘：画报地面容器 + 金线内衬面板 + 墨金字排版，账目口径与入口完全不变。
  */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun BookshelfStorageLedgerSheet(
     purgedBytes: Long,
@@ -69,12 +72,13 @@ internal fun BookshelfStorageLedgerSheet(
     onOpenVault: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    androidx.compose.material3.ModalBottomSheet(
+    val palette = LocalFlipYearPalette.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = com.example.ui.theme.SurfacePure,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = palette.decoGround,
+        shape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp),
         modifier = Modifier.testTag("bookshelf_storage_ledger_sheet")
     ) {
         Column(
@@ -87,21 +91,26 @@ internal fun BookshelfStorageLedgerSheet(
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
                     text = "空间释放账本",
-                    style = MaterialTheme.typography.headlineSmall,
+                    fontFamily = EditorialSerifFontFamily,
                     fontWeight = FontWeight.Bold,
-                    color = InkPrimary
+                    fontSize = 22.sp,
+                    color = DecoInkOnGround
                 )
                 Text(
                     text = "删除释放与批量压缩节省分开统计，回收站中的媒体可随时还原",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = InkSecondary
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = DecoInkOnGround.copy(alpha = 0.72f)
                 )
             }
 
-            FrostedGlassCard(
-                shape = RoundedCornerShape(20.dp),
-                shadowElevation = 2.dp,
-                modifier = Modifier.fillMaxWidth()
+            // 金线内衬账目面板
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(DecoPanelShape)
+                    .background(DecoMat.copy(alpha = 0.55f))
+                    .border(1.dp, DecoGold.copy(alpha = 0.45f), DecoPanelShape)
             ) {
                 Row(
                     modifier = Modifier
@@ -113,31 +122,29 @@ internal fun BookshelfStorageLedgerSheet(
                         label = "删除已释放",
                         value = formatStorageSize(purgedBytes),
                         subLabel = "$purgedCount 项",
-                        accent = CobaltPrimary,
                         modifier = Modifier.weight(1f)
                     )
                     VerticalDivider(
                         modifier = Modifier.height(34.dp),
                         thickness = 1.dp,
-                        color = HairlineBorder.copy(alpha = 0.7f)
+                        color = DecoGold.copy(alpha = 0.35f)
                     )
                     CompactMetricSlot(
                         label = "压缩共节省",
                         value = formatStorageSize(compressedSavedBytes),
                         subLabel = "$compressedCount 张",
-                        accent = EmeraldKeep,
                         modifier = Modifier.weight(1f)
                     )
                     VerticalDivider(
                         modifier = Modifier.height(34.dp),
                         thickness = 1.dp,
-                        color = HairlineBorder.copy(alpha = 0.7f)
+                        color = DecoGold.copy(alpha = 0.35f)
                     )
                     CompactMetricSlot(
                         label = "回收站待清",
                         value = formatStorageSize(pendingTrashBytes),
                         subLabel = "$pendingTrashCount 项",
-                        accent = CoralDanger,
+                        dotAccent = DecoVerm,
                         modifier = Modifier
                             .weight(1f)
                             .testTag("bookshelf_vault_metric")
@@ -146,10 +153,8 @@ internal fun BookshelfStorageLedgerSheet(
             }
 
             if (pendingTrashCount > 0) {
-                GalleryActionButton(
+                DecoVermButton(
                     text = "去回收站释放空间 (${formatStorageSize(pendingTrashBytes)})",
-                    tone = GalleryButtonTone.DANGER,
-                    height = 48.dp,
                     onClick = {
                         onDismiss()
                         onOpenVault()
@@ -161,7 +166,7 @@ internal fun BookshelfStorageLedgerSheet(
             } else {
                 GalleryActionButton(
                     text = "知道了",
-                    tone = GalleryButtonTone.GLASS,
+                    tone = GalleryButtonTone.IMMERSIVE,
                     height = 48.dp,
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth()
@@ -171,12 +176,47 @@ internal fun BookshelfStorageLedgerSheet(
     }
 }
 
+/**
+ * 朱红画报按钮：朱红底 + 纸黄字（可读性红线允许的组合），用于账本内的回收站跳转。
+ */
+@Composable
+private fun DecoVermButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(3.dp)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .height(48.dp)
+            .clip(shape)
+            .background(
+                Brush.verticalGradient(
+                    listOf(DecoVerm.copy(alpha = 0.94f), DecoVerm)
+                )
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp)
+    ) {
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.3.sp,
+            color = DecoPaperCream,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
 @Composable
 private fun CompactMetricSlot(
     label: String,
     value: String,
     subLabel: String,
-    accent: Color,
+    dotAccent: Color? = null,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -184,33 +224,50 @@ private fun CompactMetricSlot(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 11.sp,
-            color = InkTertiary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (dotAccent != null) {
+                Box(
+                    modifier = Modifier
+                        .size(5.dp)
+                        .clip(RoundedCornerShape(1.dp))
+                        .background(dotAccent)
+                )
+            }
+            Text(
+                text = label,
+                fontSize = 12.sp,
+                letterSpacing = 0.2.sp,
+                color = DecoInkOnGround.copy(alpha = 0.60f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
         Text(
             text = value,
             fontFamily = JetBrainsMonoFontFamily,
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp,
-            color = accent,
+            color = DecoInkOnGround,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         Text(
             text = subLabel,
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 10.5.sp,
-            color = InkSecondary,
+            // 标签字号红线 ≥12sp：subLabel 11sp 升 12sp
+            fontSize = 12.sp,
+            color = DecoInkOnGround.copy(alpha = 0.62f),
             maxLines = 1
         )
     }
 }
 
+/**
+ * 摩登画报空态卡：金线内衬画框面板 + 墨金字排版。
+ * 授权 / 重扫 / 加载示例 / 筛选复位 四条入口与全部 testTag 保持基线不变。
+ */
 @Composable
 internal fun EmptyLibraryPermissionCard(
     accessLevel: MediaAccessLevel,
@@ -229,37 +286,39 @@ internal fun EmptyLibraryPermissionCard(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        FrostedGlassCard(
-            shape = RoundedCornerShape(26.dp),
-            shadowElevation = 8.dp,
-            enableAmbientBlur = true,
-            modifier = Modifier.fillMaxWidth()
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(DecoPanelShape)
+                .background(DecoMat.copy(alpha = 0.72f))
+                .border(1.dp, DecoGold.copy(alpha = 0.50f), DecoPanelShape)
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = CobaltSoft,
-                    modifier = Modifier.size(62.dp)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(62.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(DecoGold.copy(alpha = 0.12f))
+                        .border(1.dp, DecoGold.copy(alpha = 0.40f), RoundedCornerShape(4.dp))
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        if (isScanning) {
-                            CircularProgressIndicator(
-                                strokeWidth = 2.6.dp,
-                                color = CobaltPrimary,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        } else {
-                            Icon(
-                                imageVector = if (activeFilter == MediaFilter.VIDEOS) Icons.Filled.Videocam else Icons.Outlined.PhotoLibrary,
-                                contentDescription = null,
-                                tint = if (activeFilter == MediaFilter.VIDEOS) VioletVideo else CobaltPrimary,
-                                modifier = Modifier.size(30.dp)
-                            )
-                        }
+                    if (isScanning) {
+                        CircularProgressIndicator(
+                            strokeWidth = 2.6.dp,
+                            color = DecoGold,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = if (activeFilter == MediaFilter.VIDEOS) Icons.Filled.Videocam else Icons.Outlined.PhotoLibrary,
+                            contentDescription = null,
+                            tint = if (activeFilter == MediaFilter.VIDEOS) DecoVerm else DecoGold,
+                            modifier = Modifier.size(30.dp)
+                        )
                     }
                 }
 
@@ -279,14 +338,18 @@ internal fun EmptyLibraryPermissionCard(
 
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = InkPrimary,
+                    fontFamily = EditorialSerifFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 21.sp,
+                    lineHeight = 27.sp,
+                    color = DecoInkOnGround,
                     textAlign = TextAlign.Center
                 )
                 Text(
                     text = desc,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = InkSecondary,
+                    fontSize = 14.sp,
+                    lineHeight = 21.sp,
+                    color = DecoInkOnGround.copy(alpha = 0.75f),
                     textAlign = TextAlign.Center
                 )
 
@@ -296,7 +359,7 @@ internal fun EmptyLibraryPermissionCard(
                     activeFilter != MediaFilter.ALL -> {
                         GalleryActionButton(
                             text = "查看全部照片和视频",
-                            tone = GalleryButtonTone.OBSIDIAN,
+                            tone = GalleryButtonTone.IMMERSIVE,
                             onClick = onResetFilter,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -305,7 +368,7 @@ internal fun EmptyLibraryPermissionCard(
                         GalleryActionButton(
                             text = stringResource(R.string.action_grant_media),
                             leadingIcon = Icons.Filled.FolderOpen,
-                            tone = GalleryButtonTone.OBSIDIAN,
+                            tone = GalleryButtonTone.IMMERSIVE,
                             onClick = onRequestPermission,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -324,7 +387,7 @@ internal fun EmptyLibraryPermissionCard(
                         GalleryActionButton(
                             text = "重新扫描本地相册",
                             leadingIcon = Icons.Filled.Refresh,
-                            tone = GalleryButtonTone.OBSIDIAN,
+                            tone = GalleryButtonTone.IMMERSIVE,
                             onClick = onRescan,
                             modifier = Modifier.fillMaxWidth()
                         )

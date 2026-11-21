@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -45,14 +43,12 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.CleanupCardItem
-import com.example.ui.theme.CobaltPrimary
-import com.example.ui.theme.CobaltSoft
-import com.example.ui.theme.HairlineBorder
-import com.example.ui.theme.InkPrimary
-import com.example.ui.theme.InkSecondary
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoMat
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.LocalIsDarkTheme
-import com.example.ui.theme.SurfacePure
 import com.example.ui.theme.TimelineSortOrder
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -91,7 +87,6 @@ fun ArcTimeScaleScrubber(
 
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
-    val isDark = LocalIsDarkTheme.current
     val isDescending = sortOrder == TimelineSortOrder.NEWEST_FIRST
 
     val timestamps = remember(queue) {
@@ -198,11 +193,15 @@ fun ArcTimeScaleScrubber(
         }
     }
 
-    val trackBaseColor = if (isDark) CobaltPrimary.copy(alpha = 0.24f) else CobaltPrimary.copy(alpha = 0.20f)
-    val activeArcColor = CobaltPrimary
-    val burstMarkerColor = com.example.ui.theme.SolarAmber
-    val tickColor = if (isDark) Color.White.copy(alpha = 0.28f) else InkSecondary.copy(alpha = 0.34f)
-    val thumbHalo = if (isDark) CobaltPrimary.copy(alpha = 0.34f) else CobaltSoft
+    // 摩登画报 · 金刻度弧线：主题金派生（暗夜暗房/日光画廊双套成立）
+    val trackBaseColor = DecoGold.copy(alpha = 0.22f)
+    val activeArcColor = DecoGold
+    val burstMarkerColor = DecoVerm
+    val burstMarkerHalo = DecoPaperCream
+    val tickColor = DecoGold.copy(alpha = 0.30f)
+    val thumbHalo = DecoGold.copy(alpha = 0.30f)
+    val thumbCoreCenter = DecoMat
+    val labelColor = DecoInkOnGround.copy(alpha = 0.66f)
 
     Box(
         modifier = modifier
@@ -335,10 +334,15 @@ fun ArcTimeScaleScrubber(
                 )
             }
 
-            // Amber radar dots marking BurstStack locations along the arc
+            // Vermilion radar dots marking BurstStack locations along the arc (paper-cream halo for dark ground)
             val burstDotRadius = 3.dp.toPx()
             for (bf in burstFractions) {
                 val pt = pointOnArc(bf)
+                drawCircle(
+                    color = burstMarkerHalo,
+                    radius = burstDotRadius + 1.2.dp.toPx(),
+                    center = Offset(pt.x, pt.y - 6.dp.toPx())
+                )
                 drawCircle(
                     color = burstMarkerColor,
                     radius = burstDotRadius,
@@ -352,15 +356,15 @@ fun ArcTimeScaleScrubber(
             val coreRadius = if (isDragging) 7.dp.toPx() else 5.5.dp.toPx()
             drawCircle(color = thumbHalo, radius = haloRadius, center = thumbCenter)
             drawCircle(color = activeArcColor, radius = coreRadius, center = thumbCenter)
-            drawCircle(color = Color.White, radius = coreRadius * 0.42f, center = thumbCenter)
+            drawCircle(color = thumbCoreCenter, radius = coreRadius * 0.42f, center = thumbCenter)
         }
 
         // Start / Mid / End labels anchored neatly below the arc
         Text(
             text = startLabel,
             fontFamily = JetBrainsMonoFontFamily,
-            fontSize = 10.sp,
-            color = InkSecondary,
+            fontSize = 12.sp,
+            color = labelColor,
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(start = 6.dp, bottom = 0.dp)
@@ -369,9 +373,9 @@ fun ArcTimeScaleScrubber(
         Text(
             text = if (isDragging) currentLabel else midLabel,
             fontFamily = JetBrainsMonoFontFamily,
-            fontSize = 10.sp,
+            fontSize = 12.sp,
             fontWeight = if (isDragging) FontWeight.Bold else FontWeight.Medium,
-            color = if (isDragging) CobaltPrimary else InkSecondary,
+            color = if (isDragging) activeArcColor else labelColor,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 0.dp)
@@ -379,8 +383,8 @@ fun ArcTimeScaleScrubber(
         Text(
             text = endLabel,
             fontFamily = JetBrainsMonoFontFamily,
-            fontSize = 10.sp,
-            color = InkSecondary,
+            fontSize = 12.sp,
+            color = labelColor,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 6.dp, bottom = 0.dp)
@@ -395,19 +399,19 @@ fun ArcTimeScaleScrubber(
             val halfPillPx = with(density) { 44.dp.toPx().roundToInt() }
             val clampedX = (xPx - halfPillPx).coerceIn(0, (widthPx - halfPillPx * 2).coerceAtLeast(0))
             Surface(
-                shape = RoundedCornerShape(50),
-                color = SurfacePure,
+                shape = RoundedCornerShape(3.dp),
+                color = DecoMat,
                 shadowElevation = 6.dp,
-                border = androidx.compose.foundation.BorderStroke(1.dp, HairlineBorder),
+                border = androidx.compose.foundation.BorderStroke(1.dp, DecoGold.copy(alpha = 0.6f)),
                 modifier = Modifier
                     .offset { IntOffset(clampedX, -with(density) { 10.dp.roundToPx() }) }
             ) {
                 Text(
                     text = currentLabel,
                     fontFamily = JetBrainsMonoFontFamily,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = InkPrimary,
+                    color = DecoInkOnGround,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
                 )
             }

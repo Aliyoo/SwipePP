@@ -52,7 +52,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -67,20 +66,15 @@ import com.example.data.PhotoItemEntity
 import com.example.data.ResolvedGeoLocation
 import com.example.data.SameDayLocationMatch
 import com.example.ui.LocationCluster
-import com.example.ui.theme.CobaltDark
-import com.example.ui.theme.CobaltPrimary
-import com.example.ui.theme.CobaltSoft
-import com.example.ui.theme.EmeraldKeep
-import com.example.ui.theme.EmeraldSoft
-import com.example.ui.theme.HairlineBorder
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoMat
+import com.example.ui.theme.DecoVerm
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.EditorialSerifFontFamily
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.InkTertiary
 import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.SolarAmber
-import com.example.ui.theme.SolarAmberSoft
-import com.example.ui.theme.SurfaceMuted
-import com.example.ui.theme.SurfacePure
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.abs
@@ -104,8 +98,8 @@ fun BatchCompressBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = SurfacePure,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = DecoMat,
+        shape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp),
         modifier = Modifier.testTag("batch_compress_sheet")
     ) {
         Column(
@@ -125,8 +119,9 @@ fun BatchCompressBottomSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.batch_compress_title),
-                        style = MaterialTheme.typography.headlineSmall,
+                        fontFamily = EditorialSerifFontFamily,
                         fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp,
                         color = InkPrimary
                     )
                     Text(
@@ -136,20 +131,20 @@ fun BatchCompressBottomSheet(
                             "已选 ${imageTargets.size} 张照片 · 当前共 ${formatStorageSize(totalImageBytes)}"
                         },
                         fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 11.5.sp,
+                        fontSize = 12.sp,
                         color = InkSecondary
                     )
                 }
                 Surface(
                     shape = CircleShape,
-                    color = EmeraldSoft,
+                    color = DecoGold.copy(alpha = 0.16f),
                     modifier = Modifier.size(42.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Filled.Compress,
                             contentDescription = null,
-                            tint = EmeraldKeep,
+                            tint = DecoGold,
                             modifier = Modifier.size(21.dp)
                         )
                     }
@@ -158,9 +153,9 @@ fun BatchCompressBottomSheet(
 
             // Live estimated savings highlight card
             Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = EmeraldSoft.copy(alpha = 0.65f),
-                border = BorderStroke(1.dp, EmeraldKeep.copy(alpha = 0.25f)),
+                shape = RoundedCornerShape(3.dp),
+                color = DecoGold.copy(alpha = 0.10f),
+                border = BorderStroke(1.dp, DecoGold.copy(alpha = 0.45f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -181,7 +176,7 @@ fun BatchCompressBottomSheet(
                             fontFamily = JetBrainsMonoFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp,
-                            color = EmeraldKeep
+                            color = DecoGold
                         )
                     }
                     Column(horizontalAlignment = Alignment.End) {
@@ -208,11 +203,11 @@ fun BatchCompressBottomSheet(
                     val percentSaved = (preset.estimatedSavingsRatio * 100).toInt()
                     Surface(
                         onClick = { selectedPreset = preset },
-                        shape = RoundedCornerShape(16.dp),
-                        color = if (isSelected) CobaltSoft.copy(alpha = 0.72f) else SurfaceMuted.copy(alpha = 0.48f),
+                        shape = RoundedCornerShape(3.dp),
+                        color = if (isSelected) DecoGold.copy(alpha = 0.14f) else InkPrimary.copy(alpha = 0.05f),
                         border = BorderStroke(
-                            width = if (isSelected) 1.4.dp else 1.dp,
-                            color = if (isSelected) CobaltPrimary else HairlineBorder
+                            width = if (isSelected) 1.5.dp else 1.dp,
+                            color = if (isSelected) DecoGold else DecoGold.copy(alpha = 0.40f)
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -228,7 +223,7 @@ fun BatchCompressBottomSheet(
                             Icon(
                                 imageVector = if (isSelected) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
                                 contentDescription = null,
-                                tint = if (isSelected) CobaltPrimary else InkTertiary,
+                                tint = if (isSelected) DecoGold else InkTertiary,
                                 modifier = Modifier.size(20.dp)
                             )
                             Column(modifier = Modifier.weight(1f)) {
@@ -243,15 +238,17 @@ fun BatchCompressBottomSheet(
                                         color = InkPrimary
                                     )
                                     if (preset == CompressionPreset.NEAR_LOSSLESS) {
+                                        // 朱红推荐章（纸黄压朱红底）
                                         Surface(
-                                            shape = RoundedCornerShape(50),
-                                            color = CobaltPrimary
+                                            shape = RoundedCornerShape(2.dp),
+                                            color = DecoVerm,
+                                            border = BorderStroke(1.dp, DecoPaperCream.copy(alpha = 0.45f))
                                         ) {
                                             Text(
                                                 text = "推荐",
                                                 style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 10.sp,
-                                                color = Color.White,
+                                                fontSize = 11.sp,
+                                                color = DecoPaperCream,
                                                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                                             )
                                         }
@@ -268,7 +265,7 @@ fun BatchCompressBottomSheet(
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,
-                                color = if (isSelected) CobaltDark else EmeraldKeep
+                                color = if (isSelected) DecoGold else InkSecondary
                             )
                         }
                     }
@@ -279,8 +276,8 @@ fun BatchCompressBottomSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(SurfaceMuted.copy(alpha = 0.55f))
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(InkPrimary.copy(alpha = 0.05f))
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -288,7 +285,7 @@ fun BatchCompressBottomSheet(
                 Icon(
                     imageVector = Icons.Filled.VerifiedUser,
                     contentDescription = null,
-                    tint = CobaltPrimary,
+                    tint = DecoGold,
                     modifier = Modifier.size(16.dp)
                 )
                 Text(
@@ -305,7 +302,7 @@ fun BatchCompressBottomSheet(
                     "所选项目中暂无可压缩照片"
                 },
                 leadingIcon = Icons.Filled.Compress,
-                tone = GalleryButtonTone.OBSIDIAN,
+                tone = GalleryButtonTone.IMMERSIVE,
                 enabled = imageTargets.isNotEmpty(),
                 onClick = { onConfirmCompress(selectedPreset) },
                 modifier = Modifier
@@ -358,8 +355,8 @@ fun BatchLocationEditorSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = SurfacePure,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = DecoMat,
+        shape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp),
         modifier = Modifier.testTag("batch_location_sheet")
     ) {
         Column(
@@ -380,27 +377,28 @@ fun BatchLocationEditorSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.batch_location_title),
-                        style = MaterialTheme.typography.headlineSmall,
+                        fontFamily = EditorialSerifFontFamily,
                         fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp,
                         color = InkPrimary
                     )
                     Text(
                         text = "共 ${targetPhotos.size} 项媒体 · 其中 $missingLocationCount 项缺失定位",
                         fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 11.5.sp,
+                        fontSize = 12.sp,
                         color = InkSecondary
                     )
                 }
                 Surface(
                     shape = CircleShape,
-                    color = SolarAmberSoft,
+                    color = DecoGold.copy(alpha = 0.16f),
                     modifier = Modifier.size(42.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Filled.EditLocationAlt,
                             contentDescription = null,
-                            tint = SolarAmber,
+                            tint = DecoGold,
                             modifier = Modifier.size(21.dp)
                         )
                     }
@@ -410,9 +408,9 @@ fun BatchLocationEditorSheet(
             // Smart Same-Day GPS Inference Card (one-tap fill from nearest geotagged photo within 24h)
             if (sameDayMatches.isNotEmpty()) {
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = CobaltSoft.copy(alpha = 0.72f),
-                    border = BorderStroke(1.dp, CobaltPrimary.copy(alpha = 0.30f)),
+                    shape = RoundedCornerShape(3.dp),
+                    color = InkPrimary.copy(alpha = 0.05f),
+                    border = BorderStroke(1.dp, DecoGold.copy(alpha = 0.45f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
@@ -428,7 +426,7 @@ fun BatchLocationEditorSheet(
                             Icon(
                                 imageVector = Icons.Filled.AutoAwesome,
                                 contentDescription = null,
-                                tint = CobaltPrimary,
+                                tint = DecoGold,
                                 modifier = Modifier.size(18.dp)
                             )
                             Column(modifier = Modifier.weight(1f)) {
@@ -454,9 +452,9 @@ fun BatchLocationEditorSheet(
                         GalleryActionButton(
                             text = "一键智能补全 ${sameDayMatches.size} 项定位",
                             leadingIcon = Icons.Filled.MyLocation,
-                            tone = GalleryButtonTone.OBSIDIAN,
+                            tone = GalleryButtonTone.IMMERSIVE,
                             height = 44.dp,
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(3.dp),
                             onClick = { onApplySameDayInference(sameDayMatches, writeExifToFile) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -479,7 +477,8 @@ fun BatchLocationEditorSheet(
             ) {
                 items(quickSuggestions, key = { it.name }) { preset ->
                     val selected = locationInput.trim() == preset.name
-                    GallerySelectableChip(
+                    DecoLocationPresetChip(
+                        label = preset.name,
                         selected = selected,
                         onClick = {
                             locationInput = preset.name
@@ -488,20 +487,7 @@ fun BatchLocationEditorSheet(
                             geocodeHint = null
                         },
                         modifier = Modifier.testTag("location_preset_${preset.name}")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.LocationOn,
-                            contentDescription = null,
-                            tint = if (selected) SolarAmber else CobaltPrimary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = preset.name,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontSize = 12.sp,
-                            color = if (selected) Color.White else InkPrimary
-                        )
-                    }
+                    )
                 }
             }
 
@@ -524,15 +510,15 @@ fun BatchLocationEditorSheet(
                         Icon(
                             imageVector = Icons.Filled.LocationOn,
                             contentDescription = null,
-                            tint = CobaltPrimary
+                            tint = DecoGold
                         )
                     },
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(3.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = CobaltPrimary,
-                        unfocusedBorderColor = HairlineBorder,
-                        focusedContainerColor = SurfaceMuted.copy(alpha = 0.45f),
-                        unfocusedContainerColor = SurfaceMuted.copy(alpha = 0.35f)
+                        focusedBorderColor = DecoGold,
+                        unfocusedBorderColor = DecoGold.copy(alpha = 0.45f),
+                        focusedContainerColor = InkPrimary.copy(alpha = 0.05f),
+                        unfocusedContainerColor = InkPrimary.copy(alpha = 0.05f)
                     ),
                     modifier = Modifier
                         .weight(1f)
@@ -556,9 +542,9 @@ fun BatchLocationEditorSheet(
                             }
                         }
                     },
-                    shape = RoundedCornerShape(14.dp),
-                    color = CobaltSoft,
-                    border = BorderStroke(1.dp, CobaltPrimary.copy(alpha = 0.28f)),
+                    shape = RoundedCornerShape(3.dp),
+                    color = DecoGold.copy(alpha = 0.14f),
+                    border = BorderStroke(1.5.dp, DecoGold),
                     modifier = Modifier
                         .height(54.dp)
                         .testTag("batch_location_resolve_button")
@@ -570,7 +556,7 @@ fun BatchLocationEditorSheet(
                         if (isResolving) {
                             CircularProgressIndicator(
                                 strokeWidth = 2.dp,
-                                color = CobaltPrimary,
+                                color = DecoGold,
                                 modifier = Modifier.size(18.dp)
                             )
                         } else {
@@ -581,13 +567,13 @@ fun BatchLocationEditorSheet(
                                 Icon(
                                     imageVector = Icons.Filled.Search,
                                     contentDescription = "解析坐标",
-                                    tint = CobaltDark,
+                                    tint = DecoGold,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Text(
                                     text = "定位",
                                     style = MaterialTheme.typography.labelLarge,
-                                    color = CobaltDark
+                                    color = DecoGold
                                 )
                             }
                         }
@@ -615,15 +601,15 @@ fun BatchLocationEditorSheet(
                     }
                 },
                 fontFamily = JetBrainsMonoFontFamily,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 color = InkSecondary
             )
 
             if (hasRealDeviceImages) {
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = SurfaceMuted.copy(alpha = 0.55f),
-                    border = BorderStroke(1.dp, HairlineBorder),
+                    shape = RoundedCornerShape(3.dp),
+                    color = InkPrimary.copy(alpha = 0.05f),
+                    border = BorderStroke(1.dp, DecoGold.copy(alpha = 0.45f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -651,8 +637,8 @@ fun BatchLocationEditorSheet(
                             checked = writeExifToFile,
                             onCheckedChange = { writeExifToFile = it },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = CobaltPrimary
+                                checkedThumbColor = DecoPaperCream,
+                                checkedTrackColor = DecoGold
                             ),
                             modifier = Modifier.testTag("batch_location_exif_switch")
                         )
@@ -663,7 +649,7 @@ fun BatchLocationEditorSheet(
             GalleryActionButton(
                 text = "应用至 ${targetPhotos.size} 项媒体 (${locationInput.trim().ifBlank { "请选择地点" }})",
                 leadingIcon = Icons.Filled.EditLocationAlt,
-                tone = GalleryButtonTone.OBSIDIAN,
+                tone = GalleryButtonTone.IMMERSIVE,
                 enabled = locationInput.isNotBlank() && targetPhotos.isNotEmpty(),
                 onClick = {
                     val trimmed = locationInput.trim()
@@ -674,6 +660,47 @@ fun BatchLocationEditorSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("confirm_batch_location_button")
+            )
+        }
+    }
+}
+
+/** 画报地点快选章：金描边纸面小方章（批量补全定位 sheet 内用） */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DecoLocationPresetChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(3.dp),
+        color = if (selected) DecoGold.copy(alpha = 0.16f) else InkPrimary.copy(alpha = 0.05f),
+        border = BorderStroke(
+            width = if (selected) 1.5.dp else 1.dp,
+            color = if (selected) DecoGold else DecoGold.copy(alpha = 0.50f)
+        ),
+        modifier = modifier
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.LocationOn,
+                contentDescription = null,
+                tint = DecoGold,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = label,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (selected) InkPrimary else InkPrimary.copy(alpha = 0.85f),
+                maxLines = 1
             )
         }
     }

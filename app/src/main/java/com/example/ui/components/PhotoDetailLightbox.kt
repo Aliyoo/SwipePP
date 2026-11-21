@@ -94,8 +94,9 @@ import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
 import com.example.data.PhotoStatus
 import com.example.sensor.rememberHapticEngine
-import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CoralDanger
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.EmeraldKeep
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.ObsidianOverlayGlass
@@ -777,13 +778,15 @@ private fun LightboxBottomHud(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     if (onRestore != null) {
+                                        // 摩登画报：回收站流内还原动作为金描边画报钮
+                                        // （onRestore 仅在 photoStatus==TRASHED 时出现，即回收站入口）
                                         LightboxActionPill(
                                             icon = Icons.Filled.Restore,
                                             label = "还原至影集",
-                                            containerColor = CobaltPrimary.copy(alpha = 0.22f),
-                                            iconTint = Color(0xFF9FB8FF),
-                                            labelColor = Color.White,
-                                            borderColor = CobaltPrimary.copy(alpha = 0.44f),
+                                            containerColor = DecoGold.copy(alpha = 0.20f),
+                                            iconTint = DecoGold,
+                                            labelColor = DecoPaperCream,
+                                            borderColor = DecoGold.copy(alpha = 0.55f),
                                             onClick = onRestore,
                                             modifier = Modifier
                                                 .weight(1f)

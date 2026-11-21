@@ -1,9 +1,15 @@
 package com.example.ui.screens.cleaner
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -12,37 +18,147 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.CleanerEntrySource
 import com.example.ui.components.CleanedCompletionBadge
-import com.example.ui.components.FrostedGlassCard
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
-import com.example.ui.components.GallerySculptedHeroButton
 import com.example.ui.components.formatStorageSize
 import com.example.ui.components.monthChineseName
-import com.example.ui.theme.CoralDanger
-import com.example.ui.theme.EmeraldKeep
-import com.example.ui.theme.HairlineBorder
-import com.example.ui.theme.InkPrimary
-import com.example.ui.theme.InkSecondary
-import com.example.ui.theme.InkTertiary
+import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoVermInk
 import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.SolarAmber
+import com.example.ui.theme.LocalFlipYearPalette
+
+// ---------------------------------------------------------------------------
+// 摩登画报 · 屏内一次性取色与共享助手（design-demos/deco-app.html 取材）
+// ---------------------------------------------------------------------------
+
+// 朱红警示字改走 theme/Color.kt 令牌 DecoVermInk（原型 THEMES.vermInk：暗夜暗房 #F0705F / 日光画廊 #A02A1E）。
+
+/**
+ * 朱红通栏动作条（原型 VermStrip 变体）：朱红实底 + 纸黄字（主 20sp / 徽记 13sp），
+ * 画片圆角 3dp，顶部 1dp 纸黄弱光。决定性动作共用。
+ */
+@Composable
+internal fun DecoVermStripButton(
+    title: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    badgeText: String? = null,
+    leadingIcon: ImageVector? = null,
+    height: Dp = 52.dp,
+    enabled: Boolean = true
+) {
+    val palette = LocalFlipYearPalette.current
+    val gold = palette.decoGold
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        label = "deco_verm_strip_scale"
+    )
+
+    Surface(
+        shape = RoundedCornerShape(3.dp),
+        color = palette.decoVerm,
+        border = BorderStroke(1.dp, DecoPaperCream.copy(alpha = 0.22f)),
+        shadowElevation = 8.dp,
+        modifier = modifier
+            .height(height)
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
+            .clip(RoundedCornerShape(3.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = ripple(color = DecoPaperCream),
+                enabled = enabled,
+                onClick = onClick
+            )
+            .drawBehind {
+                drawRect(brush = Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.18f))))
+                drawLine(
+                    color = DecoPaperCream.copy(alpha = 0.22f),
+                    start = Offset(0f, 0.8.dp.toPx()),
+                    end = Offset(size.width, 0.8.dp.toPx()),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (leadingIcon != null) {
+                Icon(
+                    imageVector = leadingIcon,
+                    contentDescription = null,
+                    tint = DecoPaperCream
+                )
+            }
+            Text(
+                text = title,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = DecoPaperCream,
+                letterSpacing = 2.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            if (!badgeText.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(2.dp),
+                    color = DecoPaperCream.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, gold.copy(alpha = 0.7f))
+                ) {
+                    Text(
+                        text = badgeText,
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        color = DecoPaperCream,
+                        maxLines = 1,
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 internal fun CleanupCompletedCelebration(
@@ -61,6 +177,11 @@ internal fun CleanupCompletedCelebration(
     modifier: Modifier = Modifier
 ) {
     val isSingleDayFinishedWithMoreInMonth = completedDay != null && remainingInFullQueue > 0
+    val palette = LocalFlipYearPalette.current
+    val decoGold = palette.decoGold
+    val decoMat = palette.decoMat
+    val inkOnGround = palette.decoInkOnGround
+    val vermInk = DecoVermInk
 
     Column(
         modifier = modifier
@@ -86,18 +207,19 @@ internal fun CleanupCompletedCelebration(
                     "${monthChineseName(monthNumber)}整理完成"
                 else -> "$title 完成"
             },
-            style = MaterialTheme.typography.headlineMedium,
+            fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
-            color = InkPrimary,
+            color = inkOnGround,
             textAlign = TextAlign.Center
         )
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // 3-Column Monospace Telemetry Dashboard (aligned with BookshelfStorageLedgerSheet)
-        FrostedGlassCard(
-            shape = RoundedCornerShape(22.dp),
-            shadowElevation = 4.dp,
+        // 金框账册：三栏画报遥测（保留 / 收藏 / 移入回收站）
+        Surface(
+            shape = RoundedCornerShape(3.dp),
+            color = decoMat,
+            border = BorderStroke(1.dp, decoGold.copy(alpha = 0.5f)),
             modifier = Modifier
                 .fillMaxWidth()
                 .semantics(mergeDescendants = true) {}
@@ -113,31 +235,31 @@ internal fun CleanupCompletedCelebration(
                     label = "保留",
                     value = "$sessionKeptCount",
                     subLabel = "已入册",
-                    accent = EmeraldKeep,
+                    accent = decoGold,
                     modifier = Modifier.weight(1f)
                 )
                 VerticalDivider(
                     modifier = Modifier.height(34.dp),
                     thickness = 1.dp,
-                    color = HairlineBorder.copy(alpha = 0.7f)
+                    color = decoGold.copy(alpha = 0.4f)
                 )
                 CompletionMetricSlot(
                     label = "收藏",
                     value = "$sessionFavoritedCount",
                     subLabel = "精选佳作",
-                    accent = SolarAmber,
+                    accent = decoGold,
                     modifier = Modifier.weight(1f)
                 )
                 VerticalDivider(
                     modifier = Modifier.height(34.dp),
                     thickness = 1.dp,
-                    color = HairlineBorder.copy(alpha = 0.7f)
+                    color = decoGold.copy(alpha = 0.4f)
                 )
                 CompletionMetricSlot(
                     label = "移入回收站",
                     value = formatStorageSize(sessionTrashedBytes),
                     subLabel = "$sessionTrashedCount 项待清",
-                    accent = CoralDanger,
+                    accent = vermInk,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -153,21 +275,19 @@ internal fun CleanupCompletedCelebration(
             } else {
                 "本次整理的照片和视频均已妥善保留在影集中。"
             },
-            style = MaterialTheme.typography.bodySmall,
-            color = InkSecondary,
+            fontSize = 14.sp,
+            color = inkOnGround.copy(alpha = 0.72f),
             textAlign = TextAlign.Center
         )
 
         Spacer(modifier = Modifier.height(22.dp))
 
         if (isSingleDayFinishedWithMoreInMonth) {
-            GallerySculptedHeroButton(
+            DecoVermStripButton(
                 title = "继续清理本月剩余",
-                leadingIcon = Icons.Filled.CleaningServices,
                 badgeText = "$remainingInFullQueue 项",
+                leadingIcon = Icons.Filled.CleaningServices,
                 onClick = onContinueFullMonth,
-                tone = GalleryButtonTone.OBSIDIAN,
-                height = 52.dp,
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("continue_full_month_button")
@@ -177,32 +297,31 @@ internal fun CleanupCompletedCelebration(
                 GalleryActionButton(
                     text = "去回收站释放空间 (${formatStorageSize(sessionTrashedBytes)})",
                     leadingIcon = Icons.Filled.DeleteOutline,
+                    iconTint = vermInk,
                     onClick = onOpenVault,
-                    tone = GalleryButtonTone.DANGER_GLASS,
+                    tone = GalleryButtonTone.IMMERSIVE,
                     height = 48.dp,
+                    shape = RoundedCornerShape(3.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("completion_open_vault_button")
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                TextButton(
+                DecoGoldTextLink(
+                    text = entrySource.backLabel,
+                    gold = decoGold,
                     onClick = onDone,
                     modifier = Modifier
                         .heightIn(min = 48.dp)
                         .testTag("cleanup_done_button")
-                ) {
-                    Text(
-                        text = entrySource.backLabel,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = InkSecondary
-                    )
-                }
+                )
             } else {
                 GalleryActionButton(
                     text = entrySource.backLabel,
                     onClick = onDone,
-                    tone = GalleryButtonTone.GLASS,
+                    tone = GalleryButtonTone.IMMERSIVE,
                     height = 48.dp,
+                    shape = RoundedCornerShape(3.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("cleanup_done_button")
@@ -210,13 +329,11 @@ internal fun CleanupCompletedCelebration(
             }
         } else {
             if (sessionTrashedCount > 0) {
-                GallerySculptedHeroButton(
+                DecoVermStripButton(
                     title = "去回收站释放空间",
-                    leadingIcon = Icons.Filled.DeleteOutline,
                     badgeText = formatStorageSize(sessionTrashedBytes),
+                    leadingIcon = Icons.Filled.DeleteOutline,
                     onClick = onOpenVault,
-                    tone = GalleryButtonTone.OBSIDIAN,
-                    height = 52.dp,
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("completion_open_vault_button")
@@ -225,24 +342,46 @@ internal fun CleanupCompletedCelebration(
                 GalleryActionButton(
                     text = entrySource.backLabel,
                     onClick = onDone,
-                    tone = GalleryButtonTone.GLASS,
+                    tone = GalleryButtonTone.IMMERSIVE,
                     height = 48.dp,
+                    shape = RoundedCornerShape(3.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("cleanup_done_button")
                 )
             } else {
-                GallerySculptedHeroButton(
+                DecoVermStripButton(
                     title = entrySource.backLabel,
                     onClick = onDone,
-                    tone = GalleryButtonTone.OBSIDIAN,
-                    height = 52.dp,
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("cleanup_done_button")
                 )
             }
         }
+    }
+}
+
+/** 金色下划线文字入口（画报弱动作，呼应原型「撤销上一步」金下划线） */
+@Composable
+private fun DecoGoldTextLink(
+    text: String,
+    gold: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    TextButton(
+        onClick = onClick,
+        modifier = modifier
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            fontSize = 13.sp,
+            letterSpacing = 1.sp,
+            color = gold,
+            textDecoration = TextDecoration.Underline
+        )
     }
 }
 
@@ -254,6 +393,7 @@ private fun CompletionMetricSlot(
     accent: Color,
     modifier: Modifier = Modifier
 ) {
+    val inkOnGround = DecoInkOnGround
     Column(
         modifier = modifier.padding(horizontal = 6.dp, vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -261,9 +401,8 @@ private fun CompletionMetricSlot(
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 11.sp,
-            color = InkTertiary,
+            fontSize = 12.sp,
+            color = inkOnGround.copy(alpha = 0.55f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -278,9 +417,8 @@ private fun CompletionMetricSlot(
         )
         Text(
             text = subLabel,
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 10.5.sp,
-            color = InkSecondary,
+            fontSize = 12.sp,
+            color = inkOnGround.copy(alpha = 0.72f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )

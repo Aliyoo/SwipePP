@@ -1,6 +1,9 @@
 package com.example.ui.screens.gallery
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -22,7 +24,6 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -39,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -46,23 +48,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
-import com.example.ui.components.FrostedGlassCard
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
-import com.example.ui.components.GallerySelectableChip
 import com.example.ui.components.formatStorageSize
 import com.example.ui.components.monthChineseName
-import com.example.ui.theme.CobaltPrimary
-import com.example.ui.theme.CobaltSoft
-import com.example.ui.theme.HairlineBorder
-import com.example.ui.theme.InkPrimary
-import com.example.ui.theme.InkSecondary
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoGround
+import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoMat
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoVerm
+import com.example.ui.theme.EditorialSerifFontFamily
 import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.SolarAmber
-import com.example.ui.theme.SurfaceMuted
-import com.example.ui.theme.SurfacePure
 
 private val CURATED_ALBUM_PRESETS = listOf("精选珍藏", "旅行日记", "家庭相册", "灵感素材")
+
+/* ---- 摩登画报 · 纸面弹层装饰（deco-app.html 金边跳签 / 金双线画框） ---- */
+private val MoveSheetShape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)
+private val MoveFrameShape = RoundedCornerShape(3.dp)
+private val MoveTagShape = RoundedCornerShape(50)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,8 +94,8 @@ internal fun BulkMoveDestinationSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = SurfacePure,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = DecoMat,
+        shape = MoveSheetShape,
         modifier = Modifier.testTag("bulk_move_sheet")
     ) {
         Column(
@@ -112,27 +116,30 @@ internal fun BulkMoveDestinationSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.bulk_move_title),
-                        style = MaterialTheme.typography.headlineSmall,
+                        fontFamily = EditorialSerifFontFamily,
                         fontWeight = FontWeight.Bold,
-                        color = InkPrimary
+                        fontSize = 19.sp,
+                        color = DecoInkOnGround
                     )
                     Text(
                         text = "已选 $selectedCount 项媒体 · 共 ${formatStorageSize(selectedBytes)}",
                         fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 11.5.sp,
-                        color = InkSecondary
+                        fontSize = 12.sp,
+                        color = DecoInkOnGround.copy(alpha = 0.62f)
                     )
                 }
+                // 方章图标座
                 Surface(
-                    shape = CircleShape,
-                    color = CobaltSoft,
+                    shape = MoveFrameShape,
+                    color = DecoGold.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, DecoGold.copy(alpha = 0.35f)),
                     modifier = Modifier.size(40.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.DriveFileMove,
                             contentDescription = null,
-                            tint = CobaltPrimary,
+                            tint = DecoGold,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -141,8 +148,9 @@ internal fun BulkMoveDestinationSheet(
 
             Text(
                 text = "快速选择目标相册",
-                style = MaterialTheme.typography.labelLarge,
-                color = InkSecondary
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = DecoInkOnGround.copy(alpha = 0.72f)
             )
 
             LazyRow(
@@ -151,7 +159,7 @@ internal fun BulkMoveDestinationSheet(
             ) {
                 items(albumSuggestions, key = { it }) { album ->
                     val selected = albumInput.trim() == album
-                    GallerySelectableChip(
+                    DecoMoveJumpTag(
                         selected = selected,
                         onClick = { albumInput = album },
                         modifier = Modifier.testTag("bulk_move_preset_$album")
@@ -159,14 +167,13 @@ internal fun BulkMoveDestinationSheet(
                         Icon(
                             imageVector = Icons.Filled.Folder,
                             contentDescription = null,
-                            tint = if (selected) SolarAmber else CobaltPrimary,
+                            tint = if (selected) DecoMat else DecoGold.copy(alpha = 0.85f),
                             modifier = Modifier.size(14.dp)
                         )
                         Text(
                             text = album,
-                            style = MaterialTheme.typography.labelLarge,
                             fontSize = 12.sp,
-                            color = if (selected) Color.White else InkPrimary
+                            color = if (selected) DecoMat else DecoInkOnGround.copy(alpha = 0.78f)
                         )
                     }
                 }
@@ -182,25 +189,31 @@ internal fun BulkMoveDestinationSheet(
                     Icon(
                         imageVector = Icons.Filled.Folder,
                         contentDescription = null,
-                        tint = CobaltPrimary
+                        tint = DecoGold
                     )
                 },
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(4.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = CobaltPrimary,
-                    unfocusedBorderColor = HairlineBorder,
-                    focusedContainerColor = SurfaceMuted.copy(alpha = 0.45f),
-                    unfocusedContainerColor = SurfaceMuted.copy(alpha = 0.35f)
+                    focusedBorderColor = DecoGold,
+                    unfocusedBorderColor = DecoGold.copy(alpha = 0.4f),
+                    cursorColor = DecoGold,
+                    focusedTextColor = DecoInkOnGround,
+                    unfocusedTextColor = DecoInkOnGround,
+                    focusedContainerColor = DecoGround.copy(alpha = 0.45f),
+                    unfocusedContainerColor = DecoGround.copy(alpha = 0.35f)
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("bulk_move_album_input")
             )
 
-            FrostedGlassCard(
-                shape = RoundedCornerShape(18.dp),
-                shadowElevation = 2.dp,
-                modifier = Modifier.fillMaxWidth()
+            // 金双线画框：外 1dp 金 + 内衬 + 1dp 弱金
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MoveFrameShape)
+                    .background(DecoGround.copy(alpha = 0.5f))
+                    .border(1.dp, DecoGold.copy(alpha = 0.6f), MoveFrameShape)
             ) {
                 Column(
                     modifier = Modifier
@@ -221,22 +234,22 @@ internal fun BulkMoveDestinationSheet(
                             Icon(
                                 imageVector = Icons.Filled.CalendarMonth,
                                 contentDescription = null,
-                                tint = CobaltPrimary,
+                                tint = DecoGold,
                                 modifier = Modifier.size(18.dp)
                             )
                             Text(
                                 text = stringResource(R.string.bulk_move_date_toggle),
-                                style = MaterialTheme.typography.bodyMedium,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = InkPrimary
+                                color = DecoInkOnGround
                             )
                         }
                         Switch(
                             checked = changeYearMonth,
                             onCheckedChange = { changeYearMonth = it },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = CobaltPrimary
+                                checkedThumbColor = DecoPaperCream,
+                                checkedTrackColor = DecoVerm
                             ),
                             modifier = Modifier.testTag("bulk_move_date_switch")
                         )
@@ -247,7 +260,7 @@ internal fun BulkMoveDestinationSheet(
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 items(availableYears, key = { it }) { yr ->
                                     val isSel = yr == chosenYear
-                                    GallerySelectableChip(
+                                    DecoMoveJumpTag(
                                         selected = isSel,
                                         onClick = { chosenYear = yr }
                                     ) {
@@ -256,7 +269,7 @@ internal fun BulkMoveDestinationSheet(
                                             fontFamily = JetBrainsMonoFontFamily,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (isSel) Color.White else InkPrimary
+                                            color = if (isSel) DecoMat else DecoInkOnGround.copy(alpha = 0.78f)
                                         )
                                     }
                                 }
@@ -264,15 +277,14 @@ internal fun BulkMoveDestinationSheet(
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 items((1..12).toList(), key = { it }) { month ->
                                     val isSel = month == chosenMonth
-                                    GallerySelectableChip(
+                                    DecoMoveJumpTag(
                                         selected = isSel,
                                         onClick = { chosenMonth = month }
                                     ) {
                                         Text(
                                             text = monthChineseName(month),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontSize = 11.5.sp,
-                                            color = if (isSel) Color.White else InkPrimary
+                                            fontSize = 12.sp,
+                                            color = if (isSel) DecoMat else DecoInkOnGround.copy(alpha = 0.78f)
                                         )
                                     }
                                 }
@@ -297,7 +309,7 @@ internal fun BulkMoveDestinationSheet(
                 GalleryActionButton(
                     text = "确认移动 ($selectedCount)",
                     leadingIcon = Icons.AutoMirrored.Filled.DriveFileMove,
-                    tone = GalleryButtonTone.OBSIDIAN,
+                    tone = GalleryButtonTone.IMMERSIVE,
                     enabled = canConfirm,
                     onClick = {
                         onConfirmMove(
@@ -312,5 +324,32 @@ internal fun BulkMoveDestinationSheet(
                 )
             }
         }
+    }
+}
+
+/** 金边跳签（选中金底 + 内衬字，未选中金描边透明底） */
+@Composable
+private fun DecoMoveJumpTag(
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = MoveTagShape,
+        color = if (selected) DecoGold else Color.Transparent,
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (selected) DecoGold else DecoGold.copy(alpha = 0.5f)
+        ),
+        modifier = modifier
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+            content = content
+        )
     }
 }

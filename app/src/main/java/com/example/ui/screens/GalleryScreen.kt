@@ -12,6 +12,9 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +30,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -37,7 +41,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BurstMode
-import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.FilterList
@@ -58,10 +61,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -80,14 +93,13 @@ import com.example.ui.GalleryEntry
 import com.example.ui.LocalFloatingDockInset
 import com.example.ui.MediaFilter
 import com.example.ui.TimelineSearchQuery
-import com.example.ui.components.ArtisticGalleryBackdrop
 import com.example.ui.components.BatchCompressBottomSheet
 import com.example.ui.components.BatchLocationEditorSheet
 import com.example.ui.components.BurstGalleryGrid
-import com.example.ui.components.FrostedGlassCard
+import com.example.ui.components.DecoPaperGround
+import com.example.ui.components.DecoSealButton
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
-import com.example.ui.components.GallerySelectableChip
 import com.example.ui.components.GallerySmartFilter
 import com.example.ui.components.PhotoDetailLightbox
 import com.example.ui.components.TimelineDateRangePickerDialog
@@ -99,17 +111,120 @@ import com.example.ui.screens.gallery.BulkMoveDestinationSheet
 import com.example.ui.screens.gallery.FloatingBulkActionBar
 import com.example.ui.screens.gallery.GalleryMoreBatchActionsSheet
 import com.example.ui.screens.gallery.GallerySelectionTopBar
-import com.example.ui.theme.CobaltDark
-import com.example.ui.theme.CobaltPrimary
-import com.example.ui.theme.CobaltSoft
-import com.example.ui.theme.InkPrimary
-import com.example.ui.theme.InkSecondary
-import com.example.ui.theme.SolarAmber
-import com.example.ui.theme.SurfaceMuted
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoGround
+import com.example.ui.theme.DecoGroundDeep
+import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoMat
+import com.example.ui.theme.DecoVerm
+import com.example.ui.theme.EditorialSerifFontFamily
 import kotlinx.coroutines.delay
 import java.util.Calendar
 
 private const val LARGE_PHOTO_THRESHOLD_BYTES = 3_000_000L
+
+/* ---- 摩登画报 · 画廊屏一次性装饰（design-demos/deco-app.html 画廊屏语言） ---- */
+/** 栏目线金渐变（跟随主题金令牌，浅暗两套都成立） */
+@Composable
+private fun galleryMonthRuleBrush(): Brush = Brush.horizontalGradient(
+    colorStops = arrayOf(
+        0.0f to DecoGold.copy(alpha = 0f),
+        0.15f to DecoGold.copy(alpha = 0.66f),
+        0.85f to DecoGold.copy(alpha = 0.66f),
+        1.0f to DecoGold.copy(alpha = 0f)
+    )
+)
+private val GalleryTileOutline = RoundedCornerShape(3.dp)
+private val GallerySealShape = RoundedCornerShape(3.dp)
+
+/**
+ * 美术字标题：EditorialSerif Bold + 完整 artShadow 三层错位影
+ * （2dp 黑 → 4dp 朱红 → 6dp 软模糊），与回收站 VaultArtText 同构（deco-app.html:140 artShadow）。
+ */
+@Composable
+private fun DecoArtTitle(
+    text: String,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    modifier: Modifier = Modifier
+) {
+    val verm = DecoVerm
+    val density = LocalDensity.current
+    val blurShadow = remember(density) {
+        with(density) {
+            Shadow(
+                color = Color.Black.copy(alpha = 0.35f),
+                offset = Offset(6.dp.toPx(), 6.dp.toPx()),
+                blurRadius = 14.dp.toPx()
+            )
+        }
+    }
+    val baseStyle = TextStyle(
+        fontFamily = EditorialSerifFontFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = fontSize,
+        letterSpacing = 0.8.sp
+    )
+    Box(modifier) {
+        // 错位阴影层对无障碍隐藏，仅顶层正稿参与语义（同 VaultArtText）
+        Text(
+            text = text,
+            color = Color.Transparent,
+            style = baseStyle.copy(shadow = blurShadow),
+            modifier = Modifier.clearAndSetSemantics { }
+        )
+        Text(
+            text = text,
+            color = verm.copy(alpha = 0.60f),
+            style = baseStyle,
+            modifier = Modifier
+                .offset(x = 4.dp, y = 4.dp)
+                .clearAndSetSemantics { }
+        )
+        Text(
+            text = text,
+            color = Color.Black.copy(alpha = 0.55f),
+            style = baseStyle,
+            modifier = Modifier
+                .offset(x = 2.dp, y = 2.dp)
+                .clearAndSetSemantics { }
+        )
+        Text(
+            text = text,
+            color = DecoInkOnGround,
+            style = baseStyle
+        )
+    }
+}
+
+/** 金边跳签（选中金底 + 内衬字，未选中金描边透明底） */
+@Composable
+private fun GalleryDecoJumpTag(
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = if (selected) DecoGold else Color.Transparent,
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (selected) DecoGold else DecoGold.copy(alpha = 0.5f)
+        ),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            content = content
+        )
+    }
+}
+
+// 方章按钮收敛到共享组件 com.example.ui.components.DecoSealButton（deco-app.html SealBtn）
+
 
 internal fun filterGalleryEntriesBySmartAndAlbum(
     allEntries: List<GalleryEntry>,
@@ -404,9 +519,8 @@ fun GalleryScreen(
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val effectiveBottomInset = if (isSelectionMode) 96.dp else floatingDockInset
 
-    ArtisticGalleryBackdrop(
-        modifier = modifier
-    ) {
+    // 摩登画报 · 画报地面收敛到共享 DecoPaperGround（groundA→groundB 渐变 + 纸纹 alpha 0.016 统一）
+    DecoPaperGround(modifier = modifier) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
@@ -452,11 +566,9 @@ fun GalleryScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(
+                                    DecoArtTitle(
                                         text = stringResource(R.string.nav_gallery),
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = InkPrimary
+                                        fontSize = 30.sp
                                     )
                                     Text(
                                         text = if (burstEntries.isNotEmpty()) {
@@ -465,7 +577,8 @@ fun GalleryScreen(
                                             "共 ${displayedEntries.size} 项 · 长按可多选"
                                         },
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = InkSecondary,
+                                        fontSize = 12.sp,
+                                        color = DecoInkOnGround.copy(alpha = 0.66f),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -475,12 +588,13 @@ fun GalleryScreen(
                                     val isFilteredView = selectedAlbumFilter != null ||
                                         smartFilter != GallerySmartFilter.ALL ||
                                         searchQuery.isActive
+                                    val multiselectAccessibilityDesc = stringResource(R.string.action_enter_multiselect)
                                     Row(
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         // One-tap Gallery -> ArcCleaner bridge with clear context-aware label
-                                        FrostedGlassCard(
+                                        Surface(
                                             onClick = {
                                                 hapticEngine.pageFlipLift()
                                                 val ids = LinkedHashSet<Long>(displayedEntries.size)
@@ -499,9 +613,9 @@ fun GalleryScreen(
                                                 }
                                                 onStartCustomCleanup(sessionTitle, ids, true)
                                             },
-                                            shape = RoundedCornerShape(50),
-                                            borderAccent = SolarAmber,
-                                            shadowElevation = 2.dp,
+                                            shape = GallerySealShape,
+                                            color = Color.Transparent,
+                                            border = BorderStroke(1.5.dp, DecoGold.copy(alpha = 0.85f)),
                                             modifier = Modifier
                                                 .heightIn(min = 38.dp)
                                                 .testTag("gallery_swipe_clean_button")
@@ -514,7 +628,7 @@ fun GalleryScreen(
                                                 Icon(
                                                     imageVector = Icons.Filled.CleaningServices,
                                                     contentDescription = null,
-                                                    tint = SolarAmber,
+                                                    tint = DecoGold,
                                                     modifier = Modifier.size(14.dp)
                                                 )
                                                 Text(
@@ -522,25 +636,25 @@ fun GalleryScreen(
                                                     style = MaterialTheme.typography.labelLarge,
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = InkPrimary
+                                                    color = DecoGold
                                                 )
                                             }
                                         }
 
-                                        com.example.ui.components.GalleryHeaderOrbButton(
+                                        DecoSealButton(
+                                            labelTop = "多",
+                                            labelBottom = "选",
                                             onClick = {
                                                 hapticEngine.bookshelfDetent()
                                                 explicitSelectionMode = true
                                             },
-                                            modifier = Modifier.testTag("gallery_enter_multiselect_button")
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Filled.CheckBox,
-                                                contentDescription = stringResource(R.string.action_enter_multiselect),
-                                                tint = CobaltPrimary,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
+                                            modifier = Modifier
+                                                .semantics {
+                                                    contentDescription = multiselectAccessibilityDesc
+                                                }
+                                                .testTag("gallery_enter_multiselect_button"),
+                                            fontSize = 13.sp
+                                        )
                                     }
                                 }
                             }
@@ -548,9 +662,9 @@ fun GalleryScreen(
                             // Explicit notice when Bookshelf global MediaFilter (Photos/Videos) is active
                             if (uiState.mediaFilter != MediaFilter.ALL) {
                                 Surface(
-                                    shape = RoundedCornerShape(14.dp),
-                                    color = CobaltSoft,
-                                    border = BorderStroke(1.dp, CobaltPrimary.copy(alpha = 0.24f)),
+                                    shape = GalleryTileOutline,
+                                    color = DecoVerm.copy(alpha = 0.12f),
+                                    border = BorderStroke(1.dp, DecoVerm.copy(alpha = 0.55f)),
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(horizontal = 20.dp)
@@ -572,14 +686,14 @@ fun GalleryScreen(
                                             Icon(
                                                 imageVector = Icons.Filled.FilterList,
                                                 contentDescription = null,
-                                                tint = CobaltPrimary,
+                                                tint = DecoVerm,
                                                 modifier = Modifier.size(15.dp)
                                             )
                                             Text(
                                                 text = "全局筛选：仅显示${uiState.mediaFilter.label}",
                                                 style = MaterialTheme.typography.labelMedium,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = CobaltDark
+                                                color = DecoInkOnGround
                                             )
                                         }
                                         TextButton(
@@ -590,7 +704,7 @@ fun GalleryScreen(
                                         ) {
                                             Text(
                                                 text = "显示全部",
-                                                color = CobaltPrimary,
+                                                color = DecoVerm,
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }
@@ -660,7 +774,7 @@ fun GalleryScreen(
                                     ) {
                                         items(quickSmartChoices, key = { it.first.name }) { (filterOption, label) ->
                                             val isSel = smartFilter == filterOption
-                                            GallerySelectableChip(
+                                            GalleryDecoJumpTag(
                                                 selected = isSel,
                                                 onClick = {
                                                     hapticEngine.pageFlipLift()
@@ -671,15 +785,24 @@ fun GalleryScreen(
                                                 Text(
                                                     text = label,
                                                     style = MaterialTheme.typography.labelMedium,
-                                                    fontSize = 11.5.sp,
+                                                    fontSize = 12.sp,
+                                                    letterSpacing = 0.5.sp,
                                                     fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
-                                                    color = if (isSel) Color.White else InkPrimary
+                                                    color = if (isSel) DecoMat else DecoInkOnGround.copy(alpha = 0.78f)
                                                 )
                                             }
                                         }
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
+                                // 画报栏目线：通栏金渐变细线（deco-app.html 画廊屏 chips 与月头之间）
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 20.dp)
+                                        .height(1.dp)
+                                        .background(galleryMonthRuleBrush())
+                                )
                             }
                         }
                     }
@@ -700,8 +823,9 @@ fun GalleryScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = SurfaceMuted,
+                            shape = GalleryTileOutline,
+                            color = DecoGroundDeep,
+                            border = BorderStroke(1.5.dp, DecoGold.copy(alpha = 0.75f)),
                             modifier = Modifier.size(64.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
@@ -714,7 +838,7 @@ fun GalleryScreen(
                                         else -> Icons.Filled.PhotoLibrary
                                     },
                                     contentDescription = null,
-                                    tint = CobaltPrimary,
+                                    tint = DecoGold,
                                     modifier = Modifier.size(30.dp)
                                 )
                             }
@@ -730,7 +854,7 @@ fun GalleryScreen(
                                 else -> "画廊暂无照片与视频"
                             },
                             style = MaterialTheme.typography.headlineMedium,
-                            color = InkPrimary,
+                            color = DecoInkOnGround,
                             textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(6.dp))
@@ -744,14 +868,15 @@ fun GalleryScreen(
                                 else -> "授权扫描本地相册或加载示例影集后，即可体验连拍叠放与批量多选整理。"
                             },
                             style = MaterialTheme.typography.bodyMedium,
-                            color = InkSecondary,
+                            fontSize = 14.sp,
+                            color = DecoInkOnGround.copy(alpha = 0.72f),
                             textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(18.dp))
                         if (searchQuery.isActive || smartFilter != GallerySmartFilter.ALL || selectedAlbumFilter != null) {
                             GalleryActionButton(
                                 text = if (searchQuery.isActive) "清除搜索与筛选" else "查看全部媒体",
-                                tone = GalleryButtonTone.OBSIDIAN,
+                                tone = GalleryButtonTone.IMMERSIVE,
                                 onClick = {
                                     resetSearchAndFilters()
                                     smartFilter = GallerySmartFilter.ALL
@@ -762,13 +887,13 @@ fun GalleryScreen(
                         } else if (uiState.mediaFilter != MediaFilter.ALL) {
                             GalleryActionButton(
                                 text = "显示全部照片与视频",
-                                tone = GalleryButtonTone.OBSIDIAN,
+                                tone = GalleryButtonTone.IMMERSIVE,
                                 onClick = onResetGlobalMediaFilter
                             )
                         } else {
                             GalleryActionButton(
                                 text = stringResource(R.string.action_load_demo),
-                                tone = GalleryButtonTone.OBSIDIAN,
+                                tone = GalleryButtonTone.IMMERSIVE,
                                 onClick = onLoadDemoArchive
                             )
                         }

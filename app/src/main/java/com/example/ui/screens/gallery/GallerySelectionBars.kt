@@ -2,8 +2,10 @@ package com.example.ui.screens.gallery
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,10 +15,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -41,6 +42,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -50,22 +54,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
-import com.example.ui.components.FrostedGlassCard
-import com.example.ui.components.GallerySelectableChip
-import com.example.ui.components.ObsidianGlassCard
 import com.example.ui.components.formatStorageSize
-import com.example.ui.theme.CobaltPrimary
-import com.example.ui.theme.CoralDanger
-import com.example.ui.theme.EmeraldKeep
-import com.example.ui.theme.HairlineBorder
-import com.example.ui.theme.InkPrimary
-import com.example.ui.theme.InkSecondary
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoMat
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoVerm
+import com.example.ui.theme.EditorialSerifFontFamily
 import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.ObsidianSatinBottom
-import com.example.ui.theme.ObsidianSatinTop
-import com.example.ui.theme.SolarAmber
-import com.example.ui.theme.SurfaceMuted
-import com.example.ui.theme.SurfacePure
+
+/* ---- 摩登画报 · 选择栏装饰（deco-app.html 金双线画框 / 朱红通栏 / 方章） ---- */
+private val SelectionBarShape = RoundedCornerShape(3.dp)
+private val SelectionSheetShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+private val VermStripShape = RoundedCornerShape(4.dp)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,8 +83,8 @@ internal fun GalleryMoreBatchActionsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = SurfacePure,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = DecoMat,
+        shape = SelectionSheetShape,
         modifier = Modifier.testTag("gallery_more_actions_sheet")
     ) {
         Column(
@@ -96,14 +97,15 @@ internal fun GalleryMoreBatchActionsSheet(
         ) {
             Text(
                 text = "更多批量操作（已选 $selectedCount 项）",
-                style = MaterialTheme.typography.titleMedium,
+                fontFamily = EditorialSerifFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = InkPrimary
+                fontSize = 17.sp,
+                color = DecoInkOnGround
             )
 
             BatchActionSheetRow(
                 icon = Icons.Filled.Compress,
-                accentColor = EmeraldKeep,
+                accentColor = DecoGold,
                 title = if (compressibleCount > 0) {
                     "${stringResource(R.string.action_batch_compress)}（$compressibleCount 张照片）"
                 } else {
@@ -117,7 +119,7 @@ internal fun GalleryMoreBatchActionsSheet(
 
             BatchActionSheetRow(
                 icon = Icons.Filled.EditLocationAlt,
-                accentColor = SolarAmber,
+                accentColor = DecoGold,
                 title = if (missingLocationCount > 0) {
                     "${stringResource(R.string.action_batch_location)}（含 $missingLocationCount 项缺定位）"
                 } else {
@@ -131,7 +133,7 @@ internal fun GalleryMoreBatchActionsSheet(
 
             BatchActionSheetRow(
                 icon = Icons.AutoMirrored.Filled.DriveFileMove,
-                accentColor = CobaltPrimary,
+                accentColor = DecoGold,
                 title = "移动至相册 / 归档年月",
                 subtitle = "归类到自定义相册或重新指定年度月份",
                 enabled = true,
@@ -154,9 +156,9 @@ private fun BatchActionSheetRow(
 ) {
     Surface(
         onClick = { if (enabled) onClick() },
-        shape = RoundedCornerShape(18.dp),
-        color = SurfaceMuted.copy(alpha = if (enabled) 0.62f else 0.32f),
-        border = BorderStroke(0.85.dp, HairlineBorder),
+        shape = SelectionBarShape,
+        color = DecoGold.copy(alpha = if (enabled) 0.08f else 0.04f),
+        border = BorderStroke(1.dp, DecoGold.copy(alpha = if (enabled) 0.45f else 0.2f)),
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 60.dp)
@@ -166,17 +168,18 @@ private fun BatchActionSheetRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // 方章图标座（正方、弱金描边）
             Surface(
-                shape = CircleShape,
-                color = if (enabled) accentColor.copy(alpha = 0.14f) else SurfaceMuted,
-                border = BorderStroke(0.75.dp, if (enabled) accentColor.copy(alpha = 0.28f) else HairlineBorder),
+                shape = SelectionBarShape,
+                color = accentColor.copy(alpha = if (enabled) 0.14f else 0.06f),
+                border = BorderStroke(1.dp, accentColor.copy(alpha = if (enabled) 0.35f else 0.16f)),
                 modifier = Modifier.size(40.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = if (enabled) accentColor else InkSecondary,
+                        tint = if (enabled) accentColor else DecoInkOnGround.copy(alpha = 0.4f),
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -186,14 +189,15 @@ private fun BatchActionSheetRow(
                     text = title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (enabled) InkPrimary else InkSecondary,
+                    color = if (enabled) DecoInkOnGround else DecoInkOnGround.copy(alpha = 0.5f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.labelSmall,
-                    color = InkSecondary,
+                    fontSize = 12.sp,
+                    color = DecoInkOnGround.copy(alpha = 0.65f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -201,7 +205,7 @@ private fun BatchActionSheetRow(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = InkSecondary.copy(alpha = if (enabled) 0.72f else 0.30f),
+                tint = DecoInkOnGround.copy(alpha = if (enabled) 0.72f else 0.3f),
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -216,14 +220,27 @@ internal fun GallerySelectionTopBar(
     onCancel: () -> Unit,
     onToggleSelectAll: () -> Unit
 ) {
-    FrostedGlassCard(
-        shape = RoundedCornerShape(20.dp),
-        borderAccent = CobaltPrimary,
-        shadowElevation = 4.dp,
-        enableAmbientBlur = true,
+    // 金双线画框：外 1.5dp 金 + 底色内衬 + 1dp 弱金（deco-app.html GoldFrame）
+    val frameGold = DecoGold
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 8.dp)
+            .clip(SelectionBarShape)
+            .background(DecoMat.copy(alpha = 0.82f))
+            .drawBehind {
+                drawRoundRect(
+                    color = frameGold.copy(alpha = 0.4f),
+                    topLeft = Offset(3.5.dp.toPx(), 3.5.dp.toPx()),
+                    size = androidx.compose.ui.geometry.Size(
+                        size.width - 7.dp.toPx(),
+                        size.height - 7.dp.toPx()
+                    ),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx(), 2.dp.toPx()),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+                )
+            }
+            .border(1.5.dp, DecoGold, SelectionBarShape)
             .testTag("gallery_selection_top_bar")
     ) {
         Row(
@@ -233,58 +250,79 @@ internal fun GallerySelectionTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            com.example.ui.components.GalleryHeaderOrbButton(
+            // 方章取消钮
+            IconButton(
                 onClick = onCancel,
-                modifier = Modifier.testTag("gallery_selection_cancel")
+                modifier = Modifier
+                    .size(40.dp)
+                    .testTag("gallery_selection_cancel")
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = stringResource(R.string.cd_exit_selection),
-                    tint = InkPrimary,
-                    modifier = Modifier.size(19.dp)
-                )
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(SelectionBarShape)
+                        .border(1.5.dp, DecoGold.copy(alpha = 0.85f), SelectionBarShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = stringResource(R.string.cd_exit_selection),
+                        tint = DecoGold,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
             }
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "已选 $selectedCount 项",
-                    style = MaterialTheme.typography.titleMedium,
+                    fontFamily = EditorialSerifFontFamily,
                     fontWeight = FontWeight.Bold,
-                    color = InkPrimary,
+                    fontSize = 16.sp,
+                    color = DecoInkOnGround,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = "合计 ${formatStorageSize(selectedBytes)} · 点击可增减项目",
                     fontFamily = JetBrainsMonoFontFamily,
-                    fontSize = 11.sp,
-                    color = InkSecondary,
+                    fontSize = 12.sp,
+                    color = DecoInkOnGround.copy(alpha = 0.62f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
 
-            GallerySelectableChip(
-                selected = allSelected,
+            // 金边跳签（全选 / 取消全选）
+            Surface(
                 onClick = onToggleSelectAll,
+                shape = RoundedCornerShape(50),
+                color = if (allSelected) DecoGold else Color.Transparent,
+                border = BorderStroke(1.dp, DecoGold.copy(alpha = 0.55f)),
                 modifier = Modifier
                     .heightIn(min = 48.dp)
                     .testTag("gallery_selection_toggle_all")
             ) {
-                Icon(
-                    imageVector = Icons.Filled.SelectAll,
-                    contentDescription = null,
-                    tint = if (allSelected) SolarAmber else CobaltPrimary,
-                    modifier = Modifier.size(15.dp)
-                )
-                Text(
-                    text = stringResource(
-                        if (allSelected) R.string.action_deselect_all else R.string.action_select_all
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontSize = 12.sp,
-                    color = if (allSelected) Color.White else InkPrimary
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.SelectAll,
+                        contentDescription = null,
+                        tint = if (allSelected) DecoMat else DecoGold,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Text(
+                        text = stringResource(
+                            if (allSelected) R.string.action_deselect_all else R.string.action_select_all
+                        ),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontSize = 12.sp,
+                        color = if (allSelected) DecoMat else DecoInkOnGround.copy(alpha = 0.78f)
+                    )
+                }
             }
         }
     }
@@ -299,28 +337,34 @@ internal fun FloatingBulkActionBar(
     onMore: () -> Unit
 ) {
     val actionsEnabled = selectedCount > 0
-    ObsidianGlassCard(
-        shape = RoundedCornerShape(22.dp),
-        topColor = ObsidianSatinTop,
-        bottomColor = ObsidianSatinBottom,
-        shadowElevation = 18.dp,
+    // 朱红通栏动作条（deco-app.html VermStrip）：朱底 + 纸黄动作字 + 中缝 1dp 金渐变
+    Box(
         modifier = Modifier
             .widthIn(max = 420.dp)
             .fillMaxWidth()
             .alpha(if (actionsEnabled) 1f else 0.56f)
+            .clip(VermStripShape)
+            .background(DecoVerm)
+            .drawBehind {
+                // 顶缘纸黄高光细线（inset 0 1px 0 rgba(239,227,200,0.22)）
+                drawLine(
+                    color = DecoPaperCream.copy(alpha = 0.22f),
+                    start = Offset(0f, 0.8.dp.toPx()),
+                    end = Offset(size.width, 0.8.dp.toPx()),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
             .testTag("gallery_bulk_action_bar")
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 7.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+                .padding(horizontal = 4.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             BulkActionPillItem(
                 icon = Icons.Filled.CheckCircle,
                 label = stringResource(R.string.action_bulk_keep),
-                iconTint = EmeraldKeep,
                 enabled = actionsEnabled,
                 onClick = onKeep,
                 modifier = Modifier
@@ -328,10 +372,11 @@ internal fun FloatingBulkActionBar(
                     .testTag("bulk_keep_button")
             )
 
+            VermStripDivider()
+
             BulkActionPillItem(
                 icon = Icons.Filled.Favorite,
                 label = stringResource(R.string.action_bulk_favorite),
-                iconTint = SolarAmber,
                 enabled = actionsEnabled,
                 onClick = onFavorite,
                 modifier = Modifier
@@ -339,11 +384,12 @@ internal fun FloatingBulkActionBar(
                     .testTag("bulk_favorite_button")
             )
 
+            VermStripDivider()
+
             BulkActionPillItem(
                 icon = Icons.Filled.DeleteOutline,
                 label = if (selectedCount > 0) "回收站($selectedCount)" else stringResource(R.string.action_bulk_delete),
-                iconTint = Color(0xFFFF7A8A),
-                containerHighlight = CoralDanger.copy(alpha = 0.24f),
+                containerHighlight = DecoPaperCream.copy(alpha = 0.14f),
                 enabled = actionsEnabled,
                 onClick = onTrash,
                 modifier = Modifier
@@ -351,10 +397,11 @@ internal fun FloatingBulkActionBar(
                     .testTag("bulk_delete_button")
             )
 
+            VermStripDivider()
+
             BulkActionPillItem(
                 icon = Icons.Filled.MoreHoriz,
                 label = "更多",
-                iconTint = Color(0xFF8FB0FF),
                 enabled = actionsEnabled,
                 onClick = onMore,
                 modifier = Modifier
@@ -365,11 +412,30 @@ internal fun FloatingBulkActionBar(
     }
 }
 
+/** 中缝 1dp 金渐变分隔（朱红通栏内部，deco-app.html VermStrip 中缝） */
+@Composable
+private fun VermStripDivider() {
+    Box(
+        modifier = Modifier
+            .padding(vertical = 10.dp)
+            .width(1.dp)
+            .height(26.dp)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        DecoGold.copy(alpha = 0f),
+                        DecoGold.copy(alpha = 0.8f),
+                        DecoGold.copy(alpha = 0f)
+                    )
+                )
+            )
+    )
+}
+
 @Composable
 private fun BulkActionPillItem(
     icon: ImageVector,
     label: String,
-    iconTint: Color,
     enabled: Boolean,
     onClick: () -> Unit,
     containerHighlight: Color = Color.Transparent,
@@ -380,7 +446,7 @@ private fun BulkActionPillItem(
         verticalArrangement = Arrangement.Center,
         modifier = modifier
             .heightIn(min = 52.dp)
-            .clip(RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(4.dp))
             .background(containerHighlight)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 6.dp, vertical = 6.dp)
@@ -388,16 +454,17 @@ private fun BulkActionPillItem(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = iconTint,
+            tint = DecoPaperCream,
             modifier = Modifier.size(21.dp)
         )
         Spacer(modifier = Modifier.height(3.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
+            letterSpacing = 0.6.sp,
             fontWeight = FontWeight.SemiBold,
-            color = Color.White,
+            color = DecoPaperCream.copy(alpha = 0.92f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )

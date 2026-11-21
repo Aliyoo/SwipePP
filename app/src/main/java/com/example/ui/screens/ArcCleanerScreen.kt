@@ -16,9 +16,12 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -38,9 +41,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Compare
@@ -48,17 +48,16 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.SwipeUp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -72,7 +71,11 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -80,6 +83,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -90,50 +94,37 @@ import com.example.sensor.ShakeDetector
 import com.example.sensor.rememberHapticEngine
 import com.example.ui.CleanerEntrySource
 import com.example.ui.CleanupCardItem
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import com.example.ui.components.ArcTimeScaleScrubber
-import com.example.ui.components.ArtisticGalleryBackdrop
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
-import com.example.ui.components.GalleryHeaderOrbButton
-import com.example.ui.components.GalleryTactileOrbButton
+import com.example.ui.components.DecoPaperGround
+import com.example.ui.components.DecoSealButton
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.PhotoDetailLightbox
-import com.example.ui.components.activeChromeSatinBrush
 import com.example.ui.components.formatPhotoDateTime
 import com.example.ui.components.formatStorageSize
 import com.example.ui.components.formatVideoDuration
-import com.example.ui.theme.GlassSpecularRimStart
-import com.example.ui.theme.LocalFlipYearPalette
-import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.screens.cleaner.BurstComparisonSheet
 import com.example.ui.screens.cleaner.CleanupCompletedCelebration
+import com.example.ui.screens.cleaner.DecoVermStripButton
 import com.example.ui.screens.cleaner.ModernArcSwipeCard
-import com.example.ui.theme.CobaltPrimary
-import com.example.ui.theme.CobaltSoft
-import com.example.ui.theme.CoralDanger
-import com.example.ui.theme.CoralSoft
-import com.example.ui.theme.EmeraldKeep
-import com.example.ui.theme.EmeraldSoft
-import com.example.ui.theme.HairlineBorder
-import com.example.ui.theme.InkPrimary
-import com.example.ui.theme.InkSecondary
-import com.example.ui.theme.InkTertiary
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoGround
+import com.example.ui.theme.DecoGroundDeep
+import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoMat
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoVerm
+import com.example.ui.theme.DecoVermInk
 import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.SolarAmber
-import com.example.ui.theme.SolarAmberSoft
-import com.example.ui.theme.SurfaceMuted
-import com.example.ui.theme.SurfacePure
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.TimelineSortOrder
-import com.example.ui.theme.VioletVideo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 
 private fun CleanupCardItem.matchesDay(day: Int): Boolean = when (this) {
     is CleanupCardItem.SinglePhoto -> photo.day == day
@@ -147,6 +138,120 @@ private data class SessionDecisionRecord(
     val trashedIds: Set<Long> = emptySet(),
     val trashedBytes: Long = 0L
 )
+
+// ---------------------------------------------------------------------------
+// 摩登画报 · 屏内一次性构件（design-demos/deco-app.html：PaperGround / SealBtn / 印钮）
+// ---------------------------------------------------------------------------
+
+/** 干支纪年副标：2026丙午 2025乙巳 2024甲辰 2023癸卯 2022壬寅（含通用六十甲子推算） */
+private fun ganzhiOfYear(year: Int): String {
+    if (year < 1) return ""
+    val stems = arrayOf("甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸")
+    val branches = arrayOf("子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥")
+    val i = Math.floorMod(year - 4, 10)
+    val j = Math.floorMod(year - 4, 12)
+    return "${stems[i]}${branches[j]}"
+}
+
+// 纸地与方章收敛到共享组件 com.example.ui.components.DecoPaperGround / DecoSealButton
+// （纸纹 alpha 统一 0.016；方章衬线金墨字 + 48dp 命中区）
+
+/** 决断印钮：保留=金环印钮 / 收藏=金环小章 / 入站(回收)=朱红实印 */
+@Composable
+private fun DecoSealOrb(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    orbSize: androidx.compose.ui.unit.Dp,
+    iconSize: androidx.compose.ui.unit.Dp,
+    tone: DecoOrbTone
+) {
+    val gold = DecoGold
+    val verm = DecoVerm
+    val cream = DecoPaperCream
+    val ground = DecoGround
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.9f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "deco_orb_scale"
+    )
+    val hasHalo = tone == DecoOrbTone.GOLD_RING_HALO
+    val totalSize = orbSize + if (hasHalo) 10.dp else 0.dp
+    val ringColor = if (tone == DecoOrbTone.VERM_SOLID) cream.copy(alpha = 0.35f) else gold
+    val fillColor = if (tone == DecoOrbTone.VERM_SOLID) verm else ground.copy(alpha = 0.42f)
+    val contentColor = if (tone == DecoOrbTone.VERM_SOLID) cream else gold
+
+    // 外层承载：金环印钮的外圈余辉（原型 0 0 0 5px goldDim(0.12)）画在按钮外沿
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(totalSize)
+            .drawBehind {
+                if (hasHalo) {
+                    drawCircle(color = gold.copy(alpha = 0.12f), radius = size.minDimension / 2f)
+                }
+            }
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(orbSize)
+                .graphicsLayer {
+                    scaleX = pressScale
+                    scaleY = pressScale
+                }
+                .clip(CircleShape)
+                .background(fillColor)
+                .border(2.dp, ringColor, CircleShape)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = ripple(color = contentColor),
+                    onClick = onClick
+                )
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(iconSize)
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = label,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = contentColor
+                )
+            }
+        }
+    }
+}
+
+private enum class DecoOrbTone { GOLD_RING, GOLD_RING_HALO, VERM_SOLID }
+
+/** 手势提示短句：色条下划线（回收=朱红警示字 / 保留=金） */
+@Composable
+private fun DecoHintSpan(text: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = text,
+            fontSize = 12.5.sp,
+            letterSpacing = 1.sp,
+            color = color
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(color.copy(alpha = 0.6f))
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -314,9 +419,7 @@ fun ArcCleanerScreen(
         inspectingStack = updated
     }
 
-    ArtisticGalleryBackdrop(
-        modifier = modifier
-    ) {
+    DecoPaperGround(modifier = modifier) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -326,8 +429,9 @@ fun ArcCleanerScreen(
                 .align(Alignment.TopCenter),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top Bar — unified frosted glass orbs + glowing coral telemetry pill
+            // Top Bar — 方章返回/撤销 + 画报题名 + 已释放空间朱红计费章
             val isDarkHeader = LocalIsDarkTheme.current
+            val vermInk = DecoVermInk
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -337,26 +441,21 @@ fun ArcCleanerScreen(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    GalleryHeaderOrbButton(
+                    DecoSealButton(
+                        labelTop = "返",
+                        labelBottom = "回",
                         onClick = onBack,
                         modifier = Modifier.testTag("cleaner_back_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.cd_back),
-                            tint = InkPrimary,
-                            modifier = Modifier.size(19.dp)
-                        )
-                    }
+                    )
                     Column {
                         Text(
                             text = title,
-                            style = MaterialTheme.typography.titleLarge,
+                            fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
-                            color = InkPrimary,
+                            color = DecoInkOnGround,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -367,8 +466,9 @@ fun ArcCleanerScreen(
                                 includeReviewed -> "重温模式 · 剩余 ${displayedQueue.size} 项"
                                 else -> "剩余 ${displayedQueue.size} 项待整理"
                             },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = InkSecondary,
+                            fontSize = 12.sp,
+                            letterSpacing = 0.5.sp,
+                            color = DecoGold,
                             modifier = Modifier.semantics {
                                 liveRegion = LiveRegionMode.Polite
                             }
@@ -376,15 +476,14 @@ fun ArcCleanerScreen(
                     }
                 }
 
-                // Dynamic Session Reclaimable Storage Micro-Pill (aligned with Bookshelf ledger pill)
+                // Dynamic Session Reclaimable Storage Chip (deco 画片章 · 等价迁移)
                 val hasTrashedInSession = sessionTrashedBytes > 0L
                 Surface(
-                    shape = RoundedCornerShape(50),
-                    color = if (isDarkHeader) SurfacePure.copy(alpha = 0.78f) else SurfacePure.copy(alpha = 0.92f),
+                    shape = RoundedCornerShape(3.dp),
+                    color = DecoMat.copy(alpha = 0.9f),
                     border = BorderStroke(
-                        0.85.dp,
-                        if (hasTrashedInSession) CoralDanger.copy(alpha = 0.42f)
-                        else if (isDarkHeader) HairlineBorder else GlassSpecularRimStart
+                        1.dp,
+                        if (hasTrashedInSession) DecoVerm.copy(alpha = 0.6f) else DecoGold.copy(alpha = 0.55f)
                     ),
                     shadowElevation = 0.dp,
                     modifier = Modifier.testTag("dynamic_storage_counter")
@@ -398,21 +497,23 @@ fun ArcCleanerScreen(
                             modifier = Modifier
                                 .size(7.dp)
                                 .clip(CircleShape)
-                                .background(if (hasTrashedInSession) CoralDanger else InkTertiary.copy(alpha = 0.45f))
+                                .background(if (hasTrashedInSession) DecoVerm else DecoGold.copy(alpha = 0.45f))
                         )
                         Text(
                             text = formatStorageSize(sessionTrashedBytes),
                             fontFamily = JetBrainsMonoFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp,
-                            color = if (hasTrashedInSession) CoralDanger else InkSecondary
+                            color = if (hasTrashedInSession) vermInk else DecoInkOnGround.copy(alpha = 0.72f)
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.width(4.dp))
 
-                GalleryHeaderOrbButton(
+                DecoSealButton(
+                    labelTop = "撤",
+                    labelBottom = "销",
                     onClick = {
                         if (performSessionUndo(triggeredByShake = false)) {
                             haptics.undoPulse()
@@ -420,17 +521,10 @@ fun ArcCleanerScreen(
                     },
                     enabled = undoStackDepth > 0,
                     modifier = Modifier.testTag("cleaner_undo_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Undo,
-                        contentDescription = stringResource(R.string.cd_undo),
-                        tint = if (undoStackDepth > 0) CobaltPrimary else InkTertiary.copy(alpha = 0.45f),
-                        modifier = Modifier.size(19.dp)
-                    )
-                }
+                )
             }
 
-            // Razor-thin animated cleanup progress indicator
+            // 金刻度进度：24 格金尺（已决=实金 / 未决=弱金）
             if (initialQueueCount > 0) {
                 val progressTarget = (1f - (displayedQueue.size.toFloat() / initialQueueCount.toFloat())).coerceIn(0.04f, 1f)
                 val animatedProgress by animateFloatAsState(
@@ -438,22 +532,27 @@ fun ArcCleanerScreen(
                     animationSpec = spring(stiffness = Spring.StiffnessLow),
                     label = "cleaner_progress"
                 )
-                Box(
+                val segmentCount = 24
+                val filledSegments = (animatedProgress * segmentCount).roundToInt().coerceIn(0, segmentCount)
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp)
-                        .padding(bottom = 4.dp)
-                        .height(3.dp)
-                        .clip(CircleShape)
-                        .background(SurfaceMuted)
+                        .padding(bottom = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(animatedProgress)
-                            .height(3.dp)
-                            .clip(CircleShape)
-                            .background(if (displayedQueue.isEmpty()) EmeraldKeep else CobaltPrimary)
-                    )
+                    repeat(segmentCount) { index ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(1.dp))
+                                .background(
+                                    if (index < filledSegments || displayedQueue.isEmpty()) DecoGold
+                                    else DecoGold.copy(alpha = 0.22f)
+                                )
+                        )
+                    }
                 }
             }
 
@@ -462,9 +561,11 @@ fun ArcCleanerScreen(
                 enter = fadeIn() + slideInVertically(),
                 exit = fadeOut() + slideOutVertically()
             ) {
+                // 摇一摇撤销 · 朱红通栏脉冲 toast（纸黄字压朱红底）
                 Surface(
-                    shape = RoundedCornerShape(50),
-                    color = CobaltPrimary,
+                    shape = RoundedCornerShape(3.dp),
+                    color = DecoVerm,
+                    border = BorderStroke(1.dp, DecoPaperCream.copy(alpha = 0.22f)),
                     modifier = Modifier.padding(bottom = 6.dp)
                 ) {
                     Row(
@@ -475,13 +576,13 @@ fun ArcCleanerScreen(
                         Icon(
                             imageVector = Icons.Filled.PhoneAndroid,
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = DecoPaperCream,
                             modifier = Modifier.size(15.dp)
                         )
                         Text(
                             text = stringResource(R.string.shake_undo_toast),
                             style = MaterialTheme.typography.labelLarge,
-                            color = Color.White
+                            color = DecoPaperCream
                         )
                     }
                 }
@@ -574,30 +675,35 @@ fun ArcCleanerScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                         modifier = Modifier
-                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(DecoGround.copy(alpha = 0.42f))
+                            .border(1.dp, DecoGold.copy(alpha = 0.5f), RoundedCornerShape(3.dp))
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
                             .semantics(mergeDescendants = true) {}
                             .testTag("cleaner_active_date_pill")
                     ) {
                         Icon(
                             imageVector = Icons.Filled.CalendarToday,
                             contentDescription = null,
-                            tint = CobaltPrimary,
+                            tint = DecoGold,
                             modifier = Modifier.size(12.dp)
                         )
                         Text(
                             text = "${activeItem.primaryPhoto.month}月${activeItem.primaryPhoto.day}日 · ${safePage + 1}/${displayedQueue.size}",
                             fontFamily = JetBrainsMonoFontFamily,
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 11.5.sp,
-                            color = InkSecondary
+                            fontSize = 12.sp,
+                            color = DecoInkOnGround
                         )
                     }
 
                     if (initialFocusDay != null && (focusedDayCount > 0 || onlyFocusedDay)) {
+                        val onGold = if (isDarkHeader) DecoGround else DecoMat
                         Surface(
                             onClick = { onlyFocusedDay = !onlyFocusedDay },
-                            shape = RoundedCornerShape(50),
-                            color = if (onlyFocusedDay) CobaltPrimary else CobaltSoft.copy(alpha = 0.72f),
+                            shape = RoundedCornerShape(3.dp),
+                            color = if (onlyFocusedDay) DecoGold else Color.Transparent,
+                            border = BorderStroke(1.dp, if (onlyFocusedDay) DecoGold else DecoGold.copy(alpha = 0.5f)),
                             modifier = Modifier.testTag("cleaner_day_filter_toggle")
                         ) {
                             Row(
@@ -608,7 +714,7 @@ fun ArcCleanerScreen(
                                 Icon(
                                     imageVector = Icons.Filled.FilterList,
                                     contentDescription = null,
-                                    tint = if (onlyFocusedDay) Color.White else CobaltPrimary,
+                                    tint = if (onlyFocusedDay) onGold else DecoGold,
                                     modifier = Modifier.size(12.dp)
                                 )
                                 Text(
@@ -617,9 +723,9 @@ fun ArcCleanerScreen(
                                     } else {
                                         "仅看 ${initialFocusDay}日 ($focusedDayCount)"
                                     },
-                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = if (onlyFocusedDay) Color.White else CobaltPrimary
+                                    color = if (onlyFocusedDay) onGold else DecoInkOnGround
                                 )
                             }
                         }
@@ -712,54 +818,54 @@ fun ArcCleanerScreen(
                     modifier = Modifier.padding(top = 2.dp, bottom = 2.dp)
                 )
 
-                // Crisp Date & Metadata Stamp below the Arc
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                // 卡片下日期地点一行（干支纪年副标 + 日期 · 地点 · 视频 · 体积）
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(horizontal = 24.dp)
                 ) {
+                    val ganzhi = ganzhiOfYear(activeItem.primaryPhoto.year)
+                    if (ganzhi.isNotEmpty()) {
+                        Text(
+                            text = "${ganzhi}年",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp,
+                            color = DecoGold
+                        )
+                        Text(text = "·", fontSize = 12.sp, color = DecoGold.copy(alpha = 0.6f))
+                    }
                     Text(
                         text = formatPhotoDateTime(activeItem.primaryPhoto.takenAtMillis),
                         fontFamily = JetBrainsMonoFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
-                        color = InkPrimary
+                        color = DecoInkOnGround
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        activeItem.primaryPhoto.locationName?.let { loc ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Filled.LocationOn,
-                                    contentDescription = null,
-                                    tint = CobaltPrimary,
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Text(
-                                    text = loc,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = InkSecondary
-                                )
-                            }
-                        }
-                        if (activeItem.primaryPhoto.isVideo) {
-                            Text(
-                                text = "视频 ${formatVideoDuration(activeItem.primaryPhoto.durationMs)}",
-                                fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = VioletVideo
-                            )
-                        }
+                    activeItem.primaryPhoto.locationName?.let { loc ->
                         Text(
-                            text = formatStorageSize(activeItem.totalBytes),
-                            fontFamily = JetBrainsMonoFontFamily,
+                            text = loc,
                             fontSize = 12.sp,
-                            color = InkSecondary
+                            color = DecoInkOnGround.copy(alpha = 0.72f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
+                    if (activeItem.primaryPhoto.isVideo) {
+                        Text(
+                            text = "视频 ${formatVideoDuration(activeItem.primaryPhoto.durationMs)}",
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = DecoGold
+                        )
+                    }
+                    Text(
+                        text = formatStorageSize(activeItem.totalBytes),
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontSize = 12.sp,
+                        color = DecoInkOnGround.copy(alpha = 0.72f)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -788,35 +894,14 @@ fun ArcCleanerScreen(
                                         .padding(horizontal = 20.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    // Sculpted Satin Obsidian primary CTA with best-frame preview & savings pill
-                                    val palette = LocalFlipYearPalette.current
-                                    val satinBrush = activeChromeSatinBrush()
-                                    val burstShape = RoundedCornerShape(18.dp)
-                                    val burstBorder = remember(palette) {
-                                        Brush.linearGradient(
-                                            listOf(
-                                                palette.activeChromeBorderStart,
-                                                Color.White.copy(alpha = 0.14f),
-                                                palette.activeChromeBorderEnd
-                                            )
-                                        )
-                                    }
-                                    Box(
+                                    // 朱红通栏主 CTA：最佳帧缩图 + 画质/省空间徽章
+                                    Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(54.dp)
-                                            .shadow(10.dp, burstShape, spotColor = InkPrimary.copy(alpha = 0.30f))
-                                            .clip(burstShape)
-                                            .drawBehind {
-                                                drawRect(brush = satinBrush)
-                                                drawLine(
-                                                    color = Color.White.copy(alpha = 0.26f),
-                                                    start = Offset(0f, 0.8.dp.toPx()),
-                                                    end = Offset(size.width, 0.8.dp.toPx()),
-                                                    strokeWidth = 1.dp.toPx()
-                                                )
-                                            }
-                                            .border(1.dp, burstBorder, burstShape)
+                                            .clip(RoundedCornerShape(3.dp))
+                                            .background(DecoVerm)
+                                            .border(1.dp, DecoPaperCream.copy(alpha = 0.22f), RoundedCornerShape(3.dp))
                                             .clickable {
                                                 haptics.swipeDeleteConfirm()
                                                 handleKeepBestInStack(current, current.bestPhoto)
@@ -832,8 +917,8 @@ fun ArcCleanerScreen(
                                             Box(
                                                 modifier = Modifier
                                                     .size(36.dp)
-                                                    .clip(RoundedCornerShape(9.dp))
-                                                    .border(1.2.dp, SolarAmber, RoundedCornerShape(9.dp))
+                                                    .clip(RoundedCornerShape(2.dp))
+                                                    .border(1.2.dp, DecoGold, RoundedCornerShape(2.dp))
                                             ) {
                                                 PhotoArtwork(
                                                     photo = current.bestPhoto,
@@ -847,31 +932,32 @@ fun ArcCleanerScreen(
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
                                                     text = "仅保留最佳帧",
-                                                    style = MaterialTheme.typography.titleSmall,
+                                                    fontSize = 19.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Color.White,
+                                                    letterSpacing = 1.sp,
+                                                    color = DecoPaperCream,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                                 Text(
                                                     text = "画质 ${current.bestPhoto.qualityScore} · 其余 ${current.photos.size - 1} 张进回收站",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = Color.White.copy(alpha = 0.74f),
+                                                    fontSize = 12.sp,
+                                                    color = DecoPaperCream.copy(alpha = 0.78f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                             }
                                             Surface(
-                                                shape = RoundedCornerShape(50),
-                                                color = Color.White.copy(alpha = 0.14f),
-                                                border = BorderStroke(0.75.dp, Color.White.copy(alpha = 0.24f))
+                                                shape = RoundedCornerShape(2.dp),
+                                                color = DecoPaperCream.copy(alpha = 0.14f),
+                                                border = BorderStroke(1.dp, DecoGold.copy(alpha = 0.7f))
                                             ) {
                                                 Text(
                                                     text = "省 ${formatStorageSize(current.nonBestBytes)}",
                                                     fontFamily = JetBrainsMonoFontFamily,
                                                     fontWeight = FontWeight.SemiBold,
-                                                    fontSize = 11.sp,
-                                                    color = Color(0xFFFDE68A),
+                                                    fontSize = 12.sp,
+                                                    color = DecoPaperCream,
                                                     maxLines = 1,
                                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                                 )
@@ -889,10 +975,10 @@ fun ArcCleanerScreen(
                                                 haptics.swipeKeepConfirm()
                                                 handleKeepEntireStack(current, false)
                                             },
-                                            tone = GalleryButtonTone.GLASS,
+                                            tone = GalleryButtonTone.IMMERSIVE,
                                             leadingIcon = Icons.Filled.Check,
                                             height = 48.dp,
-                                            shape = RoundedCornerShape(14.dp),
+                                            shape = RoundedCornerShape(3.dp),
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .testTag("keep_all_burst_button")
@@ -900,24 +986,22 @@ fun ArcCleanerScreen(
                                         GalleryActionButton(
                                             text = "对比(${current.photos.size})",
                                             onClick = { inspectingStack = current },
-                                            tone = GalleryButtonTone.GLASS,
+                                            tone = GalleryButtonTone.IMMERSIVE,
                                             leadingIcon = Icons.Filled.Compare,
                                             height = 48.dp,
-                                            shape = RoundedCornerShape(14.dp),
+                                            shape = RoundedCornerShape(3.dp),
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .testTag("compare_burst_button")
                                         )
-                                        GalleryActionButton(
-                                            text = "整组回收",
+                                        DecoVermStripButton(
+                                            title = "整组回收",
+                                            leadingIcon = Icons.Filled.DeleteOutline,
+                                            height = 48.dp,
                                             onClick = {
                                                 haptics.swipeDeleteConfirm()
                                                 handleTrashEntireStack(current)
                                             },
-                                            tone = GalleryButtonTone.DANGER_GLASS,
-                                            leadingIcon = Icons.Filled.DeleteOutline,
-                                            height = 48.dp,
-                                            shape = RoundedCornerShape(14.dp),
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .testTag("trash_burst_button")
@@ -934,13 +1018,13 @@ fun ArcCleanerScreen(
                                     horizontalArrangement = Arrangement.SpaceEvenly,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    GalleryTactileOrbButton(
-                                        icon = Icons.Filled.DeleteOutline,
+                                    // 入站：朱红实印
+                                    DecoSealOrb(
                                         label = "回收",
-                                        accentColor = CoralDanger,
-                                        tintSurface = CoralSoft,
+                                        icon = Icons.Filled.DeleteOutline,
                                         orbSize = 64.dp,
-                                        iconSize = 27.dp,
+                                        iconSize = 26.dp,
+                                        tone = DecoOrbTone.VERM_SOLID,
                                         onClick = {
                                             haptics.swipeDeleteConfirm()
                                             handleTrashSingle(current.photo)
@@ -948,13 +1032,13 @@ fun ArcCleanerScreen(
                                         modifier = Modifier.testTag("arc_trash_button")
                                     )
 
-                                    GalleryTactileOrbButton(
-                                        icon = if (current.photo.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                    // 收藏：金环小章
+                                    DecoSealOrb(
                                         label = "收藏",
-                                        accentColor = SolarAmber,
-                                        tintSurface = SolarAmberSoft,
+                                        icon = if (current.photo.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                         orbSize = 54.dp,
-                                        iconSize = 23.dp,
+                                        iconSize = 22.dp,
+                                        tone = DecoOrbTone.GOLD_RING,
                                         onClick = {
                                             haptics.swipeKeepConfirm()
                                             handleKeepSingle(current.photo, true)
@@ -962,13 +1046,13 @@ fun ArcCleanerScreen(
                                         modifier = Modifier.testTag("arc_favorite_button")
                                     )
 
-                                    GalleryTactileOrbButton(
-                                        icon = Icons.Filled.Check,
+                                    // 保留：金环印钮（外圈余辉）
+                                    DecoSealOrb(
                                         label = "保留",
-                                        accentColor = EmeraldKeep,
-                                        tintSurface = EmeraldSoft,
+                                        icon = Icons.Filled.Check,
                                         orbSize = 64.dp,
-                                        iconSize = 27.dp,
+                                        iconSize = 26.dp,
+                                        tone = DecoOrbTone.GOLD_RING_HALO,
                                         onClick = {
                                             haptics.swipeKeepConfirm()
                                             handleKeepSingle(current.photo, false)
@@ -995,13 +1079,18 @@ fun ArcCleanerScreen(
                         Icon(
                             imageVector = Icons.Filled.SwipeUp,
                             contentDescription = null,
-                            tint = InkTertiary,
+                            tint = DecoGold,
                             modifier = Modifier.size(13.dp)
                         )
+                        DecoHintSpan(text = "上滑回收", color = vermInk)
+                        Text(text = "·", fontSize = 12.5.sp, color = DecoInkOnGround.copy(alpha = 0.5f))
+                        DecoHintSpan(text = "下滑保留", color = DecoGold)
+                        Text(text = "·", fontSize = 12.5.sp, color = DecoInkOnGround.copy(alpha = 0.5f))
                         Text(
-                            text = "上滑回收 · 下滑保留 · 摇一摇撤销",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = InkTertiary
+                            text = "摇一摇撤销",
+                            fontSize = 12.5.sp,
+                            letterSpacing = 1.sp,
+                            color = DecoInkOnGround.copy(alpha = 0.72f)
                         )
                     }
                 }
@@ -1031,7 +1120,7 @@ fun ArcCleanerScreen(
         ModalBottomSheet(
             onDismissRequest = { inspectingStack = null },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = SurfacePure.copy(alpha = 0.94f)
+            containerColor = DecoMat
         ) {
             BurstComparisonSheet(
                 stack = stack,

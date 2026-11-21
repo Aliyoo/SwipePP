@@ -8,6 +8,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.R
 
+/**
+ * Editorial 衬线（画报美术字标题专用）。
+ * 字重规格：家族只注册 Normal(400) ~ Bold(700)，无 Black(900) 字面（res/font 仅一个
+ * playfair_display.ttf）；任何 FontWeight.Black(900) 请求都会由 Compose 家族解析回落到
+ * Bold(700) 渲染。因此美术字一律显式请求 FontWeight.Bold —— 代码即真值。
+ */
 val EditorialSerifFontFamily = FontFamily(
     Font(R.font.playfair_display, FontWeight.Normal),
     Font(R.font.playfair_display, FontWeight.Medium),

@@ -44,13 +44,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.zIndex
 import com.example.data.PhotoItemEntity
-import com.example.ui.theme.CobaltPrimary
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoGround
+import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.LocalIsDarkTheme
-import com.example.ui.theme.SkylightChampagneGlow
-import com.example.ui.theme.SkylightSapphireGlow
-import com.example.ui.theme.SolarAmber
-import com.example.ui.theme.StudioCanvas
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
@@ -84,7 +82,8 @@ fun <T> Adaptive3DBookshelfCarousel(
     pagerState: PagerState,
     settledCoverPhoto: PhotoItemEntity?,
     itemKey: (T) -> Any,
-    itemShape: Shape = RoundedCornerShape(topStart = 7.dp, bottomStart = 7.dp, topEnd = 22.dp, bottomEnd = 22.dp),
+    // 摩登画报画片圆角 2~4dp（design-demos/deco-app.html GoldFrame radius=2）
+    itemShape: Shape = RoundedCornerShape(4.dp),
     pagerTestTag: String = "bookshelf_3d_pager",
     modifier: Modifier = Modifier,
     itemContent: @Composable (item: T, index: Int, kinematics: CarouselItemKinematics, cardModifier: Modifier) -> Unit
@@ -180,9 +179,10 @@ fun <T> Adaptive3DBookshelfCarousel(
         val adaptiveSpacing = if (isWideScreen) 22.dp else 14.dp
 
         // 1) Whisper-soft full-bleed radial ambient spotlight (no hard circular edge)
+        // 摩登画报：金色舞台光晕（主题金派生，明暗两套地面通用），替代旧香槟/宝石蓝 skylight wash
         val isDark = LocalIsDarkTheme.current
-        val haloChampagne = SkylightChampagneGlow
-        val haloSapphire = SkylightSapphireGlow
+        val haloGold = DecoGold
+        val haloVerm = DecoVerm
         val pedestalShadowInk = if (isDark) Color.Black else InkPrimary
 
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -194,8 +194,8 @@ fun <T> Adaptive3DBookshelfCarousel(
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        haloChampagne.copy(alpha = lerp(0.16f, 0.24f, speedFactor)),
-                        haloSapphire.copy(alpha = lerp(0.07f, 0.14f, speedFactor)),
+                        haloGold.copy(alpha = lerp(0.13f, 0.20f, speedFactor)),
+                        haloVerm.copy(alpha = lerp(0.04f, 0.08f, speedFactor)),
                         Color.Transparent
                     ),
                     center = centerPt,
@@ -317,13 +317,14 @@ fun <T> Adaptive3DBookshelfCarousel(
                     itemContent(item, page, kinematics, dofModifier)
 
                     // Atmospheric Depth-of-Field veil (provides focal-plane separation across ALL Android API 24-36!)
+                    // 摩登画报：虚化蒙版取地面纸色（decoGround），让侧卡自然沉入画报纸底
                     if (dofFactor > 0.05f) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .clip(itemShape)
                                 .background(
-                                    StudioCanvas.copy(alpha = (dofFactor * lerp(0.16f, 0.28f, speedFactor)).coerceIn(0f, 0.30f))
+                                    DecoGround.copy(alpha = (dofFactor * lerp(0.16f, 0.28f, speedFactor)).coerceIn(0f, 0.30f))
                                 )
                         )
                     }

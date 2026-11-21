@@ -41,7 +41,15 @@ data class FlipYearPalette(
     val activeChromeMid: Color,
     val activeChromeBottom: Color,
     val activeChromeBorderStart: Color,
-    val activeChromeBorderEnd: Color
+    val activeChromeBorderEnd: Color,
+    // 摩登画报 Deco Poster 地面层令牌（design-demos/deco-app.html THEMES dark/light）
+    val decoGround: Color,
+    val decoGroundDeep: Color,
+    val decoInkOnGround: Color,
+    val decoGold: Color,
+    val decoVerm: Color,
+    val decoVermInk: Color,
+    val decoMat: Color
 )
 
 /**
@@ -82,7 +90,15 @@ val LightFlipYearPalette = FlipYearPalette(
     activeChromeMid = Color(0xFF181D2B),
     activeChromeBottom = Color(0xFF0E1119),
     activeChromeBorderStart = Color(0x52FFFFFF),
-    activeChromeBorderEnd = Color(0x24FFFFFF)
+    activeChromeBorderEnd = Color(0x24FFFFFF),
+    // 摩登画报 · 日光画廊（deco-app.html THEMES.light: groundA/groundB/ink/gold/verm/vermInk/mat）
+    decoGround = Color(0xFFF6F4EF),
+    decoGroundDeep = Color(0xFFEDEBE4),
+    decoInkOnGround = Color(0xFF1A1D1B),
+    decoGold = Color(0xFF7E6018),
+    decoVerm = Color(0xFFA02A1E),
+    decoVermInk = Color(0xFFA02A1E),
+    decoMat = Color(0xFFFBFAF6)
 )
 
 /**
@@ -123,7 +139,15 @@ val DarkFlipYearPalette = FlipYearPalette(
     activeChromeMid = Color(0xFF293E7E),
     activeChromeBottom = Color(0xFF1D2C5C),
     activeChromeBorderStart = Color(0x70A8C1FF),
-    activeChromeBorderEnd = Color(0x336B8FFF)
+    activeChromeBorderEnd = Color(0x336B8FFF),
+    // 摩登画报 · 暗夜暗房（deco-app.html THEMES.dark: groundA/groundB/ink/gold/verm/vermInk/mat）
+    decoGround = Color(0xFF17352F),
+    decoGroundDeep = Color(0xFF143029),
+    decoInkOnGround = Color(0xFFEFE3C8),
+    decoGold = Color(0xFFC9A24A),
+    decoVerm = Color(0xFF9E2A1D),
+    decoVermInk = Color(0xFFF0705F),
+    decoMat = Color(0xFF17352F)
 )
 
 val LocalFlipYearPalette = staticCompositionLocalOf { LightFlipYearPalette }
@@ -203,6 +227,22 @@ val GlassSpecularRimMid: Color
 val GlassSpecularRimEnd: Color
     @Composable get() = LocalFlipYearPalette.current.glassSpecularRimEnd
 
+// Deco Poster Ground Layer Tokens (摩登画报令牌 — 日光画廊/暗夜暗房双套取值)
+val DecoGround: Color
+    @Composable get() = LocalFlipYearPalette.current.decoGround
+val DecoGroundDeep: Color
+    @Composable get() = LocalFlipYearPalette.current.decoGroundDeep
+val DecoInkOnGround: Color
+    @Composable get() = LocalFlipYearPalette.current.decoInkOnGround
+val DecoGold: Color
+    @Composable get() = LocalFlipYearPalette.current.decoGold
+val DecoVerm: Color
+    @Composable get() = LocalFlipYearPalette.current.decoVerm
+val DecoVermInk: Color
+    @Composable get() = LocalFlipYearPalette.current.decoVermInk
+val DecoMat: Color
+    @Composable get() = LocalFlipYearPalette.current.decoMat
+
 // Collector Monograph Hardcover Spine & Editorial Accent Tones (invariant across themes)
 val EditionObsidian = Color(0xFF16181F)
 val EditionCobalt = Color(0xFF1B2E5C)
@@ -225,3 +265,17 @@ val ObsidianOverlayPanel = Color(0xF21B2331)       // ~95% — docks & panels ov
 val ObsidianOverlayChipOnDark = Color(0x1FFFFFFF)  // ~12% white — small chips inside dark docks
 val ObsidianOverlayBorder = Color(0x38FFFFFF)      // ~22% hairline rim on dark chrome
 val ObsidianOverlayBorderStrong = Color(0xA6FFFFFF)// ~65% — hero play orb emphasis rim
+
+// Deco Poster Paper Materials — theme-invariant (摩登画报纸材，浅暗主题同值)
+// 纸黄 #EFE3C8：只压照片暗部 / 朱红底上的文字（可读性红线，不作地面文字）；IMMERSIVE 按钮画报纸面
+val DecoPaperCream = Color(0xFFEFE3C8)
+// 深墨 #1A1D1B（日光画廊字色）：IMMERSIVE 按钮深墨字与墨色涟漪（浅暗主题同值）
+val DecoInkDeep = Color(0xFF1A1D1B)
+
+// 压照片暗 scrim 基墨 #0D1814（原型 deco-app.html rgba(13,24,20,*)，浅暗主题同值）；
+// 只用于照片暗部压底 / 深色徽章底，不作地面文字色（可读性红线）
+val DecoScrimInk = Color(0xFF0D1814)
+// 朱红通栏投影墨 #7A1A0F（原型 VermStrip boxShadow rgba(122,26,15,0.45)，浅暗主题同值）
+val DecoVermShadowInk = Color(0xFF7A1A0F)
+// 美术字错位影朱红层（原型 artShadow 第 2 层 rgba(158,42,29,0.6) —— 原型为固定值，不随主题金/朱令牌变化）
+val DecoArtShadowVerm = Color(0x999E2A1D)

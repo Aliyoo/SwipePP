@@ -17,13 +17,10 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,7 +34,6 @@ import androidx.compose.material.icons.filled.FilterNone
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -65,6 +62,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import com.example.R
 import com.example.data.ImageDownsampleTier
@@ -72,24 +70,21 @@ import com.example.data.PhotoItemEntity
 import com.example.sensor.HapticPatternEngine
 import com.example.ui.CleanupCardItem
 import com.example.ui.components.InlineVideoPlayer
-import com.example.ui.components.ObsidianGlassPill
-import com.example.ui.components.ObsidianIconOrb
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.formatEditorialPhotoTitle
 import com.example.ui.components.formatStorageSize
-import com.example.ui.theme.CobaltPrimary
-import com.example.ui.theme.CoralDanger
-import com.example.ui.theme.EmeraldKeep
-import com.example.ui.theme.HairlineBorder
-import com.example.ui.theme.InkPrimary
-import com.example.ui.theme.ObsidianOverlayBorderStrong
-import com.example.ui.theme.ObsidianOverlayOrb
-import com.example.ui.theme.SolarAmber
-import com.example.ui.theme.SurfacePure
-import com.example.ui.theme.VioletVideo
+import com.example.ui.theme.DecoInkDeep
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoScrimInk
+import com.example.ui.theme.LocalFlipYearPalette
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
+
+// 摩登画报 · 屏内一次性色彩（design-demos/deco-app.html 取材，浅暗主题同值）
+// 照片压暗 scrim / 深色徽章芯片的取色，永远不用于地面文字
+// 压照片 scrim 基墨收敛到 theme/Color.kt 共享常量 DecoScrimInk（原型 rgba(13,24,20,*)
+private val DecoPhotoChipBase = Color(0xFF132920)    // 原型压照片徽章: rgba(19,41,31,0.8~0.88)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -138,6 +133,11 @@ internal fun ModernArcSwipeCard(
     val arcAlpha = lerp(1f, 0.65f, absOffset.coerceIn(0f, 1f))
     val trashProgress = (-dragOffsetY.value / trashThresholdPx).coerceIn(0f, 1f)
     val keepProgress = (dragOffsetY.value / keepThresholdPx).coerceIn(0f, 1f)
+
+    val palette = LocalFlipYearPalette.current
+    val decoGold = palette.decoGold
+    val decoVerm = palette.decoVerm
+    val decoMat = palette.decoMat
 
     Box(
         contentAlignment = Alignment.Center,
@@ -259,15 +259,16 @@ internal fun ModernArcSwipeCard(
             }
     ) {
         if (item is CleanupCardItem.BurstStack) {
+            // 连拍底层画片：纸材薄板 + 金色弱描边（原型 2.6deg 弧叠的等价迁移）
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.92f)
                     .aspectRatio(0.75f)
                     .offset(x = (-12).dp, y = 10.dp)
                     .graphicsLayer { rotationZ = -5.5f }
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(SurfacePure.copy(alpha = 0.72f))
-                    .border(1.dp, HairlineBorder, RoundedCornerShape(22.dp))
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(decoMat.copy(alpha = 0.82f))
+                    .border(1.dp, decoGold.copy(alpha = 0.45f), RoundedCornerShape(3.dp))
             )
             Box(
                 modifier = Modifier
@@ -275,17 +276,18 @@ internal fun ModernArcSwipeCard(
                     .aspectRatio(0.75f)
                     .offset(x = 12.dp, y = 6.dp)
                     .graphicsLayer { rotationZ = 5f }
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(SurfacePure.copy(alpha = 0.88f))
-                    .border(1.dp, HairlineBorder, RoundedCornerShape(22.dp))
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(decoMat.copy(alpha = 0.94f))
+                    .border(1.dp, decoGold.copy(alpha = 0.6f), RoundedCornerShape(3.dp))
             )
         }
 
+        // 金双线画框卡片：外 1.5dp 金描边 → 3dp 纸材内衬 → 1dp 弱金内线，画片圆角 3dp
         Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = SurfacePure,
-            border = BorderStroke(1.dp, HairlineBorder),
-            shadowElevation = 14.dp,
+            shape = RoundedCornerShape(3.dp),
+            color = decoMat,
+            border = BorderStroke(1.5.dp, decoGold),
+            shadowElevation = 8.dp,
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(0.75f)
@@ -304,222 +306,244 @@ internal fun ModernArcSwipeCard(
                 )
                 .testTag("arc_card_${item.stableKey}")
         ) {
-            Column(
+            // 3dp 纸材内衬 + 1dp 弱金内线
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(8.dp)
+                    .padding(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .border(1.dp, decoGold.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .clip(RoundedCornerShape(18.dp))
-                ) {
-                    if (item.primaryPhoto.isVideo && isFocused) {
-                        InlineVideoPlayer(
-                            photo = item.primaryPhoto,
-                            playWhenReady = isVideoPlaybackActive,
-                            initialMuted = true,
-                            fillCrop = true,
-                            showFullControls = false,
-                            onOpenFullscreen = { onOpenFullscreen(item.primaryPhoto) },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        PhotoArtwork(
-                            photo = item.primaryPhoto,
-                            contentDescription = stringResource(R.string.cd_photo_card),
-                            downsampleTier = ImageDownsampleTier.HERO_CARD,
-                            targetSizePx = 960,
-                            modifier = Modifier.fillMaxSize()
-                        )
+                if (item.primaryPhoto.isVideo && isFocused) {
+                    InlineVideoPlayer(
+                        photo = item.primaryPhoto,
+                        playWhenReady = isVideoPlaybackActive,
+                        initialMuted = true,
+                        fillCrop = true,
+                        showFullControls = false,
+                        onOpenFullscreen = { onOpenFullscreen(item.primaryPhoto) },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    PhotoArtwork(
+                        photo = item.primaryPhoto,
+                        contentDescription = stringResource(R.string.cd_photo_card),
+                        downsampleTier = ImageDownsampleTier.HERO_CARD,
+                        targetSizePx = 960,
+                        modifier = Modifier.fillMaxSize()
+                    )
 
-                        if (item.primaryPhoto.isVideo) {
-                            ObsidianIconOrb(
-                                icon = Icons.Filled.PlayArrow,
+                    if (item.primaryPhoto.isVideo) {
+                        // 金环播放印钮（压照片暗部）
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(58.dp)
+                                .clip(CircleShape)
+                                .background(DecoPhotoChipBase.copy(alpha = 0.72f))
+                                .border(2.dp, decoGold, CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.PlayArrow,
                                 contentDescription = stringResource(R.string.cd_play_video),
-                                onClick = null,
-                                size = 58.dp,
-                                iconSize = 34.dp,
-                                borderColor = ObsidianOverlayBorderStrong,
-                                modifier = Modifier.align(Alignment.Center)
+                                tint = DecoPaperCream,
+                                modifier = Modifier.size(34.dp)
                             )
                         }
                     }
+                }
 
-                    // Top Floating Frosted Badges
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (item is CleanupCardItem.BurstStack) {
-                            ObsidianGlassPill(color = ObsidianOverlayOrb) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.FilterNone,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Text(
-                                        text = "${item.photos.size} 张连拍",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                }
-                            }
+                // 压照片暗 scrim（可读性红线：线性 0.62 → 透明，含顶部弱压）
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                0f to DecoScrimInk.copy(alpha = 0.30f),
+                                0.38f to Color.Transparent,
+                                1f to DecoScrimInk.copy(alpha = 0.62f)
+                            )
+                        )
+                )
 
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = SolarAmber.copy(alpha = 0.92f),
-                                border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.45f))
+                // Top Deco Badge Chips（压照片暗部：纸黄文字 + 暗房芯片）
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (item is CleanupCardItem.BurstStack) {
+                        DecoPhotoChip {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Star,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Text(
-                                        text = "最佳 · 画质 ${item.bestPhoto.qualityScore}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                }
-                            }
-                        } else if (item.primaryPhoto.widthPx > 0 && item.primaryPhoto.heightPx > 0) {
-                            ObsidianGlassPill(color = ObsidianOverlayOrb) {
+                                Icon(
+                                    imageVector = Icons.Filled.FilterNone,
+                                    contentDescription = null,
+                                    tint = DecoPaperCream,
+                                    modifier = Modifier.size(12.dp)
+                                )
                                 Text(
-                                    text = "${item.primaryPhoto.widthPx}×${item.primaryPhoto.heightPx}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    text = "${item.photos.size} 张连拍",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = DecoPaperCream
                                 )
                             }
                         }
-                    }
 
-                    // Double-tap Favorite Heart Bloom Overlay
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = showFavoriteHeartBurst,
-                        enter = fadeIn() + scaleIn(initialScale = 0.5f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)),
-                        exit = fadeOut() + scaleOut(targetScale = 1.25f),
-                        modifier = Modifier.align(Alignment.Center)
+                        // 朱红实印：最佳帧徽章
+                        Surface(
+                            shape = RoundedCornerShape(2.dp),
+                            color = decoVerm,
+                            border = BorderStroke(1.dp, DecoPaperCream.copy(alpha = 0.25f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Star,
+                                    contentDescription = null,
+                                    tint = DecoPaperCream,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = "最佳 · 画质 ${item.bestPhoto.qualityScore}",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = DecoPaperCream
+                                )
+                            }
+                        }
+                    } else if (item.primaryPhoto.widthPx > 0 && item.primaryPhoto.heightPx > 0) {
+                        DecoPhotoChip {
+                            Text(
+                                text = "${item.primaryPhoto.widthPx}×${item.primaryPhoto.heightPx}",
+                                fontSize = 12.sp,
+                                color = DecoPaperCream,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Double-tap Favorite Heart Bloom Overlay
+                AnimatedVisibility(
+                    visible = showFavoriteHeartBurst,
+                    enter = fadeIn() + scaleIn(initialScale = 0.5f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)),
+                    exit = fadeOut() + scaleOut(targetScale = 1.25f),
+                    modifier = Modifier.align(Alignment.Center)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = decoGold,
+                        shadowElevation = 10.dp,
+                        modifier = Modifier.size(72.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Filled.Favorite,
+                                contentDescription = "收藏保留",
+                                tint = DecoPaperCream,
+                                modifier = Modifier.size(38.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Swipe-up Vermilion Trash Feedback Overlay
+                if (trashProgress > 0.08f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(decoVerm.copy(alpha = trashProgress * 0.55f)),
+                        contentAlignment = Alignment.Center
                     ) {
                         Surface(
-                            shape = CircleShape,
-                            color = SolarAmber,
-                            shadowElevation = 12.dp,
-                            modifier = Modifier.size(72.dp)
+                            shape = RoundedCornerShape(3.dp),
+                            color = DecoPaperCream,
+                            border = BorderStroke(1.dp, decoGold.copy(alpha = 0.55f))
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
                                 Icon(
-                                    imageVector = Icons.Filled.Favorite,
-                                    contentDescription = "收藏保留",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(38.dp)
+                                    imageVector = Icons.Filled.DeleteOutline,
+                                    contentDescription = null,
+                                    tint = decoVerm
                                 )
-                            }
-                        }
-                    }
-
-                    // Swipe-up Coral Trash Feedback Overlay
-                    if (trashProgress > 0.08f) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(CoralDanger.copy(alpha = trashProgress * 0.52f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = SurfacePure
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.DeleteOutline,
-                                        contentDescription = null,
-                                        tint = CoralDanger
-                                    )
-                                    Text(
-                                        text = "松手移入回收站 (+${formatStorageSize(item.totalBytes)})",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = InkPrimary
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Swipe-down Emerald Keep Feedback Overlay
-                    if (keepProgress > 0.08f) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(EmeraldKeep.copy(alpha = keepProgress * 0.44f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = SurfacePure
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Check,
-                                        contentDescription = null,
-                                        tint = EmeraldKeep
-                                    )
-                                    Text(
-                                        text = if (item is CleanupCardItem.BurstStack) {
-                                            "松手保留全部 ${item.photos.size} 张连拍"
-                                        } else {
-                                            "松手保留入册"
-                                        },
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = InkPrimary
-                                    )
-                                }
+                                Text(
+                                    text = "松手移入回收站 (+${formatStorageSize(item.totalBytes)})",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = DecoInkDeep
+                                )
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                // Swipe-down Gold Keep Feedback Overlay
+                if (keepProgress > 0.08f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(decoGold.copy(alpha = keepProgress * 0.42f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(3.dp),
+                            color = DecoPaperCream,
+                            border = BorderStroke(1.dp, decoGold)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Check,
+                                    contentDescription = null,
+                                    tint = decoGold
+                                )
+                                Text(
+                                    text = if (item is CleanupCardItem.BurstStack) {
+                                        "松手保留全部 ${item.photos.size} 张连拍"
+                                    } else {
+                                        "松手保留入册"
+                                    },
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = DecoInkDeep
+                                )
+                            }
+                        }
+                    }
+                }
 
+                // 卡片底部信息行（压照片暗部）：纸黄标题 + 金色提示
                 Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
+                        .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
                 ) {
                     Text(
                         text = formatEditorialPhotoTitle(item.primaryPhoto),
-                        style = MaterialTheme.typography.bodyMedium,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = InkPrimary,
+                        color = DecoPaperCream,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
@@ -527,15 +551,15 @@ internal fun ModernArcSwipeCard(
                     if (item is CleanupCardItem.BurstStack) {
                         Text(
                             text = "点此展开",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = CobaltPrimary,
+                            fontSize = 12.sp,
+                            color = decoGold,
                             fontWeight = FontWeight.Bold
                         )
                     } else if (item.primaryPhoto.isVideo) {
                         Text(
                             text = "内嵌播放中 · 点全屏",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = VioletVideo,
+                            fontSize = 12.sp,
+                            color = decoGold,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -543,4 +567,15 @@ internal fun ModernArcSwipeCard(
             }
         }
     }
+}
+
+/** 暗房芯片（压照片）：深色底 + 纸黄字 + 纸黄弱描边，画片圆角 2dp */
+@Composable
+private fun DecoPhotoChip(content: @Composable () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(2.dp),
+        color = DecoPhotoChipBase.copy(alpha = 0.86f),
+        border = BorderStroke(1.dp, DecoPaperCream.copy(alpha = 0.22f)),
+        content = content
+    )
 }
