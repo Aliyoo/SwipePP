@@ -9,8 +9,8 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -20,8 +20,9 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -76,12 +77,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -92,8 +99,10 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -891,10 +900,14 @@ fun FlipYearApp(
     }
 }
 
+private const val ACTIVE_DOCK_TAB_WEIGHT = 1.95f
+
 /**
  * Truly floating translucent frosted-glass capsule navigation dock overlaid directly on top of
- * full-bleed maps, photo grids, and backdrops—no opaque dock strip behind it, and side margins
- * pass touches straight through to the underlying canvas.
+ * full-bleed maps, photo grids, and backdrops:
+ * - Inactive tabs stay calm, centered pure icons.
+ * - The active tab expands horizontally via a synchronized spring while a sub-pixel satin pill
+ *   glides seamlessly across the dock to reveal the label with zero layout jitter or text clipping.
  */
 @Composable
 private fun FloatingGalleryDock(
@@ -903,17 +916,32 @@ private fun FloatingGalleryDock(
     trashedCount: Int,
     onSelectTab: (String) -> Unit
 ) {
+    if (tabs.isEmpty()) return
     val isDark = LocalIsDarkTheme.current
     val palette = LocalFlipYearPalette.current
+    val density = LocalDensity.current
     val activeObsidianBrush = activeChromeSatinBrush()
     val activeRimBrush = remember(palette) {
         Brush.linearGradient(
             colors = listOf(
                 palette.activeChromeBorderStart,
-                Color.White.copy(alpha = 0.10f),
+                Color.White.copy(alpha = 0.12f),
                 palette.activeChromeBorderEnd
             )
         )
+    }
+
+    // Unified critically-damped spring shared by gliding pill, slot weights, and label reveal
+    // so sum(slotWeights) stays constant across every frame with zero neighbor jitter.
+    val dockSpringSpec = remember {
+        spring<Float>(
+            dampingRatio = 0.86f,
+            stiffness = 430f
+        )
+    }
+
+    val selectedIndex = remember(tabs, currentRoute) {
+        tabs.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
     }
 
     FrostedGlassCard(
@@ -923,81 +951,175 @@ private fun FloatingGalleryDock(
         shadowElevation = 12.dp,
         enableAmbientBlur = true,
         modifier = Modifier
-            .widthIn(max = 392.dp)
+            .widthIn(max = 376.dp)
             .fillMaxWidth()
             .testTag("floating_gallery_dock")
     ) {
-        Row(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 5.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 5.dp, vertical = 4.dp)
         ) {
-            tabs.forEach { tab ->
-                val selected = currentRoute == tab.route
-                val tabLabel = stringResource(tab.labelRes)
-                val tabAccessibilityDesc = if (tab.route == FlipYearRoutes.VAULT && trashedCount > 0) {
-                    "$tabLabel，${trashedCount} 项待清理"
-                } else {
-                    tabLabel
-                }
-                val contentColor by animateColorAsState(
-                    targetValue = if (selected) Color.White else InkSecondary,
-                    animationSpec = tween(200),
-                    label = "dock_content_color"
-                )
+            val gapDp = 4.dp
+            val gapPx = with(density) { gapDp.toPx() }
+            val containerWidthPx = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
+            val totalWeight = (tabs.size - 1) + ACTIVE_DOCK_TAB_WEIGHT
+            val availableWidthPx = (containerWidthPx - gapPx * (tabs.size - 1)).coerceAtLeast(1f)
+            val unitWidthPx = availableWidthPx / totalWeight
+            val targetPillOffsetX = selectedIndex * (unitWidthPx + gapPx)
+            val targetPillWidth = unitWidthPx * ACTIVE_DOCK_TAB_WEIGHT
 
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .then(
-                            if (selected) {
-                                Modifier
-                                    .drawBehind {
-                                        drawRect(brush = activeObsidianBrush)
-                                        drawLine(
-                                            color = Color.White.copy(alpha = 0.30f),
-                                            start = Offset(0f, 0.6.dp.toPx()),
-                                            end = Offset(size.width, 0.6.dp.toPx()),
-                                            strokeWidth = 0.9.dp.toPx()
-                                        )
-                                    }
-                                    .border(width = 1.dp, brush = activeRimBrush, shape = RoundedCornerShape(24.dp))
-                            } else {
-                                Modifier
-                            }
+            val pillOffsetXState = animateFloatAsState(
+                targetValue = targetPillOffsetX,
+                animationSpec = dockSpringSpec,
+                label = "dock_gliding_pill_x"
+            )
+            val pillWidthState = animateFloatAsState(
+                targetValue = targetPillWidth,
+                animationSpec = dockSpringSpec,
+                label = "dock_gliding_pill_w"
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .drawBehind {
+                        val cornerPx = size.height / 2f
+                        val currentX = pillOffsetXState.value
+                        val currentW = pillWidthState.value
+                        val topLeft = Offset(currentX, 0f)
+                        val pillSize = Size(currentW.coerceAtLeast(size.height), size.height)
+                        // Gliding sculpted obsidian/sapphire satin capsule (draw-phase only, sub-pixel smooth)
+                        drawRoundRect(
+                            brush = activeObsidianBrush,
+                            topLeft = topLeft,
+                            size = pillSize,
+                            cornerRadius = CornerRadius(cornerPx, cornerPx)
                         )
-                        .semantics(mergeDescendants = true) {
-                            contentDescription = tabAccessibilityDesc
-                            role = Role.Tab
-                            this.selected = selected
+                        // Subtle top specular highlight arc
+                        val sheenInset = cornerPx * 0.55f
+                        if (pillSize.width > sheenInset * 2f) {
+                            drawLine(
+                                color = Color.White.copy(alpha = 0.28f),
+                                start = Offset(topLeft.x + sheenInset, 0.75.dp.toPx()),
+                                end = Offset(topLeft.x + pillSize.width - sheenInset, 0.75.dp.toPx()),
+                                strokeWidth = 0.9.dp.toPx()
+                            )
                         }
-                        .clickable(role = Role.Tab) { onSelectTab(tab.route) }
-                        .padding(horizontal = 4.dp, vertical = 4.dp)
-                        .testTag(tab.testTag)
-                ) {
-                    TabIconWithBadge(
-                        tab = tab,
-                        selected = selected,
-                        trashedCount = trashedCount,
-                        tint = contentColor,
-                        decorative = true
+                        // Crisp gradient rim contour
+                        val strokeWidthPx = 1.dp.toPx()
+                        drawRoundRect(
+                            brush = activeRimBrush,
+                            topLeft = Offset(topLeft.x + strokeWidthPx / 2f, strokeWidthPx / 2f),
+                            size = Size(
+                                (pillSize.width - strokeWidthPx).coerceAtLeast(1f),
+                                (pillSize.height - strokeWidthPx).coerceAtLeast(1f)
+                            ),
+                            cornerRadius = CornerRadius(cornerPx, cornerPx),
+                            style = Stroke(width = strokeWidthPx)
+                        )
+                    },
+                horizontalArrangement = Arrangement.spacedBy(gapDp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                tabs.forEach { tab ->
+                    val selected = currentRoute == tab.route
+                    val tabLabel = stringResource(tab.labelRes)
+                    val tabAccessibilityDesc = if (tab.route == FlipYearRoutes.VAULT && trashedCount > 0) {
+                        "$tabLabel，${trashedCount} 项待清理"
+                    } else {
+                        tabLabel
+                    }
+
+                    val expandProgress by animateFloatAsState(
+                        targetValue = if (selected) 1f else 0f,
+                        animationSpec = dockSpringSpec,
+                        label = "dock_tab_expand_${tab.route}"
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = tabLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 10.sp,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                        color = contentColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                    val slotWeight = (1f + (ACTIVE_DOCK_TAB_WEIGHT - 1f) * expandProgress).coerceAtLeast(0.5f)
+
+                    val contentColor by animateColorAsState(
+                        targetValue = if (selected) Color.White else InkSecondary,
+                        animationSpec = tween(durationMillis = 190),
+                        label = "dock_content_color_${tab.route}"
                     )
+
+                    val interactionSource = remember { MutableInteractionSource() }
+                    val pressed by interactionSource.collectIsPressedAsState()
+                    val pressScale by animateFloatAsState(
+                        targetValue = if (pressed) 0.92f else 1f,
+                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                        label = "dock_press_scale_${tab.route}"
+                    )
+
+                    Row(
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .weight(slotWeight)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(24.dp))
+                            .graphicsLayer {
+                                scaleX = pressScale
+                                scaleY = pressScale
+                            }
+                            .semantics(mergeDescendants = true) {
+                                contentDescription = tabAccessibilityDesc
+                                role = Role.Tab
+                                this.selected = selected
+                            }
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null,
+                                role = Role.Tab
+                            ) { onSelectTab(tab.route) }
+                            .padding(horizontal = 6.dp)
+                            .testTag(tab.testTag)
+                    ) {
+                        TabIconWithBadge(
+                            tab = tab,
+                            selected = selected,
+                            trashedCount = trashedCount,
+                            tint = contentColor,
+                            decorative = true
+                        )
+
+                        // Natural-width label reveal: collapses cleanly to 0px when inactive so icon sits
+                        // mathematically centered, and slides/fades in smoothly without ever flickering "..."
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.layout { measurable, constraints ->
+                                val placeable = measurable.measure(
+                                    constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity)
+                                )
+                                val revealedWidth = (placeable.width * expandProgress).roundToInt()
+                                    .coerceIn(0, constraints.maxWidth)
+                                layout(revealedWidth, placeable.height) {
+                                    if (expandProgress > 0.02f) {
+                                        val labelAlpha = ((expandProgress - 0.20f) / 0.80f).coerceIn(0f, 1f)
+                                        val shiftX = -(1f - expandProgress) * 6.dp.toPx()
+                                        placeable.placeWithLayer(0, 0) {
+                                            alpha = labelAlpha
+                                            translationX = shiftX
+                                        }
+                                    }
+                                }
+                            }
+                        ) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = tabLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = contentColor,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Clip
+                            )
+                        }
+                    }
                 }
             }
         }
