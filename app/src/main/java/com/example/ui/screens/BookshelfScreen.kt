@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -89,6 +90,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -121,6 +123,7 @@ import com.example.ui.components.YearbookCoverStudioSheet
 import com.example.ui.components.activeChromeSatinBrush
 import com.example.ui.components.formatStorageSize
 import com.example.ui.theme.AppThemeMode
+import com.example.ui.theme.isReducedMotionEnabled
 import com.example.ui.theme.CobaltDark
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CobaltSoft
@@ -167,6 +170,7 @@ fun BookshelfScreen(
     onRescanDeviceMedia: () -> Unit,
     onSelectFilter: (MediaFilter) -> Unit,
     onLoadDemoArchive: () -> Unit,
+    onRemoveDemoArchive: () -> Unit = {},
     onSaveYearbookCover: (year: Int, mode: YearbookCoverMode, selectedPhotoIds: List<Long>, intervalSeconds: Int) -> Unit = { _, _, _, _ -> },
     onResetYearbookCover: (year: Int) -> Unit = {},
     modifier: Modifier = Modifier
@@ -174,6 +178,8 @@ fun BookshelfScreen(
     val books = uiState.yearbooks
     val haptics = rememberHapticEngine()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val reducedMotion = remember(context) { isReducedMotionEnabled(context) }
     val isDark = LocalIsDarkTheme.current
     var menuExpanded by remember { mutableStateOf(false) }
     var showThemeSheet by remember { mutableStateOf(false) }
@@ -294,24 +300,6 @@ fun BookshelfScreen(
                             containerColor = SurfacePure
                         ) {
                             DropdownMenuItem(
-                                text = { Text("外观主题 · ${themeMode.label}", color = InkPrimary) },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = when (themeMode) {
-                                            AppThemeMode.SYSTEM -> Icons.Filled.BrightnessAuto
-                                            AppThemeMode.LIGHT -> Icons.Filled.LightMode
-                                            AppThemeMode.DARK -> Icons.Filled.DarkMode
-                                        },
-                                        contentDescription = null,
-                                        tint = if (isDark) SolarAmber else CobaltPrimary
-                                    )
-                                },
-                                onClick = {
-                                    menuExpanded = false
-                                    showThemeSheet = true
-                                }
-                            )
-                            DropdownMenuItem(
                                 text = { Text("授权全部照片与视频权限", color = InkPrimary) },
                                 leadingIcon = {
                                     Icon(Icons.Filled.FolderOpen, contentDescription = null, tint = CobaltPrimary)
@@ -321,22 +309,63 @@ fun BookshelfScreen(
                                     onRequestMediaPermission()
                                 }
                             )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.action_load_demo), color = InkPrimary) },
-                                leadingIcon = {
-                                    Icon(Icons.Outlined.RestartAlt, contentDescription = null, tint = InkSecondary)
-                                },
-                                onClick = {
-                                    menuExpanded = false
-                                    onLoadDemoArchive()
-                                }
+                            if (uiState.hasSamplePhotos) {
+                                DropdownMenuItem(
+                                    text = { Text("移除示例影集", color = CoralDanger) },
+                                    leadingIcon = {
+                                        Icon(Icons.Outlined.RestartAlt, contentDescription = null, tint = CoralDanger)
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onRemoveDemoArchive()
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (uiState.hasSamplePhotos) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = CobaltSoft,
+                    border = BorderStroke(1.dp, CobaltPrimary.copy(alpha = 0.22f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .padding(bottom = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 12.dp, end = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "当前包含内置示例影集",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = CobaltDark,
+                            modifier = Modifier.weight(1f)
+                        )
+                        androidx.compose.material3.TextButton(
+                            onClick = onRemoveDemoArchive,
+                            modifier = Modifier
+                                .heightIn(min = 48.dp)
+                                .testTag("bookshelf_remove_demo_button")
+                        ) {
+                            Text(
+                                text = "移除示例",
+                                color = CoralDanger,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
                 }
             }
 
-            // Unified Frosted-Glass Studio Metrics Strip (translucent alabaster glass with specular rim)
+            // Unified Frosted-Glass Studio Metrics Strip (separate deletion freed vs compression saved)
             FrostedGlassCard(
                 shape = RoundedCornerShape(20.dp),
                 shadowElevation = 5.dp,
@@ -352,8 +381,19 @@ fun BookshelfScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     ModernMetricSlot(
-                        label = "已累计释放",
+                        label = "删除释放",
                         value = formatStorageSize(uiState.stats.totalPurgedBytes),
+                        accent = CobaltPrimary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    VerticalDivider(
+                        modifier = Modifier.height(26.dp),
+                        thickness = 1.dp,
+                        color = HairlineBorder.copy(alpha = 0.7f)
+                    )
+                    ModernMetricSlot(
+                        label = "压缩节省",
+                        value = formatStorageSize(uiState.stats.totalCompressedSavedBytes),
                         accent = EmeraldKeep,
                         modifier = Modifier.weight(1f)
                     )
@@ -371,17 +411,6 @@ fun BookshelfScreen(
                         modifier = Modifier
                             .weight(1f)
                             .testTag("bookshelf_vault_metric")
-                    )
-                    VerticalDivider(
-                        modifier = Modifier.height(26.dp),
-                        thickness = 1.dp,
-                        color = HairlineBorder.copy(alpha = 0.7f)
-                    )
-                    ModernMetricSlot(
-                        label = "已完成月份",
-                        value = "${uiState.monthStamps.size} 个月",
-                        accent = CobaltPrimary,
-                        modifier = Modifier.weight(1f)
                     )
                 }
             }
@@ -523,7 +552,7 @@ fun BookshelfScreen(
                         ModernYearbook3DCard(
                             summary = book,
                             isFocused = isBookSettledCenter,
-                            isCarouselPaused = pagerState.isScrollInProgress || customizingYear != null,
+                            isCarouselPaused = pagerState.isScrollInProgress || customizingYear != null || reducedMotion,
                             onCustomizeCover = {
                                 haptics.pageFlipLift()
                                 customizingYear = book.year
@@ -567,9 +596,9 @@ fun BookshelfScreen(
 
                         GalleryActionButton(
                             text = if (activeBook.unreviewedCount > 0) {
-                                "立即整理 ${activeBook.year} 年 · ${activeBook.unreviewedCount} 项待理"
+                                "清理 ${activeBook.year} 全年 · ${activeBook.unreviewedCount} 项"
                             } else {
-                                "重温 ${activeBook.year} 年精选回忆"
+                                "重温 ${activeBook.year} 全年 · ${activeBook.totalPhotos} 项"
                             },
                             leadingIcon = if (activeBook.unreviewedCount > 0) Icons.Filled.CleaningServices else Icons.Filled.AutoAwesome,
                             tone = GalleryButtonTone.OBSIDIAN,
@@ -1108,7 +1137,7 @@ private fun ModernYearWheel(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .width(pillWidth)
-                        .height(36.dp)
+                        .heightIn(min = 48.dp)
                         .clip(RoundedCornerShape(50))
                         .background(if (selected) activeYearBrush else transparentBrush)
                         .clickable { onSelectIndex(idx) }

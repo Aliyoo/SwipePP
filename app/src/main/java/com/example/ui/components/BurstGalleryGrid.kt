@@ -1098,7 +1098,7 @@ private fun BurstFrameCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "评分 ${photo.qualityScore}",
+                text = "画质 ${photo.qualityScore}",
                 fontFamily = JetBrainsMonoFontFamily,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
@@ -1112,7 +1112,7 @@ private fun BurstFrameCard(
             )
         }
 
-        Spacer(modifier = Modifier.height(5.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
         val bestActiveBrush = activeChromeSatinBrush()
         val glassTop = GlassLightTop
@@ -1130,7 +1130,7 @@ private fun BurstFrameCard(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .weight(1f)
-                    .height(36.dp)
+                    .height(48.dp)
                     .clip(SmallButtonShape)
                     .background(if (isBest) bestActiveBrush else bestIdleBrush)
                     .border(
@@ -1155,14 +1155,14 @@ private fun BurstFrameCard(
                     shape = SmallButtonShape,
                     color = CoralSoft,
                     border = BorderStroke(1.dp, CoralDanger.copy(alpha = 0.28f)),
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Filled.DeleteOutline,
                             contentDescription = "移入回收站",
                             tint = CoralDanger,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }

@@ -117,6 +117,7 @@ fun FootprintMapScreen(
     onBatchManualLocation: (List<PhotoItemEntity>, String, Double, Double, Boolean) -> Unit = { _, _, _, _, _ -> },
     onBatchSameDayLocation: (List<SameDayLocationMatch>, Boolean) -> Unit = { _, _ -> },
     onGeocodeLocation: suspend (String) -> ResolvedGeoLocation? = { null },
+    onToggleFavorite: (PhotoItemEntity, Boolean) -> Unit = { p, f -> onKeepPhoto(p, f) },
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -127,8 +128,9 @@ fun FootprintMapScreen(
     val totalVisibleCount = locatedCount + unlocatedPhotos.size
 
     var selectedLocationName by rememberSaveable { mutableStateOf<String?>(null) }
-    var isCardExpanded by rememberSaveable { mutableStateOf(true) }
+    var isCardExpanded by rememberSaveable { mutableStateOf(false) }
     var lightboxPhoto by remember { mutableStateOf<PhotoItemEntity?>(null) }
+    var lightboxPhotos by remember { mutableStateOf<List<PhotoItemEntity>>(emptyList()) }
     var showBatchLocationSheet by remember { mutableStateOf(false) }
     val locationChipsState = rememberLazyListState()
 
@@ -197,6 +199,12 @@ fun FootprintMapScreen(
             onSelectCluster = { cluster ->
                 selectedLocationName = cluster.locationName
                 isCardExpanded = true
+                cameraState.animateToLatLng(
+                    scope = scope,
+                    lat = cluster.latitude,
+                    lon = cluster.longitude,
+                    targetZoom = 6.8f
+                )
             },
             tileRetryTrigger = tileRetryTrigger,
             onTileStatusChanged = { loaded, failed ->
@@ -707,7 +715,7 @@ fun FootprintMapScreen(
 
                         IconButton(
                             onClick = { isCardExpanded = !isCardExpanded },
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 imageVector = if (isCardExpanded) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
@@ -729,7 +737,10 @@ fun FootprintMapScreen(
                                             .size(width = 72.dp, height = 84.dp)
                                             .clip(RoundedCornerShape(12.dp))
                                             .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp))
-                                            .clickable { lightboxPhoto = photo }
+                                            .clickable {
+                                                lightboxPhotos = unlocatedPhotos
+                                                lightboxPhoto = photo
+                                            }
                                     ) {
                                         PhotoArtwork(
                                             photo = photo,
@@ -745,7 +756,7 @@ fun FootprintMapScreen(
                                         Box(
                                             contentAlignment = Alignment.Center,
                                             modifier = Modifier
-                                                .size(width = 72.dp, height = 84.dp)
+                                                .size(width = 76.dp, height = 84.dp)
                                                 .clip(RoundedCornerShape(12.dp))
                                                 .background(StudioCanvas)
                                                 .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp))
@@ -754,11 +765,11 @@ fun FootprintMapScreen(
                                                 }
                                         ) {
                                             Text(
-                                                text = "+${unlocatedPhotos.size - 24}",
-                                                fontFamily = JetBrainsMonoFontFamily,
+                                                text = "查看全部",
+                                                style = MaterialTheme.typography.labelMedium,
                                                 fontWeight = FontWeight.Bold,
-                                                fontSize = 13.sp,
-                                                color = InkTertiary
+                                                color = CobaltPrimary,
+                                                textAlign = TextAlign.Center
                                             )
                                         }
                                     }
@@ -880,7 +891,7 @@ fun FootprintMapScreen(
                             IconButton(
                                 onClick = { isCardExpanded = !isCardExpanded },
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(48.dp)
                                     .testTag("toggle_location_card_button")
                             ) {
                                 Icon(
@@ -904,7 +915,10 @@ fun FootprintMapScreen(
                                             .size(width = 72.dp, height = 84.dp)
                                             .clip(RoundedCornerShape(12.dp))
                                             .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp))
-                                            .clickable { lightboxPhoto = photo }
+                                            .clickable {
+                                                lightboxPhotos = cluster.photos
+                                                lightboxPhoto = photo
+                                            }
                                     ) {
                                         PhotoArtwork(
                                             photo = photo,
@@ -920,7 +934,7 @@ fun FootprintMapScreen(
                                         Box(
                                             contentAlignment = Alignment.Center,
                                             modifier = Modifier
-                                                .size(width = 72.dp, height = 84.dp)
+                                                .size(width = 76.dp, height = 84.dp)
                                                 .clip(RoundedCornerShape(12.dp))
                                                 .background(StudioCanvas)
                                                 .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp))
@@ -929,11 +943,11 @@ fun FootprintMapScreen(
                                                 }
                                         ) {
                                             Text(
-                                                text = "+${cluster.photos.size - 24}",
-                                                fontFamily = JetBrainsMonoFontFamily,
+                                                text = "查看全部",
+                                                style = MaterialTheme.typography.labelMedium,
                                                 fontWeight = FontWeight.Bold,
-                                                fontSize = 13.sp,
-                                                color = InkTertiary
+                                                color = CobaltPrimary,
+                                                textAlign = TextAlign.Center
                                             )
                                         }
                                     }
@@ -986,11 +1000,16 @@ fun FootprintMapScreen(
     }
 
     lightboxPhoto?.let { photo ->
+        val list = lightboxPhotos.ifEmpty { listOf(photo) }
+        val startIdx = list.indexOfFirst { it.id == photo.id }.coerceAtLeast(0)
         PhotoDetailLightbox(
             photo = photo,
+            photos = list,
+            initialIndex = startIdx,
             onDismiss = { lightboxPhoto = null },
             onKeep = onKeepPhoto,
-            onTrash = onTrashPhoto
+            onTrash = onTrashPhoto,
+            onToggleFavorite = onToggleFavorite
         )
     }
 }

@@ -2,8 +2,10 @@ package com.example.data
 
 import android.Manifest
 import android.app.PendingIntent
+import android.app.RecoverableSecurityException
 import android.content.ContentUris
 import android.content.Context
+import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.media.MediaMetadataRetriever
@@ -30,6 +32,17 @@ data class ResolvedGeoLocation(
     val longitude: Double,
     val locationName: String
 )
+
+data class LegacyDeleteResult(
+    val deletedPhotos: List<PhotoItemEntity>,
+    val failedPhotos: List<PhotoItemEntity>,
+    val failureReason: String? = null,
+    val recoverableIntentSender: IntentSender? = null,
+    val remainingUnprocessedPhotos: List<PhotoItemEntity> = emptyList()
+) {
+    val freedBytes: Long
+        get() = deletedPhotos.sumOf { it.fileSizeBytes }
+}
 
 class LocalMediaScanner(private val context: Context) {
 
@@ -500,6 +513,67 @@ class LocalMediaScanner(private val context: Context) {
             MediaStore.createTrashRequest(context.contentResolver, uris, true)
         }.getOrNull()
     }
+
+    /**
+     * Real physical deletion for Android 10 (API 29) and below where MediaStore.createTrashRequest
+     * is unavailable. Deletes each MediaStore URI individually, stops cleanly on API 29
+     * RecoverableSecurityException so the UI can request user consent and retry remaining items,
+     * and records exact succeeded vs failed items so freed bytes never over-report.
+     */
+    suspend fun deleteDevicePhotosLegacy(photos: List<PhotoItemEntity>): LegacyDeleteResult =
+        withContext(Dispatchers.IO) {
+            val deleted = mutableListOf<PhotoItemEntity>()
+            val failed = mutableListOf<PhotoItemEntity>()
+            var lastReason: String? = null
+            val resolver = context.contentResolver
+
+            for (index in photos.indices) {
+                val photo = photos[index]
+                if (photo.isSample || photo.contentUri.isNullOrBlank() || !photo.contentUri.startsWith("content://")) {
+                    deleted += photo
+                    continue
+                }
+                val uri = runCatching { Uri.parse(photo.contentUri) }.getOrNull()
+                if (uri == null) {
+                    failed += photo
+                    lastReason = "无效的文件路径"
+                    continue
+                }
+                try {
+                    val rows = resolver.delete(uri, null, null)
+                    if (rows > 0) {
+                        deleted += photo
+                    } else {
+                        failed += photo
+                        lastReason = "系统未删除该文件（可能已被移动或受保护）"
+                    }
+                } catch (sec: SecurityException) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && sec is RecoverableSecurityException) {
+                        val remaining = photos.subList(index, photos.size)
+                        return@withContext LegacyDeleteResult(
+                            deletedPhotos = deleted,
+                            failedPhotos = failed,
+                            failureReason = "需要系统授权才能永久删除部分文件",
+                            recoverableIntentSender = sec.userAction.actionIntent.intentSender,
+                            remainingUnprocessedPhotos = remaining
+                        )
+                    } else {
+                        failed += photo
+                        lastReason = "缺少删除权限，部分文件受系统保护"
+                    }
+                } catch (t: Throwable) {
+                    failed += photo
+                    lastReason = t.localizedMessage?.take(48) ?: "文件删除失败"
+                }
+            }
+
+            LegacyDeleteResult(
+                deletedPhotos = deleted,
+                failedPhotos = failed,
+                failureReason = if (failed.isNotEmpty()) lastReason ?: "部分文件未能删除" else null,
+                recoverableIntentSender = null
+            )
+        }
 
     companion object {
         private const val BURST_WINDOW_MS = 10_000L

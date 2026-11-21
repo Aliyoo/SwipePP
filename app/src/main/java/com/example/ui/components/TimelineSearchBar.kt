@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -33,18 +34,24 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BurstMode
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -63,8 +70,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -97,10 +106,17 @@ import com.example.ui.theme.SolarAmberSoft
 import com.example.ui.theme.SurfaceMuted
 import com.example.ui.theme.SurfacePure
 
+enum class GallerySmartFilter(val label: String) {
+    ALL("全部"),
+    BURSTS("连拍组"),
+    LARGE_PHOTOS("大图省空间"),
+    MISSING_LOCATION("缺定位")
+}
+
 /**
  * Tactile Frosted-Glass Global Search Bar for the photo timeline.
- * Combines live keyword search with 1-tap Date Range Picker, structured Location & Descriptive Tag
- * filters, and removable active-filter pills with real-time match counts.
+ * Converges search + a single unified Filter button (housing smart views, albums, date range,
+ * locations, and descriptive tags) plus accessible 48dp removable active-filter pills.
  */
 @Composable
 fun TimelineGlobalSearchBar(
@@ -115,13 +131,19 @@ fun TimelineGlobalSearchBar(
     onRemoveTag: (DescriptiveTag) -> Unit,
     onRemoveKeywordTag: (String) -> Unit,
     onResetAll: () -> Unit,
+    activeSmartFilter: GallerySmartFilter = GallerySmartFilter.ALL,
+    selectedAlbum: String? = null,
+    onClearSmartFilter: () -> Unit = {},
+    onClearAlbum: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isDark = LocalIsDarkTheme.current
     val focusManager = LocalFocusManager.current
     var isFocused by remember { mutableStateOf(false) }
-    val hasDateFilter = searchQuery.dateRange?.isActive == true
-    val filterCount = searchQuery.structuredFilterCount
+    val filterCount = searchQuery.structuredFilterCount +
+        (if (activeSmartFilter != GallerySmartFilter.ALL) 1 else 0) +
+        (if (selectedAlbum != null) 1 else 0)
+    val hasAnyActiveFilter = searchQuery.isActive || activeSmartFilter != GallerySmartFilter.ALL || selectedAlbum != null
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -199,7 +221,7 @@ fun TimelineGlobalSearchBar(
                     IconButton(
                         onClick = { onKeywordChange("") },
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(48.dp)
                             .testTag("timeline_search_clear_button")
                     ) {
                         Icon(
@@ -211,33 +233,7 @@ fun TimelineGlobalSearchBar(
                     }
                 }
 
-                // 1-Tap Date Range Picker shortcut
-                IconButton(
-                    onClick = {
-                        focusManager.clearFocus()
-                        onOpenDateRangePicker()
-                    },
-                    modifier = Modifier
-                        .size(44.dp)
-                        .testTag("timeline_search_date_button")
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(if (hasDateFilter) CobaltSoft else Color.Transparent)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.DateRange,
-                            contentDescription = stringResource(R.string.cd_timeline_search_date),
-                            tint = if (hasDateFilter) CobaltPrimary else InkSecondary,
-                            modifier = Modifier.size(19.dp)
-                        )
-                    }
-                }
-
-                // Structured Filter Sheet trigger (Date Range + Locations + Descriptive Tags)
+                // Single Unified Filter Sheet trigger (Smart Views + Albums + Date + Locations + Tags)
                 Surface(
                     onClick = {
                         focusManager.clearFocus()
@@ -246,37 +242,35 @@ fun TimelineGlobalSearchBar(
                     shape = RoundedCornerShape(18.dp),
                     color = if (filterCount > 0) CobaltPrimary else SurfaceMuted.copy(alpha = 0.85f),
                     modifier = Modifier
-                        .heightIn(min = 38.dp)
+                        .heightIn(min = 48.dp)
                         .testTag("timeline_search_filter_button")
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Tune,
-                            contentDescription = stringResource(R.string.cd_timeline_search_filters),
+                            contentDescription = null,
                             tint = if (filterCount > 0) Color.White else InkPrimary,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(17.dp)
                         )
-                        if (filterCount > 0) {
-                            Text(
-                                text = filterCount.toString(),
-                                fontFamily = JetBrainsMonoFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.5.sp,
-                                color = Color.White
-                            )
-                        }
+                        Text(
+                            text = if (filterCount > 0) "筛选 $filterCount" else "筛选",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (filterCount > 0) Color.White else InkPrimary
+                        )
                     }
                 }
             }
         }
 
-        // Active Search & Structured Filter Summary Strip
+        // Active Search & Unified Filter Summary Strip
         AnimatedVisibility(
-            visible = searchQuery.isActive,
+            visible = hasAnyActiveFilter,
             enter = fadeIn() + expandVertically(),
             exit = fadeOut() + shrinkVertically()
         ) {
@@ -301,6 +295,37 @@ fun TimelineGlobalSearchBar(
                             fontSize = 11.sp,
                             color = CobaltDark,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        )
+                    }
+                }
+
+                if (activeSmartFilter != GallerySmartFilter.ALL) {
+                    item(key = "active_smart_filter") {
+                        RemovableFilterPill(
+                            icon = when (activeSmartFilter) {
+                                GallerySmartFilter.BURSTS -> Icons.Filled.BurstMode
+                                GallerySmartFilter.LARGE_PHOTOS -> Icons.Filled.Compress
+                                GallerySmartFilter.MISSING_LOCATION -> Icons.Filled.LocationOff
+                                GallerySmartFilter.ALL -> Icons.Filled.Tune
+                            },
+                            iconTint = CobaltPrimary,
+                            label = activeSmartFilter.label,
+                            onClick = onOpenFilterSheet,
+                            onRemove = onClearSmartFilter,
+                            testTag = "active_filter_smart"
+                        )
+                    }
+                }
+
+                selectedAlbum?.let { album ->
+                    item(key = "active_album_filter") {
+                        RemovableFilterPill(
+                            icon = Icons.Filled.Folder,
+                            iconTint = SolarAmber,
+                            label = album,
+                            onClick = onOpenFilterSheet,
+                            onRemove = onClearAlbum,
+                            testTag = "active_filter_album"
                         )
                     }
                 }
@@ -358,16 +383,22 @@ fun TimelineGlobalSearchBar(
                         shape = RoundedCornerShape(50),
                         color = SurfaceMuted.copy(alpha = 0.85f),
                         border = BorderStroke(1.dp, HairlineBorder),
-                        modifier = Modifier.testTag("timeline_search_reset_button")
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("timeline_search_reset_button")
                     ) {
-                        Text(
-                            text = stringResource(R.string.timeline_search_clear_all),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = InkSecondary,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                        )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.timeline_search_clear_all),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = InkSecondary
+                            )
+                        }
                     }
                 }
             }
@@ -389,45 +420,52 @@ private fun RemovableFilterPill(
         color = SurfacePure,
         border = BorderStroke(1.dp, CobaltPrimary.copy(alpha = 0.28f)),
         shadowElevation = 2.dp,
-        modifier = Modifier.testTag(testTag)
+        modifier = Modifier
+            .heightIn(min = 48.dp)
+            .testTag(testTag)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .clickable(onClick = onClick)
-                .padding(start = 9.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)
+                .padding(start = 11.dp, end = 2.dp)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = iconTint,
-                modifier = Modifier.size(13.dp)
+                modifier = Modifier.size(14.dp)
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(5.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                fontSize = 11.5.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = InkPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.width(4.dp))
-            Box(
-                contentAlignment = Alignment.Center,
+            IconButton(
+                onClick = onRemove,
                 modifier = Modifier
-                    .size(20.dp)
-                    .clip(CircleShape)
-                    .background(SurfaceMuted)
-                    .clickable(onClick = onRemove)
+                    .size(48.dp)
+                    .testTag("${testTag}_remove")
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "移除筛选 $label",
-                    tint = InkSecondary,
-                    modifier = Modifier.size(12.dp)
-                )
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(SurfaceMuted)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "移除筛选 $label",
+                        tint = InkSecondary,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
             }
         }
     }
@@ -447,14 +485,29 @@ fun TimelineSearchFilterSheet(
     locationClusters: List<LocationCluster>,
     hasUnlocatedMedia: Boolean,
     extractedKeywordTags: List<String>,
-    previewResultCount: (TimelineSearchQuery) -> Int,
+    previewResultCount: (TimelineSearchQuery, GallerySmartFilter, String?) -> Int,
     onApplyQuery: (TimelineSearchQuery) -> Unit,
-    onOpenCustomDatePicker: (DateRangeFilter?) -> Unit,
-    onDismiss: () -> Unit
+    onOpenCustomDatePicker: (TimelineSearchQuery, GallerySmartFilter, String?) -> Unit,
+    onDismiss: () -> Unit,
+    currentSmartFilter: GallerySmartFilter = GallerySmartFilter.ALL,
+    currentAlbum: String? = null,
+    existingAlbums: List<String> = emptyList(),
+    burstCount: Int = 0,
+    largePhotoCount: Int = 0,
+    missingLocationCount: Int = 0,
+    allBurstsExpanded: Boolean = false,
+    onSelectSmartFilter: (GallerySmartFilter) -> Unit = {},
+    onSelectAlbum: (String?) -> Unit = {},
+    onToggleExpandAllBursts: (() -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scrollState = rememberScrollState()
     var draft by remember(currentQuery) { mutableStateOf(currentQuery) }
-    val liveMatchCount = remember(draft) { previewResultCount(draft) }
+    var draftSmartFilter by remember(currentSmartFilter) { mutableStateOf(currentSmartFilter) }
+    var draftAlbum by remember(currentAlbum) { mutableStateOf(currentAlbum) }
+    val liveMatchCount = remember(draft, draftSmartFilter, draftAlbum) {
+        previewResultCount(draft, draftSmartFilter, draftAlbum)
+    }
 
     val datePresets = remember(availableYears) {
         buildList {
@@ -476,15 +529,14 @@ fun TimelineSearchFilterSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .navigationBarsPadding()
-                .padding(horizontal = 22.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+                .imePadding()
         ) {
-            // Sheet Header
+            // Pinned Sheet Header so title and Reset remain accessible while scrolling
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 22.dp)
+                    .padding(bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -496,13 +548,13 @@ fun TimelineSearchFilterSheet(
                         color = InkPrimary
                     )
                     Text(
-                        text = "按日期范围、拍摄地点与描述标签组合精准查找",
+                        text = "按智能分类、相册、日期、拍摄地点与标签组合查找",
                         style = MaterialTheme.typography.bodySmall,
                         color = InkSecondary
                     )
                 }
 
-                if (draft.hasStructuredFilters) {
+                if (draft.hasStructuredFilters || draftSmartFilter != GallerySmartFilter.ALL || draftAlbum != null) {
                     TextButton(
                         onClick = {
                             draft = draft.copy(
@@ -511,14 +563,177 @@ fun TimelineSearchFilterSheet(
                                 selectedTags = emptySet(),
                                 selectedKeywordTags = emptySet()
                             )
+                            draftSmartFilter = GallerySmartFilter.ALL
+                            draftAlbum = null
                         },
-                        modifier = Modifier.testTag("filter_sheet_reset_button")
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("filter_sheet_reset_button")
                     ) {
                         Text(
                             text = "重置筛选",
                             color = CoralDanger,
                             fontWeight = FontWeight.SemiBold
                         )
+                    }
+                }
+            }
+
+            if (scrollState.canScrollBackward) {
+                HorizontalDivider(
+                    color = HairlineBorder,
+                    thickness = 0.8.dp
+                )
+            }
+
+            // Scrollable filter sections with floating bottom Apply Filter action bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = 22.dp)
+                        .padding(top = 10.dp, bottom = 104.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
+
+            // Section 0: Smart Views & Burst Expansion (folded into unified Filter Sheet)
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.BurstMode,
+                            contentDescription = null,
+                            tint = CobaltPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "智能视图",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = InkPrimary
+                        )
+                    }
+                    if (burstCount > 0 && onToggleExpandAllBursts != null) {
+                        Surface(
+                            onClick = onToggleExpandAllBursts,
+                            shape = RoundedCornerShape(50),
+                            color = CobaltSoft,
+                            border = BorderStroke(1.dp, CobaltPrimary.copy(alpha = 0.25f)),
+                            modifier = Modifier
+                                .heightIn(min = 40.dp)
+                                .testTag("gallery_toggle_all_bursts")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (allBurstsExpanded) Icons.Filled.UnfoldLess else Icons.Filled.UnfoldMore,
+                                    contentDescription = null,
+                                    tint = CobaltDark,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = stringResource(
+                                        if (allBurstsExpanded) R.string.burst_collapse_all else R.string.burst_expand_all
+                                    ),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CobaltDark
+                                )
+                            }
+                        }
+                    }
+                }
+
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val smartChoices = buildList {
+                        add(GallerySmartFilter.ALL to "全部")
+                        if (burstCount > 0) add(GallerySmartFilter.BURSTS to "连拍组 ($burstCount)")
+                        if (largePhotoCount > 0) add(GallerySmartFilter.LARGE_PHOTOS to "大图省空间 ($largePhotoCount)")
+                        if (missingLocationCount > 0) add(GallerySmartFilter.MISSING_LOCATION to "缺定位 ($missingLocationCount)")
+                    }
+                    smartChoices.forEach { (filterOption, textLabel) ->
+                        val selected = draftSmartFilter == filterOption
+                        GallerySelectableChip(
+                            selected = selected,
+                            onClick = { draftSmartFilter = filterOption },
+                            modifier = Modifier.testTag("gallery_filter_${filterOption.name.lowercase()}")
+                        ) {
+                            Text(
+                                text = textLabel,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontSize = 12.sp,
+                                color = if (selected) Color.White else InkPrimary
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Section 0.5: Albums
+            if (existingAlbums.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Folder,
+                            contentDescription = null,
+                            tint = SolarAmber,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "相册分类",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = InkPrimary
+                        )
+                    }
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        existingAlbums.take(16).forEach { albumName ->
+                            val selected = draftAlbum == albumName
+                            GallerySelectableChip(
+                                selected = selected,
+                                onClick = {
+                                    draftAlbum = if (selected) null else albumName
+                                },
+                                modifier = Modifier.testTag("gallery_album_chip_$albumName")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Folder,
+                                    contentDescription = null,
+                                    tint = if (selected) SolarAmber else InkSecondary,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text(
+                                    text = albumName,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontSize = 12.sp,
+                                    color = if (selected) Color.White else InkPrimary
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -548,7 +763,7 @@ fun TimelineSearchFilterSheet(
                         )
                     }
                     Surface(
-                        onClick = { onOpenCustomDatePicker(draft.dateRange) },
+                        onClick = { onOpenCustomDatePicker(draft, draftSmartFilter, draftAlbum) },
                         shape = RoundedCornerShape(50),
                         color = CobaltSoft,
                         border = BorderStroke(1.dp, CobaltPrimary.copy(alpha = 0.28f)),
@@ -754,22 +969,46 @@ fun TimelineSearchFilterSheet(
                         }
                     }
                 }
+                }
+                }
+
+                // Floating Bottom Apply Filter Dock with soft fade scrim and click-through shield
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                colorStops = arrayOf(
+                                    0.0f to SurfacePure.copy(alpha = 0f),
+                                    0.30f to SurfacePure.copy(alpha = 0.90f),
+                                    1.0f to SurfacePure
+                                )
+                            )
+                        )
+                        .pointerInput(Unit) {}
+                        .navigationBarsPadding()
+                        .padding(horizontal = 22.dp)
+                        .padding(top = 22.dp, bottom = 14.dp)
+                        .testTag("filter_sheet_floating_footer")
+                ) {
+                    GalleryActionButton(
+                        text = "应用筛选 ($liveMatchCount 项)",
+                        leadingIcon = Icons.Filled.Search,
+                        tone = if (liveMatchCount > 0) GalleryButtonTone.OBSIDIAN else GalleryButtonTone.GLASS,
+                        height = 52.dp,
+                        onClick = {
+                            onSelectSmartFilter(draftSmartFilter)
+                            onSelectAlbum(draftAlbum)
+                            onApplyQuery(draft)
+                            onDismiss()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("filter_sheet_apply_button")
+                    )
+                }
             }
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            GalleryActionButton(
-                text = "查看匹配结果 ($liveMatchCount 项)",
-                leadingIcon = Icons.Filled.Search,
-                tone = GalleryButtonTone.OBSIDIAN,
-                onClick = {
-                    onApplyQuery(draft)
-                    onDismiss()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("filter_sheet_apply_button")
-            )
         }
     }
 }

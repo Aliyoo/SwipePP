@@ -2,6 +2,7 @@ package com.example.ui
 
 import android.app.Application
 import android.app.PendingIntent
+import android.content.IntentSender
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.BatchMediaEditor
@@ -44,23 +45,24 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     )
 
     private val undoStack = MutableStateFlow<List<UndoSnapshot>>(emptyList())
+    private val cleanerSessionUndoStack = MutableStateFlow<List<UndoSnapshot>>(emptyList())
     private val mediaFilter = MutableStateFlow(MediaFilter.ALL)
     private val mediaAccessLevel = MutableStateFlow(repository.checkMediaAccess())
     private val hasMediaLocationPermission = MutableStateFlow(repository.hasMediaLocationAccess())
     private val isScanningDevice = MutableStateFlow(false)
     private val gpsIndexProgress = MutableStateFlow(GpsIndexProgress())
     private val batchTaskProgress = MutableStateFlow(BatchTaskProgress())
-    private val feedbackBanner = MutableStateFlow<String?>(null)
+    private val snackbarMessage = MutableStateFlow<SnackbarMessage?>(null)
     private val recentlyStampedMonthKey = MutableStateFlow<String?>(null)
+    private val vaultSessionFilterIds = MutableStateFlow<Set<Long>?>(null)
     private var gpsBackfillJob: Job? = null
+    private var snackbarDismissJob: Job? = null
     private var pendingBatchWriteTask: PendingBatchWriteTask? = null
+    private var pendingLegacyRetryPhotos: List<PhotoItemEntity> = emptyList()
+    private var accumulatedLegacyFreedBytes: Long = 0L
+    private var accumulatedLegacyDeletedCount: Int = 0
 
     private sealed interface PendingBatchWriteTask {
-        data class Compress(
-            val photos: List<PhotoItemEntity>,
-            val preset: CompressionPreset
-        ) : PendingBatchWriteTask
-
         data class TagLocations(
             val updates: List<Pair<PhotoItemEntity, LocationBatchUpdate>>,
             val summaryLabel: String
@@ -81,13 +83,15 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
 
     private data class UiMeta(
         val undoDepth: Int,
+        val cleanerSessionUndoDepth: Int,
         val access: MediaAccessLevel,
         val hasLocationPerm: Boolean,
         val scanning: Boolean,
         val gpsProgress: GpsIndexProgress,
         val batchProgress: BatchTaskProgress,
-        val banner: String?,
-        val recentStamp: String?
+        val snackbar: SnackbarMessage?,
+        val recentStamp: String?,
+        val vaultSessionFilter: Set<Long>?
     )
 
     private data class DerivedLibraryData(
@@ -103,26 +107,31 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         val totalImageCount: Int,
         val totalVideoCount: Int,
         val hasDeviceMedia: Boolean,
+        val hasSamplePhotos: Boolean,
         val pendingTrashBytes: Long
     )
 
     private val metaFlow = combine(
-        undoStack,
+        combine(undoStack, cleanerSessionUndoStack) { global, session -> global.size to session.size },
         combine(mediaAccessLevel, hasMediaLocationPermission) { a, loc -> a to loc },
         combine(isScanningDevice, gpsIndexProgress, batchTaskProgress) { scan, gps, batch ->
             Triple(scan, gps, batch)
         },
-        combine(feedbackBanner, recentlyStampedMonthKey) { b, s -> b to s }
-    ) { stack, accessPair, workTriple, bannerPair ->
+        combine(snackbarMessage, recentlyStampedMonthKey, vaultSessionFilterIds) { snack, stamp, filterIds ->
+            Triple(snack, stamp, filterIds)
+        }
+    ) { undoPair, accessPair, workTriple, feedbackTriple ->
         UiMeta(
-            undoDepth = stack.size,
+            undoDepth = undoPair.first,
+            cleanerSessionUndoDepth = undoPair.second,
             access = accessPair.first,
             hasLocationPerm = accessPair.second,
             scanning = workTriple.first,
             gpsProgress = workTriple.second,
             batchProgress = workTriple.third,
-            banner = bannerPair.first,
-            recentStamp = bannerPair.second
+            snackbar = feedbackTriple.first,
+            recentStamp = feedbackTriple.second,
+            vaultSessionFilter = feedbackTriple.third
         )
     }
 
@@ -142,9 +151,18 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         var totalImageCount = 0
         var totalVideoCount = 0
         var hasDeviceMedia = false
+        var hasSamplePhotos = false
         for (p in activePhotos) {
             if (p.isVideo) totalVideoCount++ else totalImageCount++
-            if (!p.isSample) hasDeviceMedia = true
+            if (p.isSample) hasSamplePhotos = true else hasDeviceMedia = true
+        }
+        if (!hasSamplePhotos) {
+            for (t in trashed) {
+                if (t.isSample) {
+                    hasSamplePhotos = true
+                    break
+                }
+            }
         }
 
         val filtered = when (filter) {
@@ -193,6 +211,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             totalImageCount = totalImageCount,
             totalVideoCount = totalVideoCount,
             hasDeviceMedia = hasDeviceMedia,
+            hasSamplePhotos = hasSamplePhotos,
             pendingTrashBytes = pendingBytes
         )
     }
@@ -223,10 +242,14 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             totalImageCount = data.totalImageCount,
             totalVideoCount = data.totalVideoCount,
             hasDeviceMedia = data.hasDeviceMedia,
+            hasSamplePhotos = data.hasSamplePhotos,
             pendingTrashBytes = data.pendingTrashBytes,
             undoStackDepth = meta.undoDepth,
-            feedbackBanner = meta.banner,
+            cleanerSessionUndoDepth = meta.cleanerSessionUndoDepth,
+            snackbarMessage = meta.snackbar,
+            feedbackBanner = meta.snackbar?.text,
             recentlyStampedMonthKey = meta.recentStamp,
+            vaultSessionFilterIds = meta.vaultSessionFilter,
             batchTaskMessage = meta.batchProgress.message,
             batchTaskProcessed = meta.batchProgress.processed,
             batchTaskTotal = meta.batchProgress.total
@@ -333,9 +356,31 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     fun loadDemoArchive() {
         viewModelScope.launch {
             undoStack.value = emptyList()
+            cleanerSessionUndoStack.value = emptyList()
             repository.loadDemoArchive()
-            showBanner("已加载示例照片与 4K 视频影集")
+            showSnackbar("已加载示例照片与 4K 视频影集")
         }
+    }
+
+    fun removeDemoArchive() {
+        viewModelScope.launch {
+            val removed = repository.removeSamplePhotos()
+            undoStack.value = emptyList()
+            cleanerSessionUndoStack.value = emptyList()
+            if (removed > 0) {
+                showSnackbar("已移除示例影集（共 $removed 项）")
+            } else {
+                showSnackbar("当前没有示例影集")
+            }
+        }
+    }
+
+    fun setVaultSessionFilter(photoIds: Set<Long>?) {
+        vaultSessionFilterIds.value = photoIds?.takeIf { it.isNotEmpty() }
+    }
+
+    fun resetCleanerSessionUndo() {
+        cleanerSessionUndoStack.value = emptyList()
     }
 
     fun setMediaFilter(filter: MediaFilter) {
@@ -379,8 +424,10 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 byMonth.getOrPut(photo.month) { ArrayList() }.add(photo)
             }
         }
-        val monthsPresent = byMonth.keys.sortedDescending()
-        return monthsPresent.map { month ->
+        // Stage 4: Always list months 1..12 in ascending order so empty months render gracefully
+        // instead of disappearing, and FlipbookScreen opens on the most recent active month.
+        val allMonths = (1..12).toList()
+        return allMonths.map { month ->
             val monthPhotos = byMonth[month].orEmpty()
             val photosByDay = HashMap<Int, ArrayList<PhotoItemEntity>>(32)
             var videoCount = 0
@@ -519,74 +566,177 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         return result
     }
 
-    fun swipeTrashPhoto(photo: PhotoItemEntity) {
-        viewModelScope.launch {
-            pushUndo(
-                UndoSnapshot(
-                    photoStates = listOf(
-                        PhotoStateBackup(
-                            photoId = photo.id,
-                            year = photo.year,
-                            month = photo.month,
-                            previousStatus = photo.status,
-                            previousFavorite = photo.isFavorite,
-                            previousBucketName = photo.bucketName
-                        )
-                    ),
-                    description = if (photo.isVideo) "已撤回视频移入回收站" else "已撤回照片移入回收站"
+    fun swipeTrashPhoto(
+        photo: PhotoItemEntity,
+        fromCleanerSession: Boolean = false
+    ) {
+        val mediaNoun = if (photo.isVideo) "视频" else "照片"
+        val snapshot = UndoSnapshot(
+            photoStates = listOf(
+                PhotoStateBackup(
+                    photoId = photo.id,
+                    year = photo.year,
+                    month = photo.month,
+                    previousStatus = photo.status,
+                    previousFavorite = photo.isFavorite,
+                    previousBucketName = photo.bucketName
                 )
-            )
+            ),
+            description = "已撤回${mediaNoun}移入回收站",
+            actionLabel = "撤销：移入回收站 1 项",
+            cardKey = "single_${photo.id}"
+        )
+        viewModelScope.launch {
+            pushUndo(snapshot, inCleanerSession = fromCleanerSession)
             val newlyStamped = repository.markPhotoStatus(photo.id, PhotoStatus.TRASHED, photo.year, photo.month)
+            if (!fromCleanerSession) {
+                showSnackbar(
+                    text = "已将 1 项${mediaNoun}移入回收站",
+                    undoSnapshot = snapshot
+                )
+            }
             if (newlyStamped) triggerMonthStamped(photo.year, photo.month)
         }
     }
 
-    fun keepPhoto(photo: PhotoItemEntity, markFavorite: Boolean = false) {
-        viewModelScope.launch {
-            pushUndo(
-                UndoSnapshot(
-                    photoStates = listOf(
-                        PhotoStateBackup(
-                            photoId = photo.id,
-                            year = photo.year,
-                            month = photo.month,
-                            previousStatus = photo.status,
-                            previousFavorite = photo.isFavorite,
-                            previousBucketName = photo.bucketName
-                        )
-                    ),
-                    description = "已撤回保留操作"
+    fun keepPhoto(
+        photo: PhotoItemEntity,
+        markFavorite: Boolean = false,
+        fromCleanerSession: Boolean = false
+    ) {
+        val actionText = if (markFavorite) "收藏并保留" else "保留"
+        val snapshot = UndoSnapshot(
+            photoStates = listOf(
+                PhotoStateBackup(
+                    photoId = photo.id,
+                    year = photo.year,
+                    month = photo.month,
+                    previousStatus = photo.status,
+                    previousFavorite = photo.isFavorite,
+                    previousBucketName = photo.bucketName
                 )
-            )
+            ),
+            description = "已撤回${actionText}操作",
+            actionLabel = "撤销：${actionText} 1 项",
+            cardKey = "single_${photo.id}"
+        )
+        viewModelScope.launch {
+            pushUndo(snapshot, inCleanerSession = fromCleanerSession)
             if (markFavorite && !photo.isFavorite) {
                 repository.toggleFavorite(photo.id, true)
             }
             val newlyStamped = repository.markPhotoStatus(photo.id, PhotoStatus.KEPT, photo.year, photo.month)
+            if (!fromCleanerSession) {
+                showSnackbar(
+                    text = if (markFavorite) "已收藏并保留 1 项" else "已标记保留 1 项",
+                    undoSnapshot = snapshot
+                )
+            }
             if (newlyStamped) triggerMonthStamped(photo.year, photo.month)
         }
     }
 
-    fun keepBestAndTrashStackOthers(stack: CleanupCardItem.BurstStack, chosenBest: PhotoItemEntity = stack.bestPhoto) {
-        viewModelScope.launch {
-            pushUndo(
-                UndoSnapshot(
-                    photoStates = stack.photos.map {
-                        PhotoStateBackup(
-                            photoId = it.id,
-                            year = it.year,
-                            month = it.month,
-                            previousStatus = it.status,
-                            previousFavorite = it.isFavorite,
-                            previousBucketName = it.bucketName
-                        )
-                    },
-                    description = "已还原 ${stack.photos.size} 张连拍照片"
+    fun toggleFavoritePhoto(photo: PhotoItemEntity, newFavorite: Boolean) {
+        val actionText = if (newFavorite) "收藏" else "取消收藏"
+        val snapshot = UndoSnapshot(
+            photoStates = listOf(
+                PhotoStateBackup(
+                    photoId = photo.id,
+                    year = photo.year,
+                    month = photo.month,
+                    previousStatus = photo.status,
+                    previousFavorite = photo.isFavorite,
+                    previousBucketName = photo.bucketName
                 )
+            ),
+            description = "已撤回${actionText}",
+            actionLabel = "撤销：${actionText} 1 项"
+        )
+        viewModelScope.launch {
+            pushUndo(snapshot, inCleanerSession = false)
+            repository.toggleFavorite(photo.id, newFavorite)
+            if (newFavorite && photo.photoStatus == PhotoStatus.UNREVIEWED) {
+                val newlyStamped = repository.markPhotoStatus(photo.id, PhotoStatus.KEPT, photo.year, photo.month)
+                if (newlyStamped) triggerMonthStamped(photo.year, photo.month)
+            }
+            showSnackbar(
+                text = if (newFavorite) "已加入收藏" else "已取消收藏",
+                undoSnapshot = snapshot
             )
+        }
+    }
+
+    fun keepEntireBurstStack(
+        stack: CleanupCardItem.BurstStack,
+        markFavorite: Boolean = false,
+        fromCleanerSession: Boolean = true
+    ) {
+        val actionText = if (markFavorite) "收藏并保留整组" else "保留整组"
+        val snapshot = UndoSnapshot(
+            photoStates = stack.photos.map {
+                PhotoStateBackup(
+                    photoId = it.id,
+                    year = it.year,
+                    month = it.month,
+                    previousStatus = it.status,
+                    previousFavorite = it.isFavorite,
+                    previousBucketName = it.bucketName
+                )
+            },
+            description = "已撤回${actionText} (${stack.photos.size} 张)",
+            actionLabel = "撤销：保留连拍 ${stack.photos.size} 张",
+            cardKey = stack.stableKey
+        )
+        viewModelScope.launch {
+            pushUndo(snapshot, inCleanerSession = fromCleanerSession)
+            if (markFavorite) {
+                repository.toggleFavorite(stack.bestPhoto.id, true)
+            }
+            val months = stack.photos.map { it.year to it.month }.toSet()
+            val newlyStamped = repository.markPhotosStatus(
+                ids = stack.photos.map { it.id },
+                status = PhotoStatus.KEPT,
+                affectedMonths = months
+            )
+            if (!fromCleanerSession) {
+                showSnackbar(
+                    text = "已保留整组 ${stack.photos.size} 张连拍照片",
+                    undoSnapshot = snapshot
+                )
+            }
+            if (newlyStamped) triggerMonthStamped(stack.bestPhoto.year, stack.bestPhoto.month)
+        }
+    }
+
+    fun keepBestAndTrashStackOthers(
+        stack: CleanupCardItem.BurstStack,
+        chosenBest: PhotoItemEntity = stack.bestPhoto,
+        fromCleanerSession: Boolean = false
+    ) {
+        val others = stack.photos.filter { it.id != chosenBest.id }
+        val snapshot = UndoSnapshot(
+            photoStates = stack.photos.map {
+                PhotoStateBackup(
+                    photoId = it.id,
+                    year = it.year,
+                    month = it.month,
+                    previousStatus = it.status,
+                    previousFavorite = it.isFavorite,
+                    previousBucketName = it.bucketName
+                )
+            },
+            description = "已还原 ${stack.photos.size} 张连拍照片",
+            actionLabel = "撤销：仅留最佳（移入回收站 ${others.size} 张）",
+            cardKey = stack.stableKey
+        )
+        viewModelScope.launch {
+            pushUndo(snapshot, inCleanerSession = fromCleanerSession)
             repository.setBestInStack(stack.groupId, chosenBest.id)
-            val others = stack.photos.filter { it.id != chosenBest.id }
             val newlyStamped = repository.keepBestAndTrashOthers(chosenBest, others)
-            showBanner("已保留最佳照片，将 ${others.size} 张相似连拍移入回收站")
+            showSnackbar(
+                text = "已仅留最佳照片，${others.size} 张相似连拍移入回收站",
+                undoSnapshot = snapshot
+            )
             if (newlyStamped) triggerMonthStamped(chosenBest.year, chosenBest.month)
         }
     }
@@ -670,51 +820,58 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         )
     }
 
-    fun trashEntireStack(stack: CleanupCardItem.BurstStack) {
-        viewModelScope.launch {
-            pushUndo(
-                UndoSnapshot(
-                    photoStates = stack.photos.map {
-                        PhotoStateBackup(
-                            photoId = it.id,
-                            year = it.year,
-                            month = it.month,
-                            previousStatus = it.status,
-                            previousFavorite = it.isFavorite,
-                            previousBucketName = it.bucketName
-                        )
-                    },
-                    description = "已还原整组连拍 (${stack.photos.size} 张)"
+    fun trashEntireStack(stack: CleanupCardItem.BurstStack, fromCleanerSession: Boolean = true) {
+        val snapshot = UndoSnapshot(
+            photoStates = stack.photos.map {
+                PhotoStateBackup(
+                    photoId = it.id,
+                    year = it.year,
+                    month = it.month,
+                    previousStatus = it.status,
+                    previousFavorite = it.isFavorite,
+                    previousBucketName = it.bucketName
                 )
-            )
+            },
+            description = "已还原整组连拍 (${stack.photos.size} 张)",
+            actionLabel = "撤销：移入回收站 ${stack.photos.size} 张",
+            cardKey = stack.stableKey
+        )
+        viewModelScope.launch {
+            pushUndo(snapshot, inCleanerSession = fromCleanerSession)
             val months = stack.photos.map { it.year to it.month }.toSet()
             val newlyStamped = repository.markPhotosStatus(
                 ids = stack.photos.map { it.id },
                 status = PhotoStatus.TRASHED,
                 affectedMonths = months
             )
+            if (!fromCleanerSession) {
+                showSnackbar(
+                    text = "已将整组 ${stack.photos.size} 张连拍移入回收站",
+                    undoSnapshot = snapshot
+                )
+            }
             if (newlyStamped) triggerMonthStamped(stack.bestPhoto.year, stack.bestPhoto.month)
         }
     }
 
     fun bulkTrashPhotos(photos: List<PhotoItemEntity>) {
         if (photos.isEmpty()) return
-        viewModelScope.launch {
-            pushUndo(
-                UndoSnapshot(
-                    photoStates = photos.map {
-                        PhotoStateBackup(
-                            photoId = it.id,
-                            year = it.year,
-                            month = it.month,
-                            previousStatus = it.status,
-                            previousFavorite = it.isFavorite,
-                            previousBucketName = it.bucketName
-                        )
-                    },
-                    description = "已撤回批量删除 (${photos.size} 项)"
+        val snapshot = UndoSnapshot(
+            photoStates = photos.map {
+                PhotoStateBackup(
+                    photoId = it.id,
+                    year = it.year,
+                    month = it.month,
+                    previousStatus = it.status,
+                    previousFavorite = it.isFavorite,
+                    previousBucketName = it.bucketName
                 )
-            )
+            },
+            description = "已撤回移入回收站 (${photos.size} 项)",
+            actionLabel = "撤销：移入回收站 ${photos.size} 项"
+        )
+        viewModelScope.launch {
+            pushUndo(snapshot)
             val months = photos.map { it.year to it.month }.toSet()
             val newlyStamped = repository.markPhotosStatus(
                 ids = photos.map { it.id },
@@ -722,7 +879,10 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 affectedMonths = months
             )
             val mb = photos.sumOf { it.fileSizeBytes } / (1024.0 * 1024.0)
-            showBanner(String.format("已将 %d 项移入回收站 (%.1f MB)", photos.size, mb))
+            showSnackbar(
+                text = String.format("已将 %d 项移入回收站 (%.1f MB)", photos.size, mb),
+                undoSnapshot = snapshot
+            )
             if (newlyStamped) {
                 val first = photos.first()
                 triggerMonthStamped(first.year, first.month)
@@ -732,22 +892,22 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
 
     fun bulkKeepPhotos(photos: List<PhotoItemEntity>, markFavorite: Boolean = false) {
         if (photos.isEmpty()) return
-        viewModelScope.launch {
-            pushUndo(
-                UndoSnapshot(
-                    photoStates = photos.map {
-                        PhotoStateBackup(
-                            photoId = it.id,
-                            year = it.year,
-                            month = it.month,
-                            previousStatus = it.status,
-                            previousFavorite = it.isFavorite,
-                            previousBucketName = it.bucketName
-                        )
-                    },
-                    description = if (markFavorite) "已撤回批量收藏 (${photos.size} 项)" else "已撤回批量保留 (${photos.size} 项)"
+        val snapshot = UndoSnapshot(
+            photoStates = photos.map {
+                PhotoStateBackup(
+                    photoId = it.id,
+                    year = it.year,
+                    month = it.month,
+                    previousStatus = it.status,
+                    previousFavorite = it.isFavorite,
+                    previousBucketName = it.bucketName
                 )
-            )
+            },
+            description = if (markFavorite) "已撤回批量收藏 (${photos.size} 项)" else "已撤回批量保留 (${photos.size} 项)",
+            actionLabel = if (markFavorite) "撤销：收藏 ${photos.size} 项" else "撤销：保留 ${photos.size} 项"
+        )
+        viewModelScope.launch {
+            pushUndo(snapshot)
             val ids = photos.map { it.id }
             if (markFavorite) {
                 repository.togglePhotosFavorite(ids, true)
@@ -758,7 +918,10 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 status = PhotoStatus.KEPT,
                 affectedMonths = months
             )
-            showBanner(if (markFavorite) "已收藏并保留 ${photos.size} 项媒体" else "已批量保留 ${photos.size} 项媒体")
+            showSnackbar(
+                text = if (markFavorite) "已收藏并保留 ${photos.size} 项媒体" else "已批量保留 ${photos.size} 项媒体",
+                undoSnapshot = snapshot
+            )
             if (newlyStamped) {
                 val first = photos.first()
                 triggerMonthStamped(first.year, first.month)
@@ -773,22 +936,22 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         targetMonth: Int? = null
     ) {
         if (photos.isEmpty()) return
-        viewModelScope.launch {
-            pushUndo(
-                UndoSnapshot(
-                    photoStates = photos.map {
-                        PhotoStateBackup(
-                            photoId = it.id,
-                            year = it.year,
-                            month = it.month,
-                            previousStatus = it.status,
-                            previousFavorite = it.isFavorite,
-                            previousBucketName = it.bucketName
-                        )
-                    },
-                    description = "已撤回移动 (${photos.size} 项)"
+        val snapshot = UndoSnapshot(
+            photoStates = photos.map {
+                PhotoStateBackup(
+                    photoId = it.id,
+                    year = it.year,
+                    month = it.month,
+                    previousStatus = it.status,
+                    previousFavorite = it.isFavorite,
+                    previousBucketName = it.bucketName
                 )
-            )
+            },
+            description = "已撤回移动 (${photos.size} 项)",
+            actionLabel = "撤销：移动 ${photos.size} 项"
+        )
+        viewModelScope.launch {
+            pushUndo(snapshot)
             repository.movePhotos(
                 photos = photos,
                 targetAlbumName = targetAlbumName?.trim()?.takeIf { it.isNotBlank() },
@@ -802,30 +965,29 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     append("${targetYear}年${targetMonth}月影集")
                 }
             }.ifBlank { "目标相册" }
-            showBanner("已将 ${photos.size} 项移动至 $destDesc")
+            showSnackbar(
+                text = "已将 ${photos.size} 项移动至 $destDesc",
+                undoSnapshot = snapshot
+            )
         }
     }
 
+    /**
+     * Stage 1.3: Safe non-destructive compression writes a NEW MediaStore file and moves the
+     * original photo into FlipYear's Trash Vault, so no destructive overwrite permission dialog
+     * is required and originals remain recoverable.
+     */
     fun requestBatchCompress(
         photos: List<PhotoItemEntity>,
         preset: CompressionPreset
     ): PendingIntent? {
         val imageTargets = photos.filter { !it.isVideo }
         if (imageTargets.isEmpty()) {
-            showBanner("所选项目中暂无可压缩的照片")
+            showSnackbar("所选项目中暂无可压缩的照片")
             return null
         }
-        val writeIntent = repository.buildSystemWriteIntent(imageTargets)
-        return if (writeIntent != null) {
-            pendingBatchWriteTask = PendingBatchWriteTask.Compress(
-                photos = photos,
-                preset = preset
-            )
-            writeIntent
-        } else {
-            executeBatchCompress(photos = photos, preset = preset)
-            null
-        }
+        executeBatchCompress(photos = photos, preset = preset)
+        return null
     }
 
     fun requestBatchManualLocation(
@@ -899,13 +1061,6 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         val task = pendingBatchWriteTask ?: return
         pendingBatchWriteTask = null
         when (task) {
-            is PendingBatchWriteTask.Compress -> {
-                if (granted) {
-                    executeBatchCompress(task.photos, task.preset)
-                } else {
-                    showBanner("已取消批量近无损压缩")
-                }
-            }
             is PendingBatchWriteTask.TagLocations -> {
                 executeBatchLocationUpdates(
                     updates = task.updates,
@@ -926,13 +1081,13 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         preset: CompressionPreset
     ) {
         if (batchTaskProgress.value.message != null) {
-            showBanner("已有批量处理任务正在进行，请稍候")
+            showSnackbar("已有批量处理任务正在进行，请稍候")
             return
         }
         viewModelScope.launch {
             val imageCount = photos.count { !it.isVideo }
             batchTaskProgress.value = BatchTaskProgress(
-                message = "正在近无损压缩 (0/$imageCount)",
+                message = "正在批量压缩 (0/$imageCount)",
                 processed = 0,
                 total = imageCount
             )
@@ -942,7 +1097,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     preset = preset
                 ) { processed, total, _ ->
                     batchTaskProgress.value = BatchTaskProgress(
-                        message = "正在近无损压缩 ($processed/$total)",
+                        message = "正在批量压缩 ($processed/$total)",
                         processed = processed,
                         total = total
                     )
@@ -951,7 +1106,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 val savedMb = result.totalSavedBytes / (1024.0 * 1024.0)
                 val summary = when {
                     compressedCount > 0 -> buildString {
-                        append(String.format("已完成 %d 张近无损压缩，节省 %.1f MB", compressedCount, savedMb))
+                        append(String.format("已另存 %d 张压缩照片，节省 %.1f MB；原图已移入回收站可随时还原", compressedCount, savedMb))
                         if (result.skippedAlreadyOptimalCount > 0) {
                             append("（${result.skippedAlreadyOptimalCount} 张已是最优跳过）")
                         }
@@ -959,9 +1114,9 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     result.skippedAlreadyOptimalCount > 0 ->
                         "所选 ${result.skippedAlreadyOptimalCount} 张照片体积已最优，无需重复压缩"
                     else ->
-                        "未能压缩所选照片，请确认文件可写权限"
+                        "未能压缩所选照片，请确认存储空间充足"
                 }
-                showBanner(summary)
+                showSnackbar(summary, durationMs = 4500L)
             } finally {
                 batchTaskProgress.value = BatchTaskProgress()
             }
@@ -976,30 +1131,30 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     ) {
         if (updates.isEmpty()) return
         if (batchTaskProgress.value.message != null) {
-            showBanner("已有批量处理任务正在进行，请稍候")
+            showSnackbar("已有批量处理任务正在进行，请稍候")
             return
         }
-        viewModelScope.launch {
-            pushUndo(
-                UndoSnapshot(
-                    photoStates = updates.map { (photo, _) ->
-                        PhotoStateBackup(
-                            photoId = photo.id,
-                            year = photo.year,
-                            month = photo.month,
-                            previousStatus = photo.status,
-                            previousFavorite = photo.isFavorite,
-                            previousBucketName = photo.bucketName,
-                            restoreLocation = true,
-                            previousLocationName = photo.locationName,
-                            previousLatitude = photo.latitude,
-                            previousLongitude = photo.longitude,
-                            previousGpsScanned = photo.gpsScanned
-                        )
-                    },
-                    description = "已撤回批量定位更新 (${updates.size} 项)"
+        val snapshot = UndoSnapshot(
+            photoStates = updates.map { (photo, _) ->
+                PhotoStateBackup(
+                    photoId = photo.id,
+                    year = photo.year,
+                    month = photo.month,
+                    previousStatus = photo.status,
+                    previousFavorite = photo.isFavorite,
+                    previousBucketName = photo.bucketName,
+                    restoreLocation = true,
+                    previousLocationName = photo.locationName,
+                    previousLatitude = photo.latitude,
+                    previousLongitude = photo.longitude,
+                    previousGpsScanned = photo.gpsScanned
                 )
-            )
+            },
+            description = "已撤回批量定位更新 (${updates.size} 项)",
+            actionLabel = "撤销：定位 ${updates.size} 项"
+        )
+        viewModelScope.launch {
+            pushUndo(snapshot)
 
             if (writeExif) {
                 batchTaskProgress.value = BatchTaskProgress(
@@ -1030,11 +1185,41 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     else ->
                         "已为 ${updates.size} 项补全定位「$summaryLabel」"
                 }
-                showBanner(msg)
+                showSnackbar(text = msg, undoSnapshot = snapshot)
             } finally {
                 batchTaskProgress.value = BatchTaskProgress()
             }
         }
+    }
+
+    /**
+     * Stage 1.4: Message-bound undo restores ONLY the exact snapshot attached to a Snackbar,
+     * leaving any other unrelated undo entries intact.
+     */
+    fun undoBySnapshot(snapshot: UndoSnapshot) {
+        undoStack.value = undoStack.value.filterNot { it.id == snapshot.id }
+        cleanerSessionUndoStack.value = cleanerSessionUndoStack.value.filterNot { it.id == snapshot.id }
+        dismissBanner()
+        viewModelScope.launch {
+            applyUndoSnapshot(snapshot, triggeredByShake = false)
+        }
+    }
+
+    /**
+     * Stage 1.4: Shake-to-undo and cleaner undo button operate strictly within the active
+     * ArcCleaner session stack (never rolling back unrelated actions from Gallery/Vault).
+     * Returns the restored cardKey if any, so ArcCleanerScreen can unmark it in Revisit mode.
+     */
+    fun undoCleanerSessionAction(triggeredByShake: Boolean = false): String? {
+        val current = cleanerSessionUndoStack.value
+        if (current.isEmpty()) return null
+        val snapshot = current.last()
+        cleanerSessionUndoStack.value = current.dropLast(1)
+        undoStack.value = undoStack.value.filterNot { it.id == snapshot.id }
+        viewModelScope.launch {
+            applyUndoSnapshot(snapshot, triggeredByShake = triggeredByShake)
+        }
+        return snapshot.cardKey
     }
 
     fun undoLastAction(triggeredByShake: Boolean = false): Boolean {
@@ -1042,75 +1227,215 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         if (current.isEmpty()) return false
         val snapshot = current.last()
         undoStack.value = current.dropLast(1)
-
+        cleanerSessionUndoStack.value = cleanerSessionUndoStack.value.filterNot { it.id == snapshot.id }
         viewModelScope.launch {
-            val specs = snapshot.photoStates.map { backup ->
-                val targetStatus = runCatching { PhotoStatus.valueOf(backup.previousStatus) }
-                    .getOrDefault(PhotoStatus.UNREVIEWED)
-                PhotoRestoreSpec(
-                    photoId = backup.photoId,
-                    status = targetStatus.name,
-                    trashedAtMillis = if (targetStatus == PhotoStatus.TRASHED) System.currentTimeMillis() else null,
-                    isFavorite = backup.previousFavorite,
-                    bucketName = backup.previousBucketName,
-                    year = backup.year,
-                    month = backup.month,
-                    restoreLocation = backup.restoreLocation,
-                    locationName = backup.previousLocationName,
-                    latitude = backup.previousLatitude,
-                    longitude = backup.previousLongitude,
-                    gpsScanned = backup.previousGpsScanned
-                )
-            }
-            val affectedMonths = snapshot.photoStates.map { it.year to it.month }.toSet()
-            repository.restorePhotoStatesBatch(specs, affectedMonths)
-            val msg = if (triggeredByShake) {
-                "已摇动撤销 · ${snapshot.description}"
-            } else {
-                snapshot.description
-            }
-            showBanner(msg)
+            applyUndoSnapshot(snapshot, triggeredByShake = triggeredByShake)
         }
         return true
     }
 
+    private suspend fun applyUndoSnapshot(snapshot: UndoSnapshot, triggeredByShake: Boolean) {
+        val specs = snapshot.photoStates.map { backup ->
+            val targetStatus = runCatching { PhotoStatus.valueOf(backup.previousStatus) }
+                .getOrDefault(PhotoStatus.UNREVIEWED)
+            PhotoRestoreSpec(
+                photoId = backup.photoId,
+                status = targetStatus.name,
+                trashedAtMillis = if (targetStatus == PhotoStatus.TRASHED) System.currentTimeMillis() else null,
+                isFavorite = backup.previousFavorite,
+                bucketName = backup.previousBucketName,
+                year = backup.year,
+                month = backup.month,
+                restoreLocation = backup.restoreLocation,
+                locationName = backup.previousLocationName,
+                latitude = backup.previousLatitude,
+                longitude = backup.previousLongitude,
+                gpsScanned = backup.previousGpsScanned
+            )
+        }
+        val affectedMonths = snapshot.photoStates.map { it.year to it.month }.toSet()
+        repository.restorePhotoStatesBatch(specs, affectedMonths)
+        val msg = if (triggeredByShake) {
+            "已摇动撤销 · ${snapshot.description}"
+        } else {
+            snapshot.description
+        }
+        showSnackbar(msg)
+    }
+
     fun restoreFromVault(photo: PhotoItemEntity) {
+        val snapshot = UndoSnapshot(
+            photoStates = listOf(
+                PhotoStateBackup(
+                    photoId = photo.id,
+                    year = photo.year,
+                    month = photo.month,
+                    previousStatus = PhotoStatus.TRASHED.name,
+                    previousFavorite = photo.isFavorite,
+                    previousBucketName = photo.bucketName
+                )
+            ),
+            description = "已撤回还原，放回回收站",
+            actionLabel = "撤销：还原 1 项"
+        )
         viewModelScope.launch {
+            pushUndo(snapshot)
             repository.restorePhoto(photo)
-            showBanner("已放回 ${photo.year}年${photo.month}月 影集")
+            showSnackbar(
+                text = "已放回 ${photo.year}年${photo.month}月 影集",
+                undoSnapshot = snapshot
+            )
         }
     }
 
-    fun restoreAllFromVault() {
-        val trashed = uiState.value.trashedPhotos
-        if (trashed.isEmpty()) return
+    fun restoreAllFromVault(targets: List<PhotoItemEntity> = uiState.value.trashedPhotos) {
+        if (targets.isEmpty()) return
+        val snapshot = UndoSnapshot(
+            photoStates = targets.map { photo ->
+                PhotoStateBackup(
+                    photoId = photo.id,
+                    year = photo.year,
+                    month = photo.month,
+                    previousStatus = PhotoStatus.TRASHED.name,
+                    previousFavorite = photo.isFavorite,
+                    previousBucketName = photo.bucketName
+                )
+            },
+            description = "已撤回全部还原 (${targets.size} 项)",
+            actionLabel = "撤销：全部还原 ${targets.size} 项"
+        )
         viewModelScope.launch {
-            repository.restoreAllTrashed(trashed)
-            showBanner("已还原全部 ${trashed.size} 项媒体")
+            pushUndo(snapshot)
+            repository.restoreAllTrashed(targets)
+            showSnackbar(
+                text = "已还原 ${targets.size} 项媒体",
+                undoSnapshot = snapshot
+            )
         }
     }
 
-    fun buildSystemTrashIntentForVault(): PendingIntent? {
-        return repository.buildSystemTrashIntent(uiState.value.trashedPhotos)
+    fun buildSystemTrashIntentForVault(targets: List<PhotoItemEntity> = uiState.value.trashedPhotos): PendingIntent? {
+        return repository.buildSystemTrashIntent(targets)
     }
 
-    fun finalizePurgeTrashed() {
-        val trashed = uiState.value.trashedPhotos
-        if (trashed.isEmpty()) return
+    fun finalizePurgeTrashed(targets: List<PhotoItemEntity> = uiState.value.trashedPhotos) {
+        if (targets.isEmpty()) return
         viewModelScope.launch {
-            val freedBytes = repository.purgeTrashedPhotos(trashed)
+            val freedBytes = repository.purgeTrashedPhotos(targets)
             undoStack.value = emptyList()
+            cleanerSessionUndoStack.value = emptyList()
+            vaultSessionFilterIds.value = vaultSessionFilterIds.value?.minus(targets.map { it.id }.toSet())?.takeIf { it.isNotEmpty() }
             val mb = freedBytes / (1024.0 * 1024.0)
-            showBanner(String.format("成功释放 %.1f MB 空间", mb))
+            showSnackbar(String.format("成功释放 %.1f MB 空间（%d 项）", mb, targets.size))
+        }
+    }
+
+    /**
+     * Stage 1.1: Real deletion path on Android 9 & 10 (SDK < 30).
+     * Deletes each item via ContentResolver, triggers API 29 RecoverableSecurityException consent
+     * when required, accumulates ONLY actually deleted bytes, and leaves failed items in the Vault.
+     */
+    fun purgeLegacyPhotos(
+        targets: List<PhotoItemEntity>,
+        onNeedRecoverableConsent: (IntentSender) -> Unit
+    ) {
+        if (targets.isEmpty()) return
+        pendingLegacyRetryPhotos = emptyList()
+        accumulatedLegacyFreedBytes = 0L
+        accumulatedLegacyDeletedCount = 0
+        runLegacyPurgeBatch(targets, onNeedRecoverableConsent)
+    }
+
+    fun continuePendingLegacyPurge(
+        granted: Boolean,
+        onNeedRecoverableConsent: (IntentSender) -> Unit
+    ) {
+        val retryList = pendingLegacyRetryPhotos
+        pendingLegacyRetryPhotos = emptyList()
+        if (retryList.isEmpty()) return
+        if (granted) {
+            runLegacyPurgeBatch(retryList, onNeedRecoverableConsent)
+        } else {
+            val failedCount = retryList.size
+            val msg = if (accumulatedLegacyDeletedCount > 0) {
+                val mb = accumulatedLegacyFreedBytes / (1024.0 * 1024.0)
+                String.format(
+                    "已永久删除 %d 项（释放 %.1f MB）；%d 项未获系统授权，保留在回收站",
+                    accumulatedLegacyDeletedCount,
+                    mb,
+                    failedCount
+                )
+            } else {
+                "未获得系统删除授权，$failedCount 项保留在回收站"
+            }
+            accumulatedLegacyFreedBytes = 0L
+            accumulatedLegacyDeletedCount = 0
+            showSnackbar(msg, durationMs = 4500L)
+        }
+    }
+
+    private fun runLegacyPurgeBatch(
+        targets: List<PhotoItemEntity>,
+        onNeedRecoverableConsent: (IntentSender) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = repository.purgeLegacyDevicePhotos(targets)
+            accumulatedLegacyFreedBytes += result.freedBytes
+            accumulatedLegacyDeletedCount += result.deletedPhotos.size
+            if (result.deletedPhotos.isNotEmpty()) {
+                val deletedIds = result.deletedPhotos.map { it.id }.toSet()
+                vaultSessionFilterIds.value = vaultSessionFilterIds.value?.minus(deletedIds)?.takeIf { it.isNotEmpty() }
+                undoStack.value = emptyList()
+                cleanerSessionUndoStack.value = emptyList()
+            }
+
+            val consentSender = result.recoverableIntentSender
+            if (consentSender != null && result.remainingUnprocessedPhotos.isNotEmpty()) {
+                pendingLegacyRetryPhotos = result.remainingUnprocessedPhotos
+                onNeedRecoverableConsent(consentSender)
+                return@launch
+            }
+
+            val totalFreed = accumulatedLegacyFreedBytes
+            val totalDeleted = accumulatedLegacyDeletedCount
+            accumulatedLegacyFreedBytes = 0L
+            accumulatedLegacyDeletedCount = 0
+
+            val mb = totalFreed / (1024.0 * 1024.0)
+            val failedCount = result.failedPhotos.size
+            val summary = when {
+                failedCount == 0 && totalDeleted > 0 ->
+                    String.format("已永久删除 %d 项，实际释放 %.1f MB 空间", totalDeleted, mb)
+                totalDeleted > 0 && failedCount > 0 -> {
+                    val reason = result.failureReason ?: "权限不足"
+                    String.format(
+                        "已删除 %d 项（释放 %.1f MB）；%d 项删除失败保留在回收站（%s）",
+                        totalDeleted,
+                        mb,
+                        failedCount,
+                        reason
+                    )
+                }
+                failedCount > 0 -> {
+                    val reason = result.failureReason ?: "系统拒绝删除"
+                    "未能删除所选 $failedCount 项（$reason），已保留在回收站"
+                }
+                else -> "回收站暂无可清理项目"
+            }
+            showSnackbar(summary, durationMs = 4500L)
         }
     }
 
     fun dismissBanner() {
-        feedbackBanner.value = null
+        snackbarDismissJob?.cancel()
+        snackbarMessage.value = null
     }
 
-    private fun pushUndo(snapshot: UndoSnapshot) {
+    private fun pushUndo(snapshot: UndoSnapshot, inCleanerSession: Boolean = false) {
         undoStack.value = (undoStack.value + snapshot).takeLast(25)
+        if (inCleanerSession) {
+            cleanerSessionUndoStack.value = (cleanerSessionUndoStack.value + snapshot).takeLast(25)
+        }
     }
 
     private fun triggerMonthStamped(year: Int, month: Int) {
@@ -1118,11 +1443,26 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     }
 
     private fun showBanner(message: String) {
-        feedbackBanner.value = message
-        viewModelScope.launch {
-            delay(2800)
-            if (feedbackBanner.value == message) {
-                feedbackBanner.value = null
+        showSnackbar(text = message)
+    }
+
+    private fun showSnackbar(
+        text: String,
+        undoSnapshot: UndoSnapshot? = null,
+        durationMs: Long = if (undoSnapshot != null) 4500L else 2800L
+    ) {
+        val msg = SnackbarMessage(
+            text = text,
+            undoLabel = undoSnapshot?.actionLabel,
+            undoSnapshot = undoSnapshot,
+            durationMs = durationMs
+        )
+        snackbarMessage.value = msg
+        snackbarDismissJob?.cancel()
+        snackbarDismissJob = viewModelScope.launch {
+            delay(msg.durationMs)
+            if (snackbarMessage.value?.id == msg.id) {
+                snackbarMessage.value = null
             }
         }
     }

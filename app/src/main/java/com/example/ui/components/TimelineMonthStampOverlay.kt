@@ -69,7 +69,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.font.FontWeight
@@ -611,31 +613,30 @@ fun TimelineMonthStampOverlay(
 
         }
 
-        // Right-Edge Scroll Progress Stamp Flag — glides during scrolling and doubles as
-        // a draggable fast-scrub thumb: dragging it scrolls the grid and the top stamp
-        // label follows the position in real time.
-        AnimatedVisibility(
-            visible = (isScrolling || lingerVisible || isDraggingFlag) && clusterLayout.clusters.size >= 2,
-            enter = fadeIn(tween(150)) + slideInHorizontally(tween(180)) { it / 2 },
-            exit = fadeOut(tween(240)) + slideOutHorizontally(tween(200)) { it / 2 },
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxHeight()
-                .padding(top = 74.dp, bottom = 128.dp, end = 4.dp)
-        ) {
+        // Persistent Right-Edge Fast-Scrub Rail — always mounted so TalkBack can discover
+        // and control timeline jumping even when the list is idle; expands into the dark
+        // month flag while scrolling or dragging.
+        if (clusterLayout.clusters.size >= 2) {
+            val railActive = isScrolling || lingerVisible || isDraggingFlag
+            val railAlpha by animateFloatAsState(
+                targetValue = if (railActive) 1f else 0.45f,
+                animationSpec = tween(220),
+                label = "timeline_rail_idle_alpha"
+            )
+
             BoxWithConstraints(
-                modifier = Modifier.fillMaxHeight(),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .padding(top = 74.dp, bottom = 128.dp, end = 4.dp)
+                    .graphicsLayer { alpha = railAlpha },
                 contentAlignment = Alignment.TopEnd
             ) {
                 val trackHeightPx = constraints.maxHeight.toFloat().coerceAtLeast(1f)
-                val flagHeightPx = 30.dp
-                val travelPx = (trackHeightPx - 96f).coerceAtLeast(1f)
-                // While scrubbing the thumb follows the finger (dragFraction);
-                // otherwise it mirrors the grid's actual scroll position.
+                val travelPx = (trackHeightPx - 120f).coerceAtLeast(1f)
                 val displayFraction = if (isDraggingFlag) dragFraction else scrollProgressFraction
                 val indicatorOffsetY = (displayFraction * travelPx).roundToInt()
 
-                // Hairline vertical timeline track
                 val scrollRailTrackColor = if (LocalIsDarkTheme.current) Color(0x47FFFFFF) else ScrollRailTrackBg
                 Box(
                     modifier = Modifier
@@ -647,21 +648,15 @@ fun TimelineMonthStampOverlay(
                         .background(scrollRailTrackColor)
                 )
 
-                // Gliding micro stamp flag ("Jan 2026") — draggable fast-scrub thumb.
-                // Drag position maps linearly onto the grid's item range; the stamp label
-                // above tracks the cluster under the resulting scroll position.
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                // Always-discoverable 48dp-high touch & TalkBack target
+                Box(
+                    contentAlignment = Alignment.CenterEnd,
                     modifier = Modifier
                         .offset { IntOffset(x = 0, y = indicatorOffsetY) }
-                        .height(flagHeightPx)
-                        .clip(ScrollFlagShape)
-                        .background(if (isDraggingFlag) Color(0xF21A1E29) else Color(0xDE12141C))
-                        .border(0.9.dp, if (isDraggingFlag) Color(0x7AFFFFFF) else Color(0x45FFFFFF), ScrollFlagShape)
+                        .heightIn(min = 48.dp)
                         .semantics {
-                            contentDescription =
-                                "快速滚动，当前${currentCluster.stampLabel}"
+                            contentDescription = "时间轴快速滚动条，当前${currentCluster.stampLabel}"
+                            progressBarRangeInfo = ProgressBarRangeInfo(displayFraction, 0f..1f)
                             setProgress { target ->
                                 dragFraction = target.coerceIn(0f, 1f)
                                 val targetIndex =
@@ -691,22 +686,45 @@ fun TimelineMonthStampOverlay(
                                 scope.launch { gridState.scrollToItem(targetIndex) }
                             }
                         }
-                        .padding(start = 9.dp, end = 7.dp)
                         .testTag("timeline_scroll_rail_flag")
                 ) {
-                    Text(
-                        text = currentCluster.stampLabel,
-                        fontFamily = JetBrainsMonoFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp,
-                        color = Color.White
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(5.dp)
-                            .clip(CircleShape)
-                            .background(if (currentCluster.isCleaned) EmeraldKeep else SolarAmber)
-                    )
+                    if (railActive) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            modifier = Modifier
+                                .height(30.dp)
+                                .clip(ScrollFlagShape)
+                                .background(if (isDraggingFlag) Color(0xF21A1E29) else Color(0xDE12141C))
+                                .border(0.9.dp, if (isDraggingFlag) Color(0x7AFFFFFF) else Color(0x45FFFFFF), ScrollFlagShape)
+                                .padding(start = 9.dp, end = 7.dp)
+                        ) {
+                            Text(
+                                text = currentCluster.stampLabel,
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp,
+                                color = Color.White
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(5.dp)
+                                    .clip(CircleShape)
+                                    .background(if (currentCluster.isCleaned) EmeraldKeep else SolarAmber)
+                            )
+                        }
+                    } else {
+                        // Subtle resting pill thumb so users & TalkBack always have a visible anchor
+                        Box(
+                            modifier = Modifier
+                                .padding(end = 1.dp)
+                                .width(10.dp)
+                                .height(34.dp)
+                                .clip(CircleShape)
+                                .background(CobaltPrimary.copy(alpha = 0.85f))
+                                .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                        )
+                    }
                 }
             }
         }

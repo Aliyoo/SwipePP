@@ -139,7 +139,7 @@ interface FlipYearDao {
     suspend fun getCleanupStatsSync(): CleanupStatsEntity?
 
     @Query("DELETE FROM photos WHERE isSample = 1")
-    suspend fun deleteSamplePhotos()
+    suspend fun deleteSamplePhotos(): Int
 
     @Query("DELETE FROM month_stamps")
     suspend fun clearAllMonthStamps()
@@ -251,6 +251,33 @@ interface FlipYearDao {
                 widthPx = u.newWidthPx,
                 heightPx = u.newHeightPx
             )
+        }
+    }
+
+    /**
+     * Safe two-stage compression transaction: inserts newly written compressed photo copies
+     * and moves the original full-resolution photos into TRASHED so users can restore originals
+     * from the Trash Vault at any time before final purge.
+     */
+    @Transaction
+    suspend fun applySafeCompressedPhotosBatch(
+        newCompressedPhotos: List<PhotoItemEntity>,
+        originalPhotoIdsToTrash: List<Long>,
+        trashedAtMillis: Long
+    ) {
+        if (newCompressedPhotos.isNotEmpty()) {
+            newCompressedPhotos.chunked(SQLITE_BIND_CHUNK).forEach { chunk ->
+                insertPhotosIgnoreConflicts(chunk)
+            }
+        }
+        if (originalPhotoIdsToTrash.isNotEmpty()) {
+            originalPhotoIdsToTrash.chunked(SQLITE_BIND_CHUNK).forEach { chunk ->
+                updatePhotosStatus(
+                    ids = chunk,
+                    status = PhotoStatus.TRASHED.name,
+                    trashedAtMillis = trashedAtMillis
+                )
+            }
         }
     }
 

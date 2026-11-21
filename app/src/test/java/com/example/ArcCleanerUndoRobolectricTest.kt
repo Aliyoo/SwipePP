@@ -84,7 +84,6 @@ class ArcCleanerUndoRobolectricTest {
                     title = "整理 2025年6月",
                     monthNumber = 6,
                     queue = queue,
-                    pendingTrashBytes = deletedHistory.sumOf { it.second.totalBytes },
                     undoStackDepth = undoDepth,
                     onBack = {},
                     onKeepPhoto = { _, _ -> },
@@ -96,19 +95,20 @@ class ArcCleanerUndoRobolectricTest {
                             undoDepth = deletedHistory.size
                         }
                     },
+                    onKeepEntireStack = { _, _ -> },
                     onKeepBestInStack = { _, _ -> },
                     onTrashEntireStack = {},
                     onSelectBestInStack = { _, _ -> },
-                    onUndo = {
+                    onUndoSession = { _ ->
                         if (deletedHistory.isEmpty()) {
-                            false
+                            null
                         } else {
                             val (idx, item) = deletedHistory.removeAt(deletedHistory.lastIndex)
                             val mutable = queue.toMutableList()
                             mutable.add(idx.coerceIn(0, mutable.size), item)
                             queue = mutable
                             undoDepth = deletedHistory.size
-                            true
+                            item.stableKey
                         }
                     }
                 )
@@ -143,7 +143,6 @@ class ArcCleanerUndoRobolectricTest {
                     title = "整理 2025年6月",
                     monthNumber = 6,
                     queue = queue,
-                    pendingTrashBytes = 0L,
                     undoStackDepth = undoDepth,
                     onBack = {},
                     onKeepPhoto = { _, _ -> },
@@ -153,14 +152,16 @@ class ArcCleanerUndoRobolectricTest {
                         queue = emptyList()
                         undoDepth = deletedHistory.size
                     },
+                    onKeepEntireStack = { _, _ -> },
                     onKeepBestInStack = { _, _ -> },
                     onTrashEntireStack = {},
                     onSelectBestInStack = { _, _ -> },
-                    onUndo = {
-                        if (deletedHistory.isEmpty()) false else {
-                            queue = listOf(deletedHistory.removeAt(deletedHistory.lastIndex))
+                    onUndoSession = { _ ->
+                        if (deletedHistory.isEmpty()) null else {
+                            val restored = deletedHistory.removeAt(deletedHistory.lastIndex)
+                            queue = listOf(restored)
                             undoDepth = deletedHistory.size
-                            true
+                            restored.stableKey
                         }
                     }
                 )
@@ -193,7 +194,6 @@ class ArcCleanerUndoRobolectricTest {
                     title = "整理 2025年6月",
                     monthNumber = 6,
                     queue = queue,
-                    pendingTrashBytes = 0L,
                     undoStackDepth = undoDepth,
                     onBack = {},
                     onKeepPhoto = { _, _ -> },
@@ -205,17 +205,18 @@ class ArcCleanerUndoRobolectricTest {
                             undoDepth = deletedHistory.size
                         }
                     },
+                    onKeepEntireStack = { _, _ -> },
                     onKeepBestInStack = { _, _ -> },
                     onTrashEntireStack = {},
                     onSelectBestInStack = { _, _ -> },
-                    onUndo = {
-                        if (deletedHistory.isEmpty()) false else {
+                    onUndoSession = { _ ->
+                        if (deletedHistory.isEmpty()) null else {
                             val (idx, item) = deletedHistory.removeAt(deletedHistory.lastIndex)
                             val mutable = queue.toMutableList()
                             mutable.add(idx.coerceIn(0, mutable.size), item)
                             queue = mutable
                             undoDepth = deletedHistory.size
-                            true
+                            item.stableKey
                         }
                     }
                 )
@@ -259,21 +260,21 @@ class ArcCleanerUndoRobolectricTest {
                     title = "整理 2025年6月",
                     monthNumber = 6,
                     queue = queue,
-                    pendingTrashBytes = 0L,
                     undoStackDepth = undoDepth,
                     onBack = {},
                     onKeepPhoto = { _, _ -> },
                     onTrashPhoto = {},
+                    onKeepEntireStack = { _, _ -> },
                     onKeepBestInStack = { _, _ -> },
                     onTrashEntireStack = {
                         queue = listOf(CleanupCardItem.SinglePhoto(p3))
                         undoDepth = 1
                     },
                     onSelectBestInStack = { _, _ -> },
-                    onUndo = {
+                    onUndoSession = { _ ->
                         queue = listOf(burstItem, CleanupCardItem.SinglePhoto(p3))
                         undoDepth = 0
-                        true
+                        burstItem.stableKey
                     }
                 )
             }
@@ -312,15 +313,15 @@ class ArcCleanerUndoRobolectricTest {
                     monthNumber = 6,
                     initialFocusDay = 15,
                     queue = queue,
-                    pendingTrashBytes = 0L,
                     undoStackDepth = 0,
                     onBack = {},
                     onKeepPhoto = { _, _ -> },
                     onTrashPhoto = {},
+                    onKeepEntireStack = { _, _ -> },
                     onKeepBestInStack = { _, _ -> },
                     onTrashEntireStack = {},
                     onSelectBestInStack = { _, _ -> },
-                    onUndo = { false }
+                    onUndoSession = { _ -> null }
                 )
             }
         }

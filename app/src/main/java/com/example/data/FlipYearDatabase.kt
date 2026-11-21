@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CleanupStatsEntity::class,
         YearbookCoverConfigEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class FlipYearDatabase : RoomDatabase() {
@@ -51,6 +51,17 @@ abstract class FlipYearDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE cleanup_stats ADD COLUMN totalCompressedSavedBytes INTEGER NOT NULL DEFAULT 0"
+                )
+                db.execSQL(
+                    "ALTER TABLE cleanup_stats ADD COLUMN totalCompressedCount INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
+
         fun getInstance(context: Context): FlipYearDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -58,7 +69,7 @@ abstract class FlipYearDatabase : RoomDatabase() {
                     FlipYearDatabase::class.java,
                     "flipyear_cleaner.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                     .also { INSTANCE = it }

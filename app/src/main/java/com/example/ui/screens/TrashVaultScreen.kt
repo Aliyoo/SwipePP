@@ -1,9 +1,11 @@
 package com.example.ui.screens
 
+import android.os.Build
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,28 +19,33 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +57,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,9 +77,10 @@ import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.PhotoDetailLightbox
-import com.example.ui.components.daysRemainingInVault
 import com.example.ui.components.formatStorageSize
+import com.example.ui.components.formatVaultStagedLabel
 import com.example.ui.theme.CobaltPrimary
+import com.example.ui.theme.CobaltSoft
 import com.example.ui.theme.CoralDanger
 import com.example.ui.theme.CoralSoft
 import com.example.ui.theme.EmeraldKeep
@@ -78,23 +89,41 @@ import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.InkTertiary
 import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.StudioCanvas
-import com.example.ui.theme.StudioCanvasBottom
-import com.example.ui.theme.StudioCanvasTop
+import com.example.ui.theme.SurfaceMuted
 import com.example.ui.theme.SurfacePure
 
 @Composable
 fun TrashVaultScreen(
     uiState: FlipYearUiState,
     onRestorePhoto: (PhotoItemEntity) -> Unit,
-    onRestoreAll: () -> Unit,
-    onConfirmPurgeAll: () -> Unit,
+    onRestoreAll: (List<PhotoItemEntity>) -> Unit,
+    onConfirmPurgeTargets: (List<PhotoItemEntity>) -> Unit,
+    onClearSessionFilter: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showPurgeDialog by remember { mutableStateOf(false) }
     var lightboxPhoto by remember { mutableStateOf<PhotoItemEntity?>(null) }
+    var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     val haptics = rememberHapticEngine()
-    val trashed = uiState.trashedPhotos
+
+    val sessionFilterIds = uiState.vaultSessionFilterIds
+    val displayedTrashed = remember(uiState.trashedPhotos, sessionFilterIds) {
+        if (sessionFilterIds == null) uiState.trashedPhotos
+        else uiState.trashedPhotos.filter { it.id in sessionFilterIds }
+    }
+    LaunchedEffect(displayedTrashed) {
+        val validIds = displayedTrashed.map { it.id }.toSet()
+        selectedIds = selectedIds.intersect(validIds)
+    }
+
+    val targets = remember(displayedTrashed, selectedIds) {
+        if (selectedIds.isNotEmpty()) displayedTrashed.filter { it.id in selectedIds } else displayedTrashed
+    }
+    val displayedBytes = remember(displayedTrashed) { displayedTrashed.sumOf { it.fileSizeBytes } }
+    val targetBytes = remember(targets) { targets.sumOf { it.fileSizeBytes } }
+    val isPartialSelection = selectedIds.isNotEmpty()
+    val allSelected = displayedTrashed.isNotEmpty() && selectedIds.size == displayedTrashed.size
+
     val floatingDockInset = LocalFloatingDockInset.current
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
@@ -126,10 +155,50 @@ fun TrashVaultScreen(
                 )
             }
 
-            // Reclaimable Storage Frosted Glass Summary Card
+            // Session filter banner when arriving from Cleaner completion page
+            if (sessionFilterIds != null) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = CobaltSoft,
+                    border = BorderStroke(1.dp, CobaltPrimary.copy(alpha = 0.25f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .padding(bottom = 10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "仅看本次清理（${displayedTrashed.size} 项）",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = CobaltPrimary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(
+                            onClick = onClearSessionFilter,
+                            modifier = Modifier
+                                .heightIn(min = 48.dp)
+                                .testTag("vault_clear_session_filter")
+                        ) {
+                            Text(
+                                text = "查看全部 (${uiState.trashedPhotos.size})",
+                                color = CobaltPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Reclaimable Storage Frosted Glass Summary Card (split deletion vs compression stats)
             FrostedGlassCard(
                 shape = RoundedCornerShape(22.dp),
-                borderAccent = if (trashed.isNotEmpty()) CoralDanger else null,
+                borderAccent = if (displayedTrashed.isNotEmpty()) CoralDanger else null,
                 shadowElevation = 6.dp,
                 enableAmbientBlur = true,
                 modifier = Modifier
@@ -138,31 +207,33 @@ fun TrashVaultScreen(
             ) {
                 Column(
                     modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    Column {
+                        Text(
+                            text = if (isPartialSelection) "已选待释放空间" else "待释放空间",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = InkSecondary
+                        )
+                        Text(
+                            text = formatStorageSize(if (isPartialSelection) targetBytes else displayedBytes),
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 30.sp,
+                            color = if (displayedTrashed.isNotEmpty()) CoralDanger else EmeraldKeep
+                        )
+                    }
+
+                    HorizontalDivider(thickness = 0.8.dp, color = HairlineBorder)
+
+                    // Two-column split: Deletion freed vs Compression saved (Stage 1.3)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "待释放空间",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = InkSecondary
-                            )
-                            Text(
-                                text = formatStorageSize(uiState.pendingTrashBytes),
-                                fontFamily = JetBrainsMonoFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 30.sp,
-                                color = if (trashed.isNotEmpty()) CoralDanger else EmeraldKeep
-                            )
-                        }
-
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = "历史总计释放",
+                                text = "删除累计释放",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = InkTertiary
                             )
@@ -176,25 +247,45 @@ fun TrashVaultScreen(
                             Text(
                                 text = "已清理 ${uiState.stats.totalPurgedCount} 项",
                                 style = MaterialTheme.typography.labelSmall,
+                                color = InkSecondary
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "压缩累计节省",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = InkTertiary
+                            )
+                            Text(
+                                text = formatStorageSize(uiState.stats.totalCompressedSavedBytes),
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
                                 color = EmeraldKeep
+                            )
+                            Text(
+                                text = "已压缩 ${uiState.stats.totalCompressedCount} 张",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = InkSecondary
                             )
                         }
                     }
 
-                    if (trashed.isNotEmpty()) {
+                    if (displayedTrashed.isNotEmpty()) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             GalleryActionButton(
-                                text = stringResource(R.string.action_restore_all),
+                                text = if (isPartialSelection) "还原已选 (${targets.size})" else stringResource(R.string.action_restore_all),
                                 onClick = {
                                     haptics.undoPulse()
-                                    onRestoreAll()
+                                    onRestoreAll(targets)
+                                    selectedIds = emptySet()
                                 },
                                 tone = GalleryButtonTone.GLASS,
                                 leadingIcon = Icons.Filled.Restore,
-                                height = 46.dp,
+                                height = 48.dp,
                                 shape = RoundedCornerShape(14.dp),
                                 modifier = Modifier
                                     .weight(1f)
@@ -202,11 +293,11 @@ fun TrashVaultScreen(
                             )
 
                             GalleryActionButton(
-                                text = "确认清理 (${trashed.size})",
+                                text = if (isPartialSelection) "清理已选 (${targets.size})" else "确认清理 (${displayedTrashed.size})",
                                 onClick = { showPurgeDialog = true },
                                 tone = GalleryButtonTone.DANGER,
                                 leadingIcon = Icons.Filled.DeleteForever,
-                                height = 46.dp,
+                                height = 48.dp,
                                 shape = RoundedCornerShape(14.dp),
                                 modifier = Modifier
                                     .weight(1.35f)
@@ -217,9 +308,47 @@ fun TrashVaultScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            if (displayedTrashed.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = if (isPartialSelection) {
+                            "已勾选 ${selectedIds.size} / ${displayedTrashed.size} 项"
+                        } else {
+                            "勾选卡片可仅清理或还原部分项目"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = InkSecondary
+                    )
+                    TextButton(
+                        onClick = {
+                            selectedIds = if (allSelected) {
+                                emptySet()
+                            } else {
+                                displayedTrashed.map { it.id }.toSet()
+                            }
+                        },
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("vault_toggle_select_all")
+                    ) {
+                        Text(
+                            text = if (allSelected) "取消全选" else "全选",
+                            color = CobaltPrimary,
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
+            } else {
+                Spacer(modifier = Modifier.height(14.dp))
+            }
 
-            if (trashed.isEmpty()) {
+            if (displayedTrashed.isEmpty()) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -236,13 +365,21 @@ fun TrashVaultScreen(
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(
-                        text = "回收站很干净",
+                        text = if (sessionFilterIds != null && uiState.trashedPhotos.isNotEmpty()) {
+                            "本次清理项已全部处理"
+                        } else {
+                            "回收站很干净"
+                        },
                         style = MaterialTheme.typography.headlineMedium,
                         color = InkPrimary
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "在弧形时光轴中上滑清理的照片和视频会先暂存在这里，您可以随时还原或一键释放空间。",
+                        text = if (sessionFilterIds != null && uiState.trashedPhotos.isNotEmpty()) {
+                            "回收站中还有 ${uiState.trashedPhotos.size} 项历史暂存项目，可点击上方查看全部。"
+                        } else {
+                            "在弧形时光轴中上滑移入回收站的照片和视频会先暂存在这里，您可以随时还原或按需释放空间。"
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = InkSecondary,
                         textAlign = TextAlign.Center
@@ -254,7 +391,7 @@ fun TrashVaultScreen(
                     contentPadding = PaddingValues(
                         start = 20.dp,
                         end = 20.dp,
-                        top = 6.dp,
+                        top = 4.dp,
                         bottom = 20.dp + floatingDockInset + navBarBottom
                     ),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -264,12 +401,18 @@ fun TrashVaultScreen(
                         .weight(1f)
                         .testTag("vault_photo_grid")
                 ) {
-                    items(trashed, key = { it.id }) { photo ->
+                    items(displayedTrashed, key = { it.id }) { photo ->
+                        val isSelected = photo.id in selectedIds
                         ModernVaultMediaCard(
                             photo = photo,
+                            isSelected = isSelected,
+                            onToggleSelect = {
+                                selectedIds = if (isSelected) selectedIds - photo.id else selectedIds + photo.id
+                            },
                             onPreview = { lightboxPhoto = photo },
                             onRestore = {
                                 haptics.undoPulse()
+                                selectedIds = selectedIds - photo.id
                                 onRestorePhoto(photo)
                             },
                             modifier = Modifier.animateItem(
@@ -286,14 +429,20 @@ fun TrashVaultScreen(
     }
 
     lightboxPhoto?.let { photo ->
+        val startIdx = displayedTrashed.indexOfFirst { it.id == photo.id }.coerceAtLeast(0)
         PhotoDetailLightbox(
             photo = photo,
+            photos = displayedTrashed,
+            initialIndex = startIdx,
             onDismiss = { lightboxPhoto = null },
             onRestore = onRestorePhoto
         )
     }
 
-    if (showPurgeDialog) {
+    if (showPurgeDialog && targets.isNotEmpty()) {
+        val isLegacyPermanentDelete = Build.VERSION.SDK_INT < Build.VERSION_CODES.R &&
+            targets.any { !it.isSample && !it.contentUri.isNullOrBlank() }
+
         AlertDialog(
             onDismissRequest = { showPurgeDialog = false },
             containerColor = SurfacePure,
@@ -306,32 +455,44 @@ fun TrashVaultScreen(
             },
             title = {
                 Text(
-                    text = "确认释放 ${formatStorageSize(uiState.pendingTrashBytes)}？",
+                    text = if (isLegacyPermanentDelete) {
+                        "永久删除 ${targets.size} 项（${formatStorageSize(targetBytes)}）？"
+                    } else {
+                        "确认释放 ${formatStorageSize(targetBytes)}？"
+                    },
                     color = InkPrimary
                 )
             },
             text = {
                 Text(
-                    text = "即将清理这 ${trashed.size} 项照片与视频（系统将请求将真实本地文件移入 Android 系统回收站，30 天内仍可在系统相册恢复）。",
+                    text = if (isLegacyPermanentDelete) {
+                        "当前系统版本不支持移入系统回收站。确认后这 ${targets.size} 项本地文件将被永久删除，无法恢复；未能删除的文件会留在回收站并提示原因。"
+                    } else {
+                        "即将清理这 ${targets.size} 项照片与视频（系统将请求将真实本地文件移入 Android 系统回收站，30 天内仍可在系统相册恢复）。"
+                    },
                     color = InkSecondary
                 )
             },
             confirmButton = {
                 GalleryActionButton(
-                    text = stringResource(R.string.action_purge_confirm),
+                    text = if (isLegacyPermanentDelete) "永久删除，无法恢复" else stringResource(R.string.action_purge_confirm),
                     onClick = {
                         haptics.swipeDeleteConfirm()
                         showPurgeDialog = false
-                        onConfirmPurgeAll()
+                        onConfirmPurgeTargets(targets)
+                        selectedIds = emptySet()
                     },
                     tone = GalleryButtonTone.DANGER,
-                    height = 42.dp,
+                    height = 48.dp,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.testTag("vault_dialog_confirm_purge")
                 )
             },
             dismissButton = {
-                TextButton(onClick = { showPurgeDialog = false }) {
+                TextButton(
+                    onClick = { showPurgeDialog = false },
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) {
                     Text("取消", color = InkSecondary)
                 }
             }
@@ -342,6 +503,8 @@ fun TrashVaultScreen(
 @Composable
 private fun ModernVaultMediaCard(
     photo: PhotoItemEntity,
+    isSelected: Boolean,
+    onToggleSelect: () -> Unit,
     onPreview: () -> Unit,
     onRestore: () -> Unit,
     modifier: Modifier = Modifier
@@ -349,7 +512,10 @@ private fun ModernVaultMediaCard(
     Surface(
         shape = RoundedCornerShape(18.dp),
         color = SurfacePure,
-        border = BorderStroke(1.dp, HairlineBorder),
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else 1.dp,
+            color = if (isSelected) CobaltPrimary else HairlineBorder
+        ),
         shadowElevation = 2.dp,
         modifier = modifier.fillMaxWidth()
     ) {
@@ -363,7 +529,7 @@ private fun ModernVaultMediaCard(
             ) {
                 PhotoArtwork(
                     photo = photo,
-                    contentDescription = photo.caption,
+                    contentDescription = photo.caption.ifBlank { if (photo.isVideo) "待清理视频" else "待清理照片" },
                     downsampleTier = ImageDownsampleTier.GRID_THUMB,
                     targetSizePx = 288,
                     modifier = Modifier.fillMaxSize()
@@ -378,6 +544,7 @@ private fun ModernVaultMediaCard(
                         )
                 )
 
+                // Honest staged duration badge (Stage 1.2)
                 Surface(
                     shape = RoundedCornerShape(50),
                     color = CoralSoft.copy(alpha = 0.94f),
@@ -386,12 +553,44 @@ private fun ModernVaultMediaCard(
                         .padding(8.dp)
                 ) {
                     Text(
-                        text = "剩 ${daysRemainingInVault(photo.trashedAtMillis)} 天",
+                        text = formatVaultStagedLabel(photo.trashedAtMillis),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = CoralDanger,
                         modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                     )
+                }
+
+                // 48dp accessible selection checkbox target
+                Box(
+                    contentAlignment = Alignment.TopEnd,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(48.dp)
+                        .clickable(role = Role.Checkbox, onClick = onToggleSelect)
+                        .semantics {
+                            contentDescription = if (isSelected) "已勾选此项，点击取消勾选" else "未勾选，点击勾选此项"
+                        }
+                        .padding(8.dp)
+                        .testTag("vault_select_${photo.id}")
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(if (isSelected) CobaltPrimary else Color.Black.copy(alpha = 0.48f))
+                            .border(1.5.dp, Color.White, CircleShape)
+                    ) {
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    }
                 }
 
                 Text(
@@ -409,7 +608,7 @@ private fun ModernVaultMediaCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -431,7 +630,9 @@ private fun ModernVaultMediaCard(
                 TextButton(
                     onClick = onRestore,
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    modifier = Modifier.testTag("restore_photo_${photo.id}")
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .testTag("restore_photo_${photo.id}")
                 ) {
                     Text(
                         text = stringResource(R.string.action_restore),

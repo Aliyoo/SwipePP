@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -35,8 +36,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.filled.BurstMode
@@ -50,11 +53,10 @@ import androidx.compose.material.icons.filled.EditLocationAlt
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.LocationOff
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
-import androidx.compose.material.icons.filled.UnfoldLess
-import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -111,6 +113,7 @@ import com.example.ui.components.FrostedGlassCard
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.GallerySelectableChip
+import com.example.ui.components.GallerySmartFilter
 import com.example.ui.components.ObsidianGlassCard
 import com.example.ui.components.PhotoDetailLightbox
 import com.example.ui.components.TimelineDateRangePickerDialog
@@ -119,6 +122,7 @@ import com.example.ui.components.TimelineSearchFilterSheet
 import com.example.ui.components.formatStorageSize
 import com.example.ui.components.monthChineseName
 import kotlinx.coroutines.delay
+import java.util.Calendar
 import com.example.ui.theme.CobaltDark
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CobaltSoft
@@ -137,11 +141,42 @@ import com.example.ui.theme.SurfacePure
 private val CURATED_ALBUM_PRESETS = listOf("精选珍藏", "旅行日记", "家庭相册", "灵感素材")
 private const val LARGE_PHOTO_THRESHOLD_BYTES = 3_000_000L
 
-private enum class GallerySmartFilter {
-    ALL,
-    BURSTS,
-    LARGE_PHOTOS,
-    MISSING_LOCATION
+internal fun filterGalleryEntriesBySmartAndAlbum(
+    allEntries: List<GalleryEntry>,
+    smartFilter: GallerySmartFilter,
+    selectedAlbum: String?,
+    burstEntries: List<GalleryEntry.Burst>? = null,
+    largePhotoEntries: List<GalleryEntry>? = null,
+    missingLocationEntries: List<GalleryEntry>? = null
+): List<GalleryEntry> {
+    val base = when (smartFilter) {
+        GallerySmartFilter.ALL -> allEntries
+        GallerySmartFilter.BURSTS -> burstEntries ?: allEntries.filterIsInstance<GalleryEntry.Burst>()
+        GallerySmartFilter.LARGE_PHOTOS -> largePhotoEntries ?: allEntries.filter { entry ->
+            when (entry) {
+                is GalleryEntry.Single -> !entry.photo.isVideo && entry.photo.fileSizeBytes >= LARGE_PHOTO_THRESHOLD_BYTES
+                is GalleryEntry.Burst -> entry.photos.any { !it.isVideo && it.fileSizeBytes >= LARGE_PHOTO_THRESHOLD_BYTES }
+            }
+        }
+        GallerySmartFilter.MISSING_LOCATION -> missingLocationEntries ?: allEntries.filter { entry ->
+            when (entry) {
+                is GalleryEntry.Single ->
+                    entry.photo.locationName.isNullOrBlank() || entry.photo.latitude == null || entry.photo.longitude == null
+                is GalleryEntry.Burst ->
+                    entry.photos.any { it.locationName.isNullOrBlank() || it.latitude == null || it.longitude == null }
+            }
+        }
+    }
+    return if (selectedAlbum == null) {
+        base
+    } else {
+        base.filter { entry ->
+            when (entry) {
+                is GalleryEntry.Single -> entry.photo.bucketName == selectedAlbum
+                is GalleryEntry.Burst -> entry.photos.any { it.bucketName == selectedAlbum }
+            }
+        }
+    }
 }
 
 @Composable
@@ -160,6 +195,7 @@ fun GalleryScreen(
     onBatchSameDayLocation: (List<SameDayLocationMatch>, Boolean) -> Unit = { _, _ -> },
     onGeocodeLocation: suspend (String) -> ResolvedGeoLocation? = { null },
     onSelectionModeChanged: (Boolean) -> Unit = {},
+    onToggleFavorite: (PhotoItemEntity, Boolean) -> Unit = { p, f -> onKeepPhoto(p, f) },
     modifier: Modifier = Modifier
 ) {
     val hapticEngine = rememberHapticEngine()
@@ -170,6 +206,7 @@ fun GalleryScreen(
 
     var explicitSelectionMode by remember { mutableStateOf(false) }
     var selectedPhotoIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var showMoreActionsSheet by remember { mutableStateOf(false) }
     var showMoveSheet by remember { mutableStateOf(false) }
     var showCompressSheet by remember { mutableStateOf(false) }
     var showLocationSheet by remember { mutableStateOf(false) }
@@ -196,6 +233,8 @@ fun GalleryScreen(
         {
             rawSearchKeyword = ""
             searchQuery = TimelineSearchQuery()
+            smartFilter = GallerySmartFilter.ALL
+            selectedAlbumFilter = null
         }
     }
 
@@ -212,7 +251,13 @@ fun GalleryScreen(
         exitSelectionMode()
     }
 
-    BackHandler(enabled = !isSelectionMode && searchQuery.isActive) {
+    BackHandler(
+        enabled = !isSelectionMode && (
+            searchQuery.isActive ||
+                smartFilter != GallerySmartFilter.ALL ||
+                selectedAlbumFilter != null
+            )
+    ) {
         resetSearchAndFilters()
     }
 
@@ -284,23 +329,14 @@ fun GalleryScreen(
         smartFilter,
         selectedAlbumFilter
     ) {
-        val base = when (smartFilter) {
-            GallerySmartFilter.ALL -> allEntries
-            GallerySmartFilter.BURSTS -> burstEntries
-            GallerySmartFilter.LARGE_PHOTOS -> largePhotoEntries
-            GallerySmartFilter.MISSING_LOCATION -> missingLocationEntries
-        }
-        val album = selectedAlbumFilter
-        if (album == null) {
-            base
-        } else {
-            base.filter { entry ->
-                when (entry) {
-                    is GalleryEntry.Single -> entry.photo.bucketName == album
-                    is GalleryEntry.Burst -> entry.photos.any { it.bucketName == album }
-                }
-            }
-        }
+        filterGalleryEntriesBySmartAndAlbum(
+            allEntries = allEntries,
+            smartFilter = smartFilter,
+            selectedAlbum = selectedAlbumFilter,
+            burstEntries = burstEntries,
+            largePhotoEntries = largePhotoEntries,
+            missingLocationEntries = missingLocationEntries
+        )
     }
 
     val displayedEntries = remember(chipFilteredEntries, searchQuery) {
@@ -398,7 +434,7 @@ fun GalleryScreen(
         burstEntries.all { it.groupId in expandedBurstIds }
     val floatingDockInset = LocalFloatingDockInset.current
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val effectiveBottomInset = if (isSelectionMode) 156.dp else floatingDockInset
+    val effectiveBottomInset = if (isSelectionMode) 96.dp else floatingDockInset
 
     ArtisticGalleryBackdrop(
         modifier = modifier
@@ -408,6 +444,7 @@ fun GalleryScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
+                    .imePadding()
                     .widthIn(max = 680.dp)
                     .align(Alignment.TopCenter)
             ) {
@@ -443,21 +480,21 @@ fun GalleryScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                                    .padding(horizontal = 20.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "智能连拍画廊",
+                                        text = stringResource(R.string.nav_gallery),
                                         style = MaterialTheme.typography.headlineLarge,
                                         color = InkPrimary
                                     )
                                     Text(
                                         text = if (burstEntries.isNotEmpty()) {
-                                            "已聚合 ${burstEntries.size} 组连拍（共 $burstPhotosTotal 张）· 支持批量压缩与补定位"
+                                            "共 ${displayedEntries.size} 项 · 含 ${burstEntries.size} 组连拍"
                                         } else {
-                                            "点击多选或长按照片，体验近无损压缩与补全定位"
+                                            "共 ${displayedEntries.size} 项 · 长按可多选"
                                         },
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = InkSecondary,
@@ -477,11 +514,11 @@ fun GalleryScreen(
                                         borderAccent = CobaltPrimary,
                                         shadowElevation = 4.dp,
                                         modifier = Modifier
-                                            .heightIn(min = 42.dp)
+                                            .heightIn(min = 48.dp)
                                             .testTag("gallery_enter_multiselect_button")
                                     ) {
                                         Row(
-                                            modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp),
+                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(5.dp)
                                         ) {
@@ -503,7 +540,7 @@ fun GalleryScreen(
                                 }
                             }
 
-                            // Global Timeline Search Bar (filter by date range, location, or descriptive tags)
+                            // Unified Search Bar + Single Filter Button (smart views & albums folded inside)
                             if (allEntries.isNotEmpty()) {
                                 TimelineGlobalSearchBar(
                                     rawKeyword = rawSearchKeyword,
@@ -533,191 +570,12 @@ fun GalleryScreen(
                                             selectedKeywordTags = searchQuery.selectedKeywordTags - kw
                                         )
                                     },
-                                    onResetAll = resetSearchAndFilters
+                                    onResetAll = resetSearchAndFilters,
+                                    activeSmartFilter = smartFilter,
+                                    selectedAlbum = selectedAlbumFilter,
+                                    onClearSmartFilter = { smartFilter = GallerySmartFilter.ALL },
+                                    onClearAlbum = { selectedAlbumFilter = null }
                                 )
-                                Spacer(modifier = Modifier.height(10.dp))
-                            }
-
-                            // Smart Discovery Filter Ribbon: All / Bursts / Large Photos / Missing Location / Expand Bursts
-                            if (allEntries.isNotEmpty()) {
-                                LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 20.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    item(key = "filter_all") {
-                                        val selected = smartFilter == GallerySmartFilter.ALL && selectedAlbumFilter == null
-                                        GallerySelectableChip(
-                                            selected = selected,
-                                            onClick = {
-                                                smartFilter = GallerySmartFilter.ALL
-                                                selectedAlbumFilter = null
-                                            },
-                                            modifier = Modifier.testTag("gallery_filter_all")
-                                        ) {
-                                            Text(
-                                                text = "全部 (${allEntries.size})",
-                                                style = MaterialTheme.typography.labelLarge,
-                                                fontSize = 12.sp,
-                                                color = if (selected) Color.White else InkPrimary
-                                            )
-                                        }
-                                    }
-
-                                    item(key = "filter_bursts") {
-                                        val selected = smartFilter == GallerySmartFilter.BURSTS
-                                        GallerySelectableChip(
-                                            selected = selected,
-                                            onClick = {
-                                                smartFilter = GallerySmartFilter.BURSTS
-                                                selectedAlbumFilter = null
-                                            },
-                                            modifier = Modifier.testTag("gallery_filter_bursts")
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Filled.BurstMode,
-                                                contentDescription = null,
-                                                tint = if (selected) SolarAmber else CobaltPrimary,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                            Text(
-                                                text = "连拍组 (${burstEntries.size})",
-                                                style = MaterialTheme.typography.labelLarge,
-                                                fontSize = 12.sp,
-                                                color = if (selected) Color.White else InkPrimary
-                                            )
-                                        }
-                                    }
-
-                                    if (largePhotoEntries.isNotEmpty()) {
-                                        item(key = "filter_large") {
-                                            val selected = smartFilter == GallerySmartFilter.LARGE_PHOTOS
-                                            GallerySelectableChip(
-                                                selected = selected,
-                                                onClick = {
-                                                    smartFilter = GallerySmartFilter.LARGE_PHOTOS
-                                                    selectedAlbumFilter = null
-                                                },
-                                                modifier = Modifier.testTag("gallery_filter_large")
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.Compress,
-                                                    contentDescription = null,
-                                                    tint = if (selected) SolarAmber else EmeraldKeep,
-                                                    modifier = Modifier.size(14.dp)
-                                                )
-                                                Text(
-                                                    text = "大图省空间 (${largePhotoEntries.size})",
-                                                    style = MaterialTheme.typography.labelLarge,
-                                                    fontSize = 12.sp,
-                                                    color = if (selected) Color.White else InkPrimary
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    if (missingLocationEntries.isNotEmpty()) {
-                                        item(key = "filter_missing_loc") {
-                                            val selected = smartFilter == GallerySmartFilter.MISSING_LOCATION
-                                            GallerySelectableChip(
-                                                selected = selected,
-                                                onClick = {
-                                                    smartFilter = GallerySmartFilter.MISSING_LOCATION
-                                                    selectedAlbumFilter = null
-                                                },
-                                                modifier = Modifier.testTag("gallery_filter_missing_location")
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.LocationOff,
-                                                    contentDescription = null,
-                                                    tint = if (selected) SolarAmber else CoralDanger,
-                                                    modifier = Modifier.size(14.dp)
-                                                )
-                                                Text(
-                                                    text = "缺定位 (${missingLocationEntries.size})",
-                                                    style = MaterialTheme.typography.labelLarge,
-                                                    fontSize = 12.sp,
-                                                    color = if (selected) Color.White else InkPrimary
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    if (burstEntries.isNotEmpty()) {
-                                        item(key = "toggle_all_bursts") {
-                                            FrostedGlassCard(
-                                                onClick = {
-                                                    expandedBurstIds = if (allBurstsExpanded) {
-                                                        emptySet()
-                                                    } else {
-                                                        burstEntries.map { it.groupId }.toSet()
-                                                    }
-                                                },
-                                                shape = RoundedCornerShape(50),
-                                                borderAccent = CobaltPrimary,
-                                                shadowElevation = 3.dp,
-                                                modifier = Modifier.testTag("gallery_toggle_all_bursts")
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                                ) {
-                                                    Icon(
-                                                        imageVector = if (allBurstsExpanded) Icons.Filled.UnfoldLess else Icons.Filled.UnfoldMore,
-                                                        contentDescription = null,
-                                                        tint = CobaltDark,
-                                                        modifier = Modifier.size(15.dp)
-                                                    )
-                                                    Text(
-                                                        text = stringResource(
-                                                            if (allBurstsExpanded) R.string.burst_collapse_all else R.string.burst_expand_all
-                                                        ),
-                                                        style = MaterialTheme.typography.labelLarge,
-                                                        fontSize = 12.sp,
-                                                        color = CobaltDark
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Sleek Album Collection Filter Ribbon (auto-surfaces moved/device albums)
-                                if (existingAlbums.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    LazyRow(
-                                        contentPadding = PaddingValues(horizontal = 20.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        items(existingAlbums, key = { it }) { albumName ->
-                                            val isSelectedAlbum = selectedAlbumFilter == albumName
-                                            GallerySelectableChip(
-                                                selected = isSelectedAlbum,
-                                                onClick = {
-                                                    smartFilter = GallerySmartFilter.ALL
-                                                    selectedAlbumFilter = if (isSelectedAlbum) null else albumName
-                                                },
-                                                modifier = Modifier.testTag("gallery_album_chip_$albumName")
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.Folder,
-                                                    contentDescription = null,
-                                                    tint = if (isSelectedAlbum) SolarAmber else InkSecondary,
-                                                    modifier = Modifier.size(13.dp)
-                                                )
-                                                Text(
-                                                    text = albumName,
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    fontSize = 11.5.sp,
-                                                    color = if (isSelectedAlbum) Color.White else InkPrimary
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
                                 Spacer(modifier = Modifier.height(6.dp))
                             }
                         }
@@ -836,7 +694,7 @@ fun GalleryScreen(
                 }
             }
 
-            // Floating Obsidian Glass Bulk Action Capsule + Smart Batch Edit Strip
+            // Floating 4-Action Obsidian Glass Bulk Action Capsule (Keep / Favorite / Trash / More)
             AnimatedVisibility(
                 visible = isSelectionMode,
                 enter = fadeIn(tween(200)) + slideInVertically(
@@ -855,34 +713,18 @@ fun GalleryScreen(
                     .navigationBarsPadding()
                     .padding(horizontal = 20.dp, vertical = 12.dp)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                Box(
                     modifier = Modifier
                         .widthIn(max = 420.dp)
                         .pointerInput(Unit) {}
                 ) {
-                    if (selectedPhotos.isNotEmpty()) {
-                        FloatingBatchEditStrip(
-                            compressibleImageCount = selectedCompressibleCount,
-                            missingLocationCount = selectedMissingLocationCount,
-                            onCompress = {
-                                hapticEngine.pageFlipLift()
-                                showCompressSheet = true
-                            },
-                            onEditLocation = {
-                                hapticEngine.pageFlipLift()
-                                showLocationSheet = true
-                            }
-                        )
-                    }
-
                     FloatingBulkActionBar(
                         selectedCount = selectedPhotos.size,
-                        onMove = {
+                        onKeep = {
                             if (selectedPhotos.isNotEmpty()) {
-                                hapticEngine.pageFlipLift()
-                                showMoveSheet = true
+                                hapticEngine.swipeKeepConfirm()
+                                onBulkKeepPhotos(selectedPhotos, false)
+                                exitSelectionMode()
                             }
                         },
                         onFavorite = {
@@ -892,18 +734,17 @@ fun GalleryScreen(
                                 exitSelectionMode()
                             }
                         },
-                        onKeep = {
-                            if (selectedPhotos.isNotEmpty()) {
-                                hapticEngine.swipeKeepConfirm()
-                                onBulkKeepPhotos(selectedPhotos, false)
-                                exitSelectionMode()
-                            }
-                        },
-                        onDelete = {
+                        onTrash = {
                             if (selectedPhotos.isNotEmpty()) {
                                 hapticEngine.swipeDeleteConfirm()
                                 onBulkTrashPhotos(selectedPhotos)
                                 exitSelectionMode()
+                            }
+                        },
+                        onMore = {
+                            if (selectedPhotos.isNotEmpty()) {
+                                hapticEngine.pageFlipLift()
+                                showMoreActionsSheet = true
                             }
                         }
                     )
@@ -912,18 +753,41 @@ fun GalleryScreen(
         }
     }
 
+    if (showMoreActionsSheet && selectedPhotos.isNotEmpty()) {
+        GalleryMoreBatchActionsSheet(
+            selectedCount = selectedPhotos.size,
+            compressibleCount = selectedCompressibleCount,
+            missingLocationCount = selectedMissingLocationCount,
+            onCompress = {
+                showMoreActionsSheet = false
+                showCompressSheet = true
+            },
+            onEditLocation = {
+                showMoreActionsSheet = false
+                showLocationSheet = true
+            },
+            onMove = {
+                showMoreActionsSheet = false
+                showMoveSheet = true
+            },
+            onDismiss = { showMoreActionsSheet = false }
+        )
+    }
+
     if (showMoveSheet && selectedPhotos.isNotEmpty()) {
-        val availableYears = remember(uiState.yearbooks) {
-            (uiState.yearbooks.map { it.year } + listOf(2026, 2025, 2024, 2023))
+        val currentYear = remember { Calendar.getInstance().get(Calendar.YEAR) }
+        val availableYears = remember(uiState.yearbooks, currentYear) {
+            uiState.yearbooks.map { it.year }
                 .distinct()
                 .sortedDescending()
+                .ifEmpty { listOf(currentYear) }
         }
         BulkMoveDestinationSheet(
             selectedCount = selectedPhotos.size,
             selectedBytes = selectedBytes,
             existingAlbums = existingAlbums,
             availableYears = availableYears,
-            defaultYear = selectedPhotos.firstOrNull()?.year ?: availableYears.firstOrNull() ?: 2026,
+            defaultYear = selectedPhotos.firstOrNull()?.year ?: availableYears.firstOrNull() ?: currentYear,
             defaultMonth = selectedPhotos.firstOrNull()?.month ?: 1,
             onDismiss = { showMoveSheet = false },
             onConfirmMove = { albumName, targetYear, targetMonth ->
@@ -983,19 +847,47 @@ fun GalleryScreen(
             locationClusters = uiState.locationClusters,
             hasUnlocatedMedia = uiState.unlocatedPhotos.isNotEmpty(),
             extractedKeywordTags = extractedKeywordTags,
-            previewResultCount = { draft ->
-                filterGalleryEntriesBySearch(chipFilteredEntries, draft).size
+            previewResultCount = { draftQuery, draftSmart, draftAlbum ->
+                val smartAndAlbumEntries = filterGalleryEntriesBySmartAndAlbum(
+                    allEntries = allEntries,
+                    smartFilter = draftSmart,
+                    selectedAlbum = draftAlbum,
+                    burstEntries = burstEntries,
+                    largePhotoEntries = largePhotoEntries,
+                    missingLocationEntries = missingLocationEntries
+                )
+                filterGalleryEntriesBySearch(smartAndAlbumEntries, draftQuery).size
             },
             onApplyQuery = { nextQuery ->
                 searchQuery = nextQuery
                 rawSearchKeyword = nextQuery.keyword
             },
-            onOpenCustomDatePicker = { currentRange ->
-                pendingPickerInitialRange = currentRange
+            onOpenCustomDatePicker = { draftQuery, draftSmart, draftAlbum ->
+                searchQuery = draftQuery
+                rawSearchKeyword = draftQuery.keyword
+                smartFilter = draftSmart
+                selectedAlbumFilter = draftAlbum
+                pendingPickerInitialRange = draftQuery.dateRange
                 showSearchFilterSheet = false
                 showDateRangePicker = true
             },
-            onDismiss = { showSearchFilterSheet = false }
+            onDismiss = { showSearchFilterSheet = false },
+            currentSmartFilter = smartFilter,
+            currentAlbum = selectedAlbumFilter,
+            existingAlbums = existingAlbums,
+            burstCount = burstEntries.size,
+            largePhotoCount = largePhotoEntries.size,
+            missingLocationCount = missingLocationEntries.size,
+            allBurstsExpanded = allBurstsExpanded,
+            onSelectSmartFilter = { smartFilter = it },
+            onSelectAlbum = { selectedAlbumFilter = it },
+            onToggleExpandAllBursts = {
+                expandedBurstIds = if (allBurstsExpanded) {
+                    emptySet()
+                } else {
+                    burstEntries.map { it.groupId }.toSet()
+                }
+            }
         )
     }
 
@@ -1011,109 +903,178 @@ fun GalleryScreen(
     }
 
     lightboxPhoto?.let { photo ->
+        val flatPhotos = remember(displayedEntries) {
+            displayedEntries.flatMap { entry ->
+                when (entry) {
+                    is GalleryEntry.Single -> listOf(entry.photo)
+                    is GalleryEntry.Burst -> entry.photos
+                }
+            }
+        }
+        val startIdx = flatPhotos.indexOfFirst { it.id == photo.id }.coerceAtLeast(0)
         PhotoDetailLightbox(
             photo = photo,
+            photos = flatPhotos.ifEmpty { listOf(photo) },
+            initialIndex = startIdx,
             onDismiss = { lightboxPhoto = null },
             onKeep = onKeepPhoto,
-            onTrash = onTrashPhoto
+            onTrash = onTrashPhoto,
+            onToggleFavorite = onToggleFavorite
         )
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FloatingBatchEditStrip(
-    compressibleImageCount: Int,
+private fun GalleryMoreBatchActionsSheet(
+    selectedCount: Int,
+    compressibleCount: Int,
     missingLocationCount: Int,
     onCompress: () -> Unit,
-    onEditLocation: () -> Unit
+    onEditLocation: () -> Unit,
+    onMove: () -> Unit,
+    onDismiss: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pointerInput(Unit) {},
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = SurfacePure,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        modifier = Modifier.testTag("gallery_more_actions_sheet")
     ) {
-        ObsidianGlassCard(
-            // Empty lambda when disabled so the card still consumes taps instead of
-            // letting them fall through to the photo grid underneath.
-            onClick = if (compressibleImageCount > 0) onCompress else ({}),
-            shape = RoundedCornerShape(22.dp),
-            topColor = ObsidianSatinTop,
-            bottomColor = ObsidianSatinBottom,
-            borderAccent = if (compressibleImageCount > 0) EmeraldKeep else null,
-            shadowElevation = 10.dp,
+        Column(
             modifier = Modifier
-                .weight(1f)
-                .heightIn(min = 48.dp)
-                .alpha(if (compressibleImageCount > 0) 1f else 0.55f)
-                .testTag("bulk_compress_button")
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Compress,
-                    contentDescription = null,
-                    tint = if (compressibleImageCount > 0) EmeraldKeep else Color.White.copy(alpha = 0.35f),
-                    modifier = Modifier.size(17.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = if (compressibleImageCount > 0) {
-                        "${stringResource(R.string.action_batch_compress)}($compressibleImageCount)"
-                    } else {
-                        "仅支持照片压缩"
-                    },
-                    style = MaterialTheme.typography.labelLarge,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (compressibleImageCount > 0) Color.White else Color.White.copy(alpha = 0.45f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
+            Text(
+                text = "更多批量操作（已选 $selectedCount 项）",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = InkPrimary
+            )
 
-        ObsidianGlassCard(
-            onClick = onEditLocation,
-            shape = RoundedCornerShape(22.dp),
-            topColor = ObsidianSatinTop,
-            bottomColor = ObsidianSatinBottom,
-            borderAccent = SolarAmber,
-            shadowElevation = 10.dp,
-            modifier = Modifier
-                .weight(1f)
-                .heightIn(min = 48.dp)
-                .testTag("bulk_location_button")
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+            Surface(
+                onClick = { if (compressibleCount > 0) onCompress() },
+                shape = RoundedCornerShape(16.dp),
+                color = SurfaceMuted.copy(alpha = if (compressibleCount > 0) 0.7f else 0.35f),
+                border = BorderStroke(1.dp, HairlineBorder),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp)
+                    .testTag("bulk_compress_button")
             ) {
-                Icon(
-                    imageVector = Icons.Filled.EditLocationAlt,
-                    contentDescription = null,
-                    tint = SolarAmber,
-                    modifier = Modifier.size(17.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = if (missingLocationCount > 0) {
-                        "${stringResource(R.string.action_batch_location)} · ${missingLocationCount}缺"
-                    } else {
-                        stringResource(R.string.action_batch_location)
-                    },
-                    style = MaterialTheme.typography.labelLarge,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Compress,
+                        contentDescription = null,
+                        tint = if (compressibleCount > 0) EmeraldKeep else InkSecondary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (compressibleCount > 0) {
+                                "${stringResource(R.string.action_batch_compress)}（$compressibleCount 张照片）"
+                            } else {
+                                "批量压缩（当前所选无照片）"
+                            },
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (compressibleCount > 0) InkPrimary else InkSecondary
+                        )
+                        Text(
+                            text = "另存压缩新图，原图安全暂存回收站",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = InkSecondary
+                        )
+                    }
+                }
+            }
+
+            Surface(
+                onClick = onEditLocation,
+                shape = RoundedCornerShape(16.dp),
+                color = SurfaceMuted.copy(alpha = 0.7f),
+                border = BorderStroke(1.dp, HairlineBorder),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp)
+                    .testTag("bulk_location_button")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.EditLocationAlt,
+                        contentDescription = null,
+                        tint = SolarAmber,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (missingLocationCount > 0) {
+                                "${stringResource(R.string.action_batch_location)}（含 $missingLocationCount 项缺定位）"
+                            } else {
+                                stringResource(R.string.action_batch_location)
+                            },
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = InkPrimary
+                        )
+                        Text(
+                            text = "按同日足迹推断或手动搜索地点补全定位",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = InkSecondary
+                        )
+                    }
+                }
+            }
+
+            Surface(
+                onClick = onMove,
+                shape = RoundedCornerShape(16.dp),
+                color = SurfaceMuted.copy(alpha = 0.7f),
+                border = BorderStroke(1.dp, HairlineBorder),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp)
+                    .testTag("bulk_move_button")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.DriveFileMove,
+                        contentDescription = null,
+                        tint = CobaltPrimary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "移动至相册 / 归档年月",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = InkPrimary
+                        )
+                        Text(
+                            text = "归类到自定义相册或重新指定年度月份",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = InkSecondary
+                        )
+                    }
+                }
             }
         }
     }
@@ -1206,10 +1167,10 @@ private fun GallerySelectionTopBar(
 @Composable
 private fun FloatingBulkActionBar(
     selectedCount: Int,
-    onMove: () -> Unit,
-    onFavorite: () -> Unit,
     onKeep: () -> Unit,
-    onDelete: () -> Unit
+    onFavorite: () -> Unit,
+    onTrash: () -> Unit,
+    onMore: () -> Unit
 ) {
     ObsidianGlassCard(
         shape = RoundedCornerShape(22.dp),
@@ -1230,13 +1191,13 @@ private fun FloatingBulkActionBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             BulkActionPillItem(
-                icon = Icons.AutoMirrored.Filled.DriveFileMove,
-                label = stringResource(R.string.action_bulk_move),
-                iconTint = Color(0xFF8FB0FF),
-                onClick = onMove,
+                icon = Icons.Filled.CheckCircle,
+                label = stringResource(R.string.action_bulk_keep),
+                iconTint = EmeraldKeep,
+                onClick = onKeep,
                 modifier = Modifier
                     .weight(1f)
-                    .testTag("bulk_move_button")
+                    .testTag("bulk_keep_button")
             )
 
             BulkActionPillItem(
@@ -1250,24 +1211,24 @@ private fun FloatingBulkActionBar(
             )
 
             BulkActionPillItem(
-                icon = Icons.Filled.CheckCircle,
-                label = stringResource(R.string.action_bulk_keep),
-                iconTint = EmeraldKeep,
-                onClick = onKeep,
+                icon = Icons.Filled.DeleteOutline,
+                label = if (selectedCount > 0) "回收站($selectedCount)" else stringResource(R.string.action_bulk_delete),
+                iconTint = Color(0xFFFF7A8A),
+                containerHighlight = CoralDanger.copy(alpha = 0.24f),
+                onClick = onTrash,
                 modifier = Modifier
-                    .weight(1f)
-                    .testTag("bulk_keep_button")
+                    .weight(1.22f)
+                    .testTag("bulk_delete_button")
             )
 
             BulkActionPillItem(
-                icon = Icons.Filled.DeleteOutline,
-                label = "${stringResource(R.string.action_bulk_delete)}($selectedCount)",
-                iconTint = Color(0xFFFF7A8A),
-                containerHighlight = CoralDanger.copy(alpha = 0.24f),
-                onClick = onDelete,
+                icon = Icons.Filled.MoreHoriz,
+                label = "更多",
+                iconTint = Color(0xFF8FB0FF),
+                onClick = onMore,
                 modifier = Modifier
-                    .weight(1.12f)
-                    .testTag("bulk_delete_button")
+                    .weight(0.92f)
+                    .testTag("bulk_more_button")
             )
         }
     }
@@ -1294,7 +1255,7 @@ private fun BulkActionPillItem(
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = label,
+            contentDescription = null,
             tint = iconTint,
             modifier = Modifier.size(21.dp)
         )
@@ -1344,6 +1305,8 @@ private fun BulkMoveDestinationSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
                 .padding(horizontal = 22.dp)
                 .padding(bottom = 24.dp),

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -171,7 +172,7 @@ fun BatchCompressBottomSheet(
                 ) {
                     Column {
                         Text(
-                            text = "预计可释放空间",
+                            text = "预计可节省体积",
                             style = MaterialTheme.typography.labelMedium,
                             color = InkSecondary
                         )
@@ -365,6 +366,7 @@ fun BatchLocationEditorSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
+                .imePadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 22.dp)
                 .padding(bottom = 24.dp),
@@ -634,12 +636,12 @@ fun BatchLocationEditorSheet(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "同步写入照片 EXIF GPS 坐标",
+                                text = "同步写入照片 EXIF 定位信息",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = InkPrimary
                             )
                             Text(
-                                text = "开启后同时更新相册原图 GPS（系统将弹窗授权一次）",
+                                text = "EXIF 是照片自带的拍摄参数与经纬度信息；开启后会一并写入相册原图（系统将弹窗授权一次）",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = InkSecondary
                             )

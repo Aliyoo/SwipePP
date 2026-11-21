@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -63,6 +64,8 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -131,6 +134,7 @@ fun FlipbookScreen(
     onKeepBestInBurst: (GalleryEntry.Burst, PhotoItemEntity) -> Unit,
     onKeepPhoto: (PhotoItemEntity, Boolean) -> Unit,
     onTrashPhoto: (PhotoItemEntity) -> Unit,
+    onToggleFavorite: (PhotoItemEntity, Boolean) -> Unit = { p, f -> onKeepPhoto(p, f) },
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -138,6 +142,7 @@ fun FlipbookScreen(
     var showGalleryMode by remember { mutableStateOf(false) }
     var expandedBurstIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var lightboxPhoto by remember { mutableStateOf<PhotoItemEntity?>(null) }
+    var lightboxContextPhotos by remember { mutableStateOf<List<PhotoItemEntity>>(emptyList()) }
 
     ArtisticGalleryBackdrop(
         warmAccent = true,
@@ -279,7 +284,10 @@ fun FlipbookScreen(
                     Text("该年份暂无照片或视频", color = InkSecondary)
                 }
             } else {
-                val pagerState = rememberPagerState(initialPage = 0, pageCount = { monthPages.size })
+                val defaultPage = remember(year) {
+                    monthPages.indexOfLast { it.totalPhotos > 0 }.takeIf { it >= 0 } ?: 0
+                }
+                val pagerState = rememberPagerState(initialPage = defaultPage, pageCount = { monthPages.size })
                 val monthPillListState = rememberLazyListState()
 
                 LaunchedEffect(pagerState.currentPage, monthPages.size) {
@@ -383,7 +391,12 @@ fun FlipbookScreen(
                                 haptics.swipeDeleteConfirm()
                                 onTrashPhoto(photo)
                             },
-                            onPhotoClick = { photo -> lightboxPhoto = photo },
+                            onPhotoClick = { photo ->
+                                lightboxContextPhotos = pageModel.photos
+                                    .filter { it.photoStatus != PhotoStatus.TRASHED }
+                                    .sortedByDescending { it.takenAtMillis }
+                                lightboxPhoto = photo
+                            },
                             onCleanClick = {
                                 onStartMonthCleanup(
                                     pageModel.year,
@@ -448,11 +461,16 @@ fun FlipbookScreen(
     }
 
     lightboxPhoto?.let { photo ->
+        val list = lightboxContextPhotos.ifEmpty { listOf(photo) }
+        val startIdx = list.indexOfFirst { it.id == photo.id }.coerceAtLeast(0)
         PhotoDetailLightbox(
             photo = photo,
+            photos = list,
+            initialIndex = startIdx,
             onDismiss = { lightboxPhoto = null },
             onKeep = onKeepPhoto,
-            onTrash = onTrashPhoto
+            onTrash = onTrashPhoto,
+            onToggleFavorite = onToggleFavorite
         )
     }
 }
@@ -640,7 +658,38 @@ private fun ModernCalendarBookPage(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            if (showGalleryMode) {
+            if (page.totalPhotos == 0) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CalendarMonth,
+                        contentDescription = null,
+                        tint = InkTertiary.copy(alpha = 0.65f),
+                        modifier = Modifier.size(44.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "${monthChineseName(page.month)}暂无照片或视频",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = InkPrimary,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "这一页留白给未来的回忆，左右滑动可浏览其他月份",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = InkSecondary,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            } else if (showGalleryMode) {
                 val monthGalleryEntries = remember(page.photos) {
                     val visible = page.photos.filter { it.photoStatus != PhotoStatus.TRASHED }
                         .sortedByDescending { it.takenAtMillis }
@@ -703,47 +752,59 @@ private fun ModernCalendarBookPage(
             Spacer(modifier = Modifier.height(12.dp))
 
             // Footer CTA
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
+            if (page.totalPhotos > 0) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (page.unreviewedCount > 0) {
+                                "剩余 ${page.unreviewedCount} 项待整理"
+                            } else {
+                                "已精选归档 ${page.keptCount} 项回忆"
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = InkPrimary
+                        )
+                        Text(
+                            text = if (page.unreviewedCount > 0) {
+                                "共 ${formatStorageSize(page.reclaimableBytes)}"
+                            } else {
+                                "已释放 ${formatStorageSize(page.stamp?.freedBytes ?: 0L)}"
+                            },
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (page.unreviewedCount > 0) CoralDanger else EmeraldKeep
+                        )
+                    }
+
+                    GalleryActionButton(
                         text = if (page.unreviewedCount > 0) {
-                            "剩余 ${page.unreviewedCount} 项待整理"
+                            "整理 ${monthChineseName(page.month)} · 进入弧形时光轴"
                         } else {
-                            "已精选归档 ${page.keptCount} 项回忆"
+                            "重温 ${monthChineseName(page.month)} 回忆"
                         },
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = InkPrimary
-                    )
-                    Text(
-                        text = if (page.unreviewedCount > 0) {
-                            "共 ${formatStorageSize(page.reclaimableBytes)}"
-                        } else {
-                            "已释放 ${formatStorageSize(page.stamp?.freedBytes ?: 0L)}"
-                        },
-                        fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (page.unreviewedCount > 0) CoralDanger else EmeraldKeep
+                        leadingIcon = if (page.unreviewedCount > 0) Icons.Filled.CleaningServices else Icons.Filled.AutoAwesome,
+                        tone = GalleryButtonTone.OBSIDIAN,
+                        onClick = onCleanClick,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("clean_month_button_${page.month}")
                     )
                 }
-
-                GalleryActionButton(
-                    text = if (page.unreviewedCount > 0) {
-                        "整理 ${monthChineseName(page.month)} · 进入弧形时光轴"
-                    } else {
-                        "重温 ${monthChineseName(page.month)} 回忆"
-                    },
-                    leadingIcon = if (page.unreviewedCount > 0) Icons.Filled.CleaningServices else Icons.Filled.AutoAwesome,
-                    tone = GalleryButtonTone.OBSIDIAN,
-                    onClick = onCleanClick,
+            } else {
+                Text(
+                    text = "本月无媒体记录",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = InkTertiary,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("clean_month_button_${page.month}")
+                        .padding(vertical = 8.dp)
                 )
             }
         }
@@ -808,6 +869,7 @@ private fun MonthCalendarGrid(
                         val dayPhotos = page.photosByDay[dayNum].orEmpty()
                         val isDayCleaned = dayNum in page.cleanedDays
                         CalendarDaySlot(
+                            month = page.month,
                             day = dayNum,
                             itemsCount = dayPhotos.size,
                             hasVideo = dayPhotos.any { it.isVideo },
@@ -816,7 +878,7 @@ private fun MonthCalendarGrid(
                             onClick = { if (dayPhotos.isNotEmpty()) onDayClick(dayNum) },
                             modifier = Modifier
                                 .weight(1f)
-                                .aspectRatio(0.92f)
+                                .heightIn(min = 48.dp)
                                 .testTag("calendar_day_${page.month}_$dayNum")
                         )
                     } else {
@@ -830,6 +892,7 @@ private fun MonthCalendarGrid(
 
 @Composable
 private fun CalendarDaySlot(
+    month: Int,
     day: Int,
     itemsCount: Int,
     hasVideo: Boolean,
@@ -839,6 +902,7 @@ private fun CalendarDaySlot(
     modifier: Modifier = Modifier
 ) {
     val hasPhoto = coverPhoto != null
+    val dayDesc = if (hasPhoto) "${month}月${day}日，${itemsCount}项媒体，点击进入整理" else "${month}月${day}日，无照片"
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
@@ -850,6 +914,7 @@ private fun CalendarDaySlot(
                     Modifier
                 }
             )
+            .semantics(mergeDescendants = true) { contentDescription = dayDesc }
             .clickable(enabled = hasPhoto, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {

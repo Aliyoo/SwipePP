@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -93,6 +94,7 @@ import com.example.ui.theme.SolarAmber
 import com.example.ui.theme.StudioCanvas
 import com.example.ui.theme.SurfaceMuted
 import com.example.ui.theme.SurfacePure
+import com.example.ui.theme.isReducedMotionEnabled
 import kotlinx.coroutines.delay
 
 private enum class CoverPickerFilter(val label: String) {
@@ -158,11 +160,14 @@ fun YearbookCoverStudioSheet(
         }
     }
 
-    // Live miniature cover preview slideshow
+    val context = LocalContext.current
+    val reducedMotion = remember(context) { isReducedMotionEnabled(context) }
+
+    // Live miniature cover preview slideshow (paused when system animator scale is 0)
     var previewIndex by remember(previewSlides) { mutableIntStateOf(0) }
-    LaunchedEffect(previewSlides, intervalSeconds, selectedMode) {
+    LaunchedEffect(previewSlides, intervalSeconds, selectedMode, reducedMotion) {
         previewIndex = 0
-        if (previewSlides.size <= 1) return@LaunchedEffect
+        if (previewSlides.size <= 1 || reducedMotion) return@LaunchedEffect
         val previewStepMs = (intervalSeconds * 1000L).coerceAtMost(3500L)
         while (true) {
             delay(previewStepMs)
@@ -215,10 +220,80 @@ fun YearbookCoverStudioSheet(
                 .testTag("yearbook_cover_studio_sheet"),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // 1) Top Hero Row: Live Miniature 3D Book Preview + Mode Context
+            // 1) Step 1 — Mode-First Selection (Stage 4: pick mode first, then reveal only its parameters)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "${stringResource(R.string.cover_studio_title)} · ${summary.year}",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = InkPrimary
+                )
+                FrostedGlassCard(
+                    shape = RoundedCornerShape(50),
+                    shadowElevation = 2.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        CoverModeSegment(
+                            mode = YearbookCoverMode.SMART_CAROUSEL,
+                            icon = Icons.Filled.AutoAwesome,
+                            selected = selectedMode == YearbookCoverMode.SMART_CAROUSEL,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                selectedMode = YearbookCoverMode.SMART_CAROUSEL
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("cover_mode_smart")
+                        )
+                        CoverModeSegment(
+                            mode = YearbookCoverMode.SINGLE_CUSTOM,
+                            icon = Icons.Filled.Image,
+                            selected = selectedMode == YearbookCoverMode.SINGLE_CUSTOM,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                selectedMode = YearbookCoverMode.SINGLE_CUSTOM
+                                if (selectedIds.isEmpty()) {
+                                    smartCuratedSlides.firstOrNull()?.let { selectedIds = listOf(it.id) }
+                                } else if (selectedIds.size > 1) {
+                                    selectedIds = listOf(selectedIds.first())
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("cover_mode_single")
+                        )
+                        CoverModeSegment(
+                            mode = YearbookCoverMode.CUSTOM_CAROUSEL,
+                            icon = Icons.Filled.Collections,
+                            selected = selectedMode == YearbookCoverMode.CUSTOM_CAROUSEL,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                selectedMode = YearbookCoverMode.CUSTOM_CAROUSEL
+                                if (selectedIds.size < 2) {
+                                    val seed = (selectedIds + smartCuratedSlides.map { it.id })
+                                        .distinct()
+                                        .take(3)
+                                    selectedIds = seed
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("cover_mode_custom_carousel")
+                        )
+                    }
+                }
+            }
+
+            // 2) Live Preview & Mode-Specific Context
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 MiniBookCoverPreview(
@@ -227,7 +302,7 @@ fun YearbookCoverStudioSheet(
                     slides = previewSlides,
                     currentIndex = previewIndex,
                     modifier = Modifier
-                        .width(96.dp)
+                        .width(84.dp)
                         .aspectRatio(0.70f)
                 )
 
@@ -235,12 +310,6 @@ fun YearbookCoverStudioSheet(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = "${stringResource(R.string.cover_studio_title)} · ${summary.year}",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = InkPrimary
-                    )
                     Text(
                         text = when (selectedMode) {
                             YearbookCoverMode.SMART_CAROUSEL -> stringResource(R.string.cover_mode_smart_desc)
@@ -272,7 +341,7 @@ fun YearbookCoverStudioSheet(
                                     YearbookCoverMode.SMART_CAROUSEL ->
                                         "智能优选 ${previewSlides.size} 张 · 每${intervalSeconds}秒轮播"
                                     YearbookCoverMode.SINGLE_CUSTOM ->
-                                        if (selectedIds.isNotEmpty()) "已锁定 1 张专属静态封面" else "请从下方点选 1 张封面"
+                                        if (selectedIds.isNotEmpty()) "已锁定 1 张静态封面" else "请从下方点选 1 张封面"
                                     YearbookCoverMode.CUSTOM_CAROUSEL ->
                                         "已选 ${selectedIds.size}/${YearbookCoverCurator.MAX_COVER_SLIDES} 张 · 每${intervalSeconds}秒轮播"
                                 },
@@ -288,69 +357,7 @@ fun YearbookCoverStudioSheet(
                 }
             }
 
-            // 2) Mode Selector Segmented Pill
-            FrostedGlassCard(
-                shape = RoundedCornerShape(50),
-                shadowElevation = 2.dp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    CoverModeSegment(
-                        mode = YearbookCoverMode.SMART_CAROUSEL,
-                        icon = Icons.Filled.AutoAwesome,
-                        selected = selectedMode == YearbookCoverMode.SMART_CAROUSEL,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            selectedMode = YearbookCoverMode.SMART_CAROUSEL
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("cover_mode_smart")
-                    )
-                    CoverModeSegment(
-                        mode = YearbookCoverMode.SINGLE_CUSTOM,
-                        icon = Icons.Filled.Image,
-                        selected = selectedMode == YearbookCoverMode.SINGLE_CUSTOM,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            selectedMode = YearbookCoverMode.SINGLE_CUSTOM
-                            if (selectedIds.isEmpty()) {
-                                smartCuratedSlides.firstOrNull()?.let { selectedIds = listOf(it.id) }
-                            } else if (selectedIds.size > 1) {
-                                selectedIds = listOf(selectedIds.first())
-                            }
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("cover_mode_single")
-                    )
-                    CoverModeSegment(
-                        mode = YearbookCoverMode.CUSTOM_CAROUSEL,
-                        icon = Icons.Filled.Collections,
-                        selected = selectedMode == YearbookCoverMode.CUSTOM_CAROUSEL,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            selectedMode = YearbookCoverMode.CUSTOM_CAROUSEL
-                            if (selectedIds.size < 2) {
-                                val seed = (selectedIds + smartCuratedSlides.map { it.id })
-                                    .distinct()
-                                    .take(3)
-                                selectedIds = seed
-                            }
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("cover_mode_custom_carousel")
-                    )
-                }
-            }
-
-            // 3) Carousel Cadence Selector (visible in Smart & Custom Carousel modes)
+            // 3) Mode-Specific Parameters: Carousel Cadence ONLY for carousel modes
             AnimatedVisibility(visible = selectedMode != YearbookCoverMode.SINGLE_CUSTOM) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -375,7 +382,7 @@ fun YearbookCoverStudioSheet(
                             },
                             modifier = Modifier
                                 .weight(1f)
-                                .heightIn(min = 44.dp)
+                                .heightIn(min = 48.dp)
                                 .testTag("cover_speed_${sec}s")
                         ) {
                             Text(
@@ -593,7 +600,7 @@ private fun CoverModeSegment(
         color = if (selected) palette.activeChromeMid else Color.Transparent,
         border = if (selected) BorderStroke(0.9.dp, palette.activeChromeBorderStart) else null,
         shadowElevation = if (selected) 3.dp else 0.dp,
-        modifier = modifier.heightIn(min = 44.dp)
+        modifier = modifier.heightIn(min = 48.dp)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),

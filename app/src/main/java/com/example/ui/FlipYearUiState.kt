@@ -96,9 +96,33 @@ data class LocationCluster(
 )
 
 data class UndoSnapshot(
+    val id: Long = System.nanoTime(),
     val photoStates: List<PhotoStateBackup>,
-    val description: String
+    val description: String,
+    val actionLabel: String = "撤销",
+    val cardKey: String? = null
 )
+
+@Immutable
+data class SnackbarMessage(
+    val id: Long = System.nanoTime(),
+    val text: String,
+    val undoLabel: String? = null,
+    val undoSnapshot: UndoSnapshot? = null,
+    val durationMs: Long = if (undoSnapshot != null) 4500L else 2800L
+)
+
+enum class CleanerEntrySource(val routeKey: String, val backLabel: String) {
+    FLIPBOOK("flipbook", "返回月历"),
+    BOOKSHELF("bookshelf", "返回书架"),
+    MAP("map", "返回足迹"),
+    GALLERY("gallery", "返回画廊");
+
+    companion object {
+        fun fromRouteKey(key: String?): CleanerEntrySource =
+            entries.firstOrNull { it.routeKey == key } ?: BOOKSHELF
+    }
+}
 
 data class PhotoStateBackup(
     val photoId: Long,
@@ -167,10 +191,14 @@ data class FlipYearUiState(
     val totalImageCount: Int = 0,
     val totalVideoCount: Int = 0,
     val hasDeviceMedia: Boolean = false,
+    val hasSamplePhotos: Boolean = false,
     val pendingTrashBytes: Long = 0L,
     val undoStackDepth: Int = 0,
+    val cleanerSessionUndoDepth: Int = 0,
+    val snackbarMessage: SnackbarMessage? = null,
     val feedbackBanner: String? = null,
     val recentlyStampedMonthKey: String? = null,
+    val vaultSessionFilterIds: Set<Long>? = null,
     val batchTaskMessage: String? = null,
     val batchTaskProcessed: Int = 0,
     val batchTaskTotal: Int = 0

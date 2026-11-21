@@ -17,6 +17,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,8 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -54,9 +57,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -71,6 +76,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.isTraversalGroup
@@ -101,11 +107,8 @@ import java.util.Locale
 
 /**
  * Editorial full-screen darkroom photo & video inspection lightbox.
- * Supports pinch-to-zoom, double-tap 2.5x zoom, pan while zoomed, and unified zero-overlap bottom controls.
- *
- * When hosted inside [FlipYearApp], renders directly into [LocalFullScreenOverlayHost] inside
- * `MainActivity`'s true edge-to-edge window instead of spawning a floating Android Dialog window,
- * eliminating Samsung One UI / Android 15–16 dialog window cutout offset and bottom-bar truncation.
+ * Supports left/right paging across the current photo collection, swipe-down to close,
+ * pinch/double-tap zoom, favorite toggle, and auto-advancing after triage actions.
  */
 @Composable
 fun PhotoDetailLightbox(
@@ -113,25 +116,34 @@ fun PhotoDetailLightbox(
     onDismiss: () -> Unit,
     onKeep: ((PhotoItemEntity, Boolean) -> Unit)? = null,
     onTrash: ((PhotoItemEntity) -> Unit)? = null,
-    onRestore: ((PhotoItemEntity) -> Unit)? = null
+    onRestore: ((PhotoItemEntity) -> Unit)? = null,
+    photos: List<PhotoItemEntity> = listOf(photo),
+    initialIndex: Int = 0,
+    onToggleFavorite: ((PhotoItemEntity, Boolean) -> Unit)? = null
 ) {
     val overlayHost = LocalFullScreenOverlayHost.current
     if (overlayHost != null) {
         val entryId = remember { Any() }
         val latestPhoto by rememberUpdatedState(photo)
+        val latestPhotos by rememberUpdatedState(photos)
+        val latestInitialIndex by rememberUpdatedState(initialIndex)
         val latestOnDismiss by rememberUpdatedState(onDismiss)
         val latestOnKeep by rememberUpdatedState(onKeep)
         val latestOnTrash by rememberUpdatedState(onTrash)
         val latestOnRestore by rememberUpdatedState(onRestore)
+        val latestOnToggleFavorite by rememberUpdatedState(onToggleFavorite)
 
         DisposableEffect(overlayHost, entryId) {
             overlayHost.upsert(entryId) {
                 PhotoDetailLightboxContent(
                     photo = latestPhoto,
+                    photos = latestPhotos,
+                    initialIndex = latestInitialIndex,
                     onDismiss = latestOnDismiss,
                     onKeep = latestOnKeep,
                     onTrash = latestOnTrash,
-                    onRestore = latestOnRestore
+                    onRestore = latestOnRestore,
+                    onToggleFavorite = latestOnToggleFavorite
                 )
             }
             onDispose {
@@ -141,7 +153,6 @@ fun PhotoDetailLightbox(
         return
     }
 
-    // Standalone fallback (previews / isolated tests without FlipYearApp's FullScreenOverlayHost)
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
@@ -176,10 +187,13 @@ fun PhotoDetailLightbox(
 
         PhotoDetailLightboxContent(
             photo = photo,
+            photos = photos,
+            initialIndex = initialIndex,
             onDismiss = onDismiss,
             onKeep = onKeep,
             onTrash = onTrash,
-            onRestore = onRestore
+            onRestore = onRestore,
+            onToggleFavorite = onToggleFavorite
         )
     }
 }
@@ -187,20 +201,23 @@ fun PhotoDetailLightbox(
 @Composable
 private fun PhotoDetailLightboxContent(
     photo: PhotoItemEntity,
+    photos: List<PhotoItemEntity>,
+    initialIndex: Int,
     onDismiss: () -> Unit,
     onKeep: ((PhotoItemEntity, Boolean) -> Unit)?,
     onTrash: ((PhotoItemEntity) -> Unit)?,
-    onRestore: ((PhotoItemEntity) -> Unit)?
+    onRestore: ((PhotoItemEntity) -> Unit)?,
+    onToggleFavorite: ((PhotoItemEntity, Boolean) -> Unit)?
 ) {
     val haptics = rememberHapticEngine()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val view = LocalView.current
+    val density = LocalDensity.current
+    val dismissThresholdPx = with(density) { 112.dp.toPx() }
 
     BackHandler(onBack = onDismiss)
 
-    // Ensure crisp light system bar icons over the pitch-dark #0A0C12 darkroom canvas,
-    // restoring the previous theme appearance cleanly when the lightbox closes.
     DisposableEffect(view) {
         val window = (view as? DialogWindowProvider)?.window
             ?: (view.parent as? DialogWindowProvider)?.window
@@ -220,146 +237,258 @@ private fun PhotoDetailLightboxContent(
         }
     }
 
-    var scale by remember(photo.id) { mutableFloatStateOf(1f) }
-    var offset by remember(photo.id) { mutableStateOf(Offset.Zero) }
-    var showChrome by remember(photo.id) { mutableStateOf(true) }
-    val scaleAnim = remember(photo.id) { Animatable(1f) }
-
-    val renderUnifiedBottomHud: @Composable (videoScrubber: (@Composable () -> Unit)?) -> Unit = { videoScrubber ->
-        LightboxBottomHud(
-            photo = photo,
-            visible = showChrome,
-            zoomScale = scale,
-            videoScrubber = videoScrubber,
-            onRestore = if (photo.photoStatus == PhotoStatus.TRASHED && onRestore != null) {
-                {
-                    haptics.undoPulse()
-                    onRestore(photo)
-                    onDismiss()
-                }
-            } else null,
-            onTrash = if (photo.photoStatus != PhotoStatus.TRASHED && onTrash != null) {
-                {
-                    haptics.swipeDeleteConfirm()
-                    onTrash(photo)
-                    onDismiss()
-                }
-            } else null,
-            onFavorite = if (photo.photoStatus != PhotoStatus.TRASHED && onKeep != null) {
-                {
-                    haptics.swipeKeepConfirm()
-                    onKeep(photo, true)
-                    onDismiss()
-                }
-            } else null,
-            onKeep = if (photo.photoStatus != PhotoStatus.TRASHED && onKeep != null) {
-                {
-                    haptics.swipeKeepConfirm()
-                    onKeep(photo, false)
-                    onDismiss()
-                }
-            } else null
-        )
+    val initialList = remember {
+        val base = photos.ifEmpty { listOf(photo) }
+        if (base.any { it.id == photo.id }) base else listOf(photo)
     }
+    val sessionPhotos = remember { mutableStateListOf<PhotoItemEntity>().apply { addAll(initialList) } }
+    val resolvedStartIndex = remember {
+        if (initialIndex in initialList.indices && initialList[initialIndex].id == photo.id) {
+            initialIndex
+        } else {
+            initialList.indexOfFirst { it.id == photo.id }.coerceAtLeast(0)
+        }
+    }
+
+    if (sessionPhotos.isEmpty()) {
+        LaunchedEffect(Unit) { onDismiss() }
+        return
+    }
+
+    val pagerState = rememberPagerState(
+        initialPage = resolvedStartIndex.coerceIn(0, sessionPhotos.lastIndex),
+        pageCount = { sessionPhotos.size }
+    )
+    val currentIndex = pagerState.currentPage.coerceIn(0, sessionPhotos.lastIndex)
+    val currentPhoto = sessionPhotos[currentIndex]
+
+    var scale by remember(currentPhoto.id) { mutableFloatStateOf(1f) }
+    var offset by remember(currentPhoto.id) { mutableStateOf(Offset.Zero) }
+    var showChrome by remember { mutableStateOf(true) }
+    val scaleAnim = remember(currentPhoto.id) { Animatable(1f) }
+    val dismissDragY = remember { Animatable(0f) }
+
+    fun removeCurrentOrDismiss() {
+        val idx = pagerState.currentPage.coerceIn(0, sessionPhotos.lastIndex)
+        sessionPhotos.removeAt(idx)
+        if (sessionPhotos.isEmpty()) {
+            onDismiss()
+        } else {
+            val nextIdx = idx.coerceAtMost(sessionPhotos.lastIndex)
+            scope.launch { pagerState.scrollToPage(nextIdx) }
+        }
+    }
+
+    fun advanceOrDismiss() {
+        val idx = pagerState.currentPage
+        if (idx < sessionPhotos.lastIndex) {
+            scope.launch { pagerState.animateScrollToPage(idx + 1) }
+        } else {
+            onDismiss()
+        }
+    }
+
+    val renderUnifiedBottomHud: @Composable (targetPhoto: PhotoItemEntity, videoScrubber: (@Composable () -> Unit)?) -> Unit =
+        { targetPhoto, videoScrubber ->
+            LightboxBottomHud(
+                photo = targetPhoto,
+                visible = showChrome,
+                zoomScale = if (targetPhoto.id == currentPhoto.id) scale else 1f,
+                videoScrubber = videoScrubber,
+                onRestore = if (targetPhoto.photoStatus == PhotoStatus.TRASHED && onRestore != null) {
+                    {
+                        haptics.undoPulse()
+                        onRestore(targetPhoto)
+                        removeCurrentOrDismiss()
+                    }
+                } else null,
+                onTrash = if (targetPhoto.photoStatus != PhotoStatus.TRASHED && onTrash != null) {
+                    {
+                        haptics.swipeDeleteConfirm()
+                        onTrash(targetPhoto)
+                        removeCurrentOrDismiss()
+                    }
+                } else null,
+                onFavorite = if (targetPhoto.photoStatus != PhotoStatus.TRASHED && (onToggleFavorite != null || onKeep != null)) {
+                    {
+                        haptics.swipeKeepConfirm()
+                        if (onToggleFavorite != null) {
+                            val nextFav = !targetPhoto.isFavorite
+                            onToggleFavorite(targetPhoto, nextFav)
+                            val idx = sessionPhotos.indexOfFirst { it.id == targetPhoto.id }
+                            if (idx >= 0) {
+                                sessionPhotos[idx] = sessionPhotos[idx].copy(
+                                    isFavorite = nextFav,
+                                    status = PhotoStatus.KEPT.name
+                                )
+                            }
+                        } else if (onKeep != null) {
+                            onKeep(targetPhoto, true)
+                            advanceOrDismiss()
+                        }
+                    }
+                } else null,
+                onKeep = if (targetPhoto.photoStatus != PhotoStatus.TRASHED && onKeep != null) {
+                    {
+                        haptics.swipeKeepConfirm()
+                        onKeep(targetPhoto, false)
+                        advanceOrDismiss()
+                    }
+                } else null
+            )
+        }
+
+    val dismissProgress = (dismissDragY.value / (dismissThresholdPx * 2.4f)).coerceIn(0f, 1f)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0C12))
+            .background(Color(0xFF0A0C12).copy(alpha = (1f - dismissProgress * 0.65f).coerceIn(0.35f, 1f)))
             .semantics(mergeDescendants = false) { isTraversalGroup = true }
             .pointerInput(Unit) {}
             .testTag("photo_detail_lightbox")
     ) {
         // Static GPU-blurred ambient photo radiance behind darkroom veil
         BlurredAmbientPhotoBackdrop(
-            photo = photo,
-            alpha = 0.28f,
+            photo = currentPhoto,
+            alpha = 0.28f * (1f - dismissProgress * 0.5f),
             blurRadius = 34.dp,
             modifier = Modifier.fillMaxSize()
         )
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xC2090B10))
+                .background(Color(0xC2090B10).copy(alpha = (0.76f * (1f - dismissProgress * 0.45f)).coerceIn(0.25f, 0.76f)))
         )
 
-        // Interactive Zoom & Pan Photo Canvas OR Embedded Inline Video Player
-        if (photo.isVideo) {
-            InlineVideoPlayer(
-                photo = photo,
-                playWhenReady = true,
-                initialMuted = false,
-                fillCrop = false,
-                showFullControls = true,
-                showChrome = showChrome,
-                onToggleChrome = { showChrome = !showChrome },
-                bottomDockOverlay = { scrubberContent ->
-                    renderUnifiedBottomHud(scrubberContent)
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(photo.id) {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            val newScale = (scale * zoom).coerceIn(1f, 4.5f)
-                            scale = newScale
-                            if (newScale > 1.02f) {
-                                val maxShiftX = (size.width * (newScale - 1f)) / 2f
-                                val maxShiftY = (size.height * (newScale - 1f)) / 2f
-                                offset = Offset(
-                                    x = (offset.x + pan.x).coerceIn(-maxShiftX, maxShiftX),
-                                    y = (offset.y + pan.y).coerceIn(-maxShiftY, maxShiftY)
-                                )
-                            } else {
-                                offset = Offset.Zero
+        // HorizontalPager for prev/next photo browsing + vertical swipe-down to close
+        HorizontalPager(
+            state = pagerState,
+            userScrollEnabled = scale <= 1.05f,
+            key = { index -> sessionPhotos.getOrNull(index)?.id ?: index.toLong() },
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    translationY = dismissDragY.value
+                    val dragScale = (1f - dismissProgress * 0.10f).coerceIn(0.88f, 1f)
+                    scaleX = dragScale
+                    scaleY = dragScale
+                }
+                .pointerInput(scale <= 1.05f, dismissThresholdPx) {
+                    if (scale > 1.05f) return@pointerInput
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { change, dragAmount ->
+                            val nextY = (dismissDragY.value + dragAmount).coerceAtLeast(0f)
+                            if (nextY > 0f) {
+                                change.consume()
+                                scope.launch { dismissDragY.snapTo(nextY) }
                             }
-                        }
-                    }
-                    .pointerInput(photo.id) {
-                        detectTapGestures(
-                            onTap = { showChrome = !showChrome },
-                            onDoubleTap = {
+                        },
+                        onDragEnd = {
+                            if (dismissDragY.value >= dismissThresholdPx) {
+                                onDismiss()
+                            } else {
                                 scope.launch {
-                                    val target = if (scale > 1.4f) 1f else 2.5f
-                                    scaleAnim.snapTo(scale)
-                                    scaleAnim.animateTo(
-                                        targetValue = target,
-                                        animationSpec = spring(
-                                            dampingRatio = Spring.DampingRatioNoBouncy,
-                                            stiffness = Spring.StiffnessMedium
+                                    dismissDragY.animateTo(
+                                        0f,
+                                        spring(dampingRatio = Spring.DampingRatioMediumBouncy)
+                                    )
+                                }
+                            }
+                        },
+                        onDragCancel = {
+                            scope.launch { dismissDragY.animateTo(0f) }
+                        }
+                    )
+                }
+                .testTag("lightbox_pager")
+        ) { pageIndex ->
+            val pagePhoto = sessionPhotos.getOrNull(pageIndex) ?: return@HorizontalPager
+            val isCurrentPage = pageIndex == pagerState.currentPage
+
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (pagePhoto.isVideo) {
+                    InlineVideoPlayer(
+                        photo = pagePhoto,
+                        playWhenReady = isCurrentPage,
+                        initialMuted = false,
+                        fillCrop = false,
+                        showFullControls = true,
+                        showChrome = showChrome,
+                        onToggleChrome = { showChrome = !showChrome },
+                        bottomDockOverlay = { scrubberContent ->
+                            renderUnifiedBottomHud(pagePhoto, scrubberContent)
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(pagePhoto.id) {
+                                detectTransformGestures { _, pan, zoom, _ ->
+                                    if (!isCurrentPage) return@detectTransformGestures
+                                    val newScale = (scale * zoom).coerceIn(1f, 4.5f)
+                                    scale = newScale
+                                    if (newScale > 1.02f) {
+                                        val maxShiftX = (size.width * (newScale - 1f)) / 2f
+                                        val maxShiftY = (size.height * (newScale - 1f)) / 2f
+                                        offset = Offset(
+                                            x = (offset.x + pan.x).coerceIn(-maxShiftX, maxShiftX),
+                                            y = (offset.y + pan.y).coerceIn(-maxShiftY, maxShiftY)
                                         )
-                                    ) {
-                                        scale = value
-                                        if (value <= 1.05f) offset = Offset.Zero
+                                    } else {
+                                        offset = Offset.Zero
                                     }
                                 }
                             }
+                            .pointerInput(pagePhoto.id) {
+                                detectTapGestures(
+                                    onTap = { showChrome = !showChrome },
+                                    onDoubleTap = {
+                                        if (!isCurrentPage) return@detectTapGestures
+                                        scope.launch {
+                                            val target = if (scale > 1.4f) 1f else 2.5f
+                                            scaleAnim.snapTo(scale)
+                                            scaleAnim.animateTo(
+                                                targetValue = target,
+                                                animationSpec = spring(
+                                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                                    stiffness = Spring.StiffnessMedium
+                                                )
+                                            ) {
+                                                scale = value
+                                                if (value <= 1.05f) offset = Offset.Zero
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                    ) {
+                        PhotoArtwork(
+                            photo = pagePhoto,
+                            contentDescription = pagePhoto.caption.ifBlank { "照片预览" },
+                            contentScale = ContentScale.Fit,
+                            showVideoBadge = false,
+                            downsampleTier = ImageDownsampleTier.LIGHTBOX_FULL,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    if (isCurrentPage) {
+                                        scaleX = scale
+                                        scaleY = scale
+                                        translationX = offset.x
+                                        translationY = offset.y
+                                    }
+                                }
                         )
                     }
-            ) {
-                PhotoArtwork(
-                    photo = photo,
-                    contentDescription = photo.caption,
-                    contentScale = ContentScale.Fit,
-                    showVideoBadge = false,
-                    downsampleTier = ImageDownsampleTier.LIGHTBOX_FULL,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            translationX = offset.x
-                            translationY = offset.y
-                        }
-                )
-            }
 
-            Box(modifier = Modifier.align(Alignment.BottomCenter)) {
-                renderUnifiedBottomHud(null)
+                    Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+                        renderUnifiedBottomHud(pagePhoto, null)
+                    }
+                }
             }
         }
 
@@ -405,19 +534,26 @@ private fun PhotoDetailLightboxContent(
                         .padding(horizontal = 12.dp)
                 ) {
                     Text(
-                        text = formatPhotoDateTime(photo.takenAtMillis),
+                        text = buildString {
+                            append(formatPhotoDateTime(currentPhoto.takenAtMillis))
+                            if (sessionPhotos.size > 1) {
+                                append(" · ${currentIndex + 1}/${sessionPhotos.size}")
+                            }
+                        },
                         fontFamily = JetBrainsMonoFontFamily,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     val metaLine = buildString {
-                        if (photo.widthPx > 0 && photo.heightPx > 0) {
-                            append("${photo.widthPx}×${photo.heightPx} · ")
+                        if (currentPhoto.widthPx > 0 && currentPhoto.heightPx > 0) {
+                            append("${currentPhoto.widthPx}×${currentPhoto.heightPx} · ")
                         }
-                        append(formatStorageSize(photo.fileSizeBytes))
-                        if (photo.isVideo) {
-                            append(" · ${formatVideoDuration(photo.durationMs)}")
+                        append(formatStorageSize(currentPhoto.fileSizeBytes))
+                        if (currentPhoto.isVideo) {
+                            append(" · ${formatVideoDuration(currentPhoto.durationMs)}")
                         }
                     }
                     Text(
@@ -430,7 +566,7 @@ private fun PhotoDetailLightboxContent(
                     )
                 }
 
-                // Quality Score Badge (consistent dark matte pill, zero shadow bleed)
+                // Quality Score Badge with explicit "画质" label (Stage 4)
                 ObsidianGlassPill {
                     Row(
                         modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
@@ -444,7 +580,7 @@ private fun PhotoDetailLightboxContent(
                             modifier = Modifier.size(13.dp)
                         )
                         Text(
-                            text = "${photo.qualityScore}",
+                            text = "画质 ${currentPhoto.qualityScore}",
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
@@ -507,7 +643,6 @@ private fun LightboxBottomHud(
                     .widthIn(max = 540.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Crisp Caption + Location Header directly on protective scrim (no double-card nesting)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -565,7 +700,6 @@ private fun LightboxBottomHud(
                     }
                 }
 
-                // Single Unified Obsidian Satin Dock (gradient + specular lip + rim)
                 if (videoScrubber != null || hasActions) {
                     ObsidianGlassCard(
                         shape = RoundedCornerShape(22.dp),
@@ -613,13 +747,13 @@ private fun LightboxBottomHud(
                                         if (onTrash != null) {
                                             LightboxActionPill(
                                                 icon = Icons.Filled.DeleteOutline,
-                                                label = "删除",
+                                                label = "移入回收站",
                                                 containerColor = CoralDanger.copy(alpha = 0.22f),
                                                 contentColor = Color(0xFFFF8E9E),
                                                 borderColor = CoralDanger.copy(alpha = 0.42f),
                                                 onClick = onTrash,
                                                 modifier = Modifier
-                                                    .weight(1f)
+                                                    .weight(1.15f)
                                                     .testTag("lightbox_trash_button")
                                             )
                                         }
@@ -645,7 +779,7 @@ private fun LightboxBottomHud(
                                                 borderColor = EmeraldKeep.copy(alpha = 0.42f),
                                                 onClick = onKeep,
                                                 modifier = Modifier
-                                                    .weight(1f)
+                                                    .weight(0.95f)
                                                     .testTag("lightbox_keep_button")
                                             )
                                         }
@@ -686,15 +820,15 @@ private fun LightboxActionPill(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = label,
+                contentDescription = null,
                 tint = contentColor,
                 modifier = Modifier.size(18.dp)
             )
-            Spacer(modifier = Modifier.width(5.dp))
+            Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
-                fontSize = 13.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = contentColor,
                 maxLines = 1,

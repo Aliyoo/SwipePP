@@ -17,7 +17,7 @@ enum class AppThemeMode(
     ),
     LIGHT(
         storageKey = "light",
-        label = "浅色画廊",
+        label = "日光画廊",
         subtitle = "暖白石膏日光画廊质感"
     ),
     DARK(
@@ -40,8 +40,23 @@ fun resolveIsDarkTheme(mode: AppThemeMode, isSystemInDarkTheme: Boolean): Boolea
     }
 
 /**
- * Lightweight synchronous SharedPreferences store for appearance preference so MainActivity
- * resolves dark/light mode before frame 1 with zero white flash on cold launch.
+ * Reads Android system Animator Duration Scale so animations (slideshow, Ken Burns drift)
+ * gracefully stop when the user enables "Remove animations" / animator scale = 0.
+ */
+fun isReducedMotionEnabled(context: Context): Boolean {
+    val scale = runCatching {
+        android.provider.Settings.Global.getFloat(
+            context.contentResolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f
+        )
+    }.getOrDefault(1f)
+    return scale == 0f
+}
+
+/**
+ * Lightweight synchronous SharedPreferences store for appearance & onboarding preferences
+ * so MainActivity resolves dark/light mode before frame 1 with zero white flash on cold launch.
  */
 class ThemePreferences(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -50,14 +65,26 @@ class ThemePreferences(context: Context) {
     )
     val themeMode: StateFlow<AppThemeMode> = _themeMode.asStateFlow()
 
+    private val _hasSeenOnboardingGuide = MutableStateFlow(
+        prefs.getBoolean(KEY_ONBOARDING_SEEN, false)
+    )
+    val hasSeenOnboardingGuide: StateFlow<Boolean> = _hasSeenOnboardingGuide.asStateFlow()
+
     fun setThemeMode(mode: AppThemeMode) {
         if (_themeMode.value == mode) return
         _themeMode.value = mode
         prefs.edit().putString(KEY_THEME_MODE, mode.storageKey).apply()
     }
 
+    fun markOnboardingGuideSeen() {
+        if (_hasSeenOnboardingGuide.value) return
+        _hasSeenOnboardingGuide.value = true
+        prefs.edit().putBoolean(KEY_ONBOARDING_SEEN, true).apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "flipyear_theme_prefs"
         private const val KEY_THEME_MODE = "app_theme_mode"
+        private const val KEY_ONBOARDING_SEEN = "has_seen_onboarding_guide_v1"
     }
 }

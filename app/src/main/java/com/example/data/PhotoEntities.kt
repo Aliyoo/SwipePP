@@ -97,7 +97,9 @@ data class CleanupStatsEntity(
     @PrimaryKey val id: Int = 1,
     val totalPurgedBytes: Long = 0L,
     val totalPurgedCount: Int = 0,
-    val cleanedStreakDays: Int = 1
+    val cleanedStreakDays: Int = 1,
+    val totalCompressedSavedBytes: Long = 0L,
+    val totalCompressedCount: Int = 0
 )
 
 enum class YearbookCoverMode(val label: String) {

@@ -36,8 +36,8 @@ class TimelineMonthStampTest {
 
     @Test
     fun buildTimelineClusterLayout_groupsMonthlyClustersAndComputesStamps() {
-        assertEquals("Jan 2026", formatMonthSummaryStamp(2026, 1))
-        assertEquals("Dec 2025", formatMonthSummaryStamp(2025, 12))
+        assertEquals("2026年1月", formatMonthSummaryStamp(2026, 1))
+        assertEquals("2025年12月", formatMonthSummaryStamp(2025, 12))
 
         val janBurst = GalleryEntry.Burst(
             groupId = "b1",
@@ -63,7 +63,7 @@ class TimelineMonthStampTest {
         assertTrue(layout.gridItems[3] is TimelineGridItem.MonthDivider)
 
         val janCluster = layout.clusters[0]
-        assertEquals("Jan 2026", janCluster.stampLabel)
+        assertEquals("2026年1月", janCluster.stampLabel)
         assertEquals(2, janCluster.photoCount)
         assertEquals(1, janCluster.videoCount)
         assertEquals(1, janCluster.burstGroupCount)
@@ -72,16 +72,16 @@ class TimelineMonthStampTest {
         assertFalse(janCluster.isCleaned)
 
         val decCluster = layout.clusters[1]
-        assertEquals("Dec 2025", decCluster.stampLabel)
+        assertEquals("2025年12月", decCluster.stampLabel)
         assertEquals(1, decCluster.photoCount)
         assertEquals(0, decCluster.burstGroupCount)
         assertEquals(3, decCluster.firstGridIndex)
         assertTrue(decCluster.isCleaned)
 
         // Binary search lookup across grid indices
-        assertEquals("Jan 2026", layout.clusterForVisibleIndex(0)?.stampLabel)
-        assertEquals("Jan 2026", layout.clusterForVisibleIndex(2)?.stampLabel)
-        assertEquals("Dec 2025", layout.clusterForVisibleIndex(3)?.stampLabel)
-        assertEquals("Dec 2025", layout.clusterForVisibleIndex(4)?.stampLabel)
+        assertEquals("2026年1月", layout.clusterForVisibleIndex(0)?.stampLabel)
+        assertEquals("2026年1月", layout.clusterForVisibleIndex(2)?.stampLabel)
+        assertEquals("2025年12月", layout.clusterForVisibleIndex(3)?.stampLabel)
+        assertEquals("2025年12月", layout.clusterForVisibleIndex(4)?.stampLabel)
     }
 }

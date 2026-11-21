@@ -459,71 +459,49 @@ fun InlineVideoPlayer(
                 }
             }
         } else {
-            // Compact Card-Inline Overlay Controls (Arc Cleaner Card)
-            val progress = (positionMs.toFloat() / durationMs.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
-            Column(
+            // Stage 2: Compact Card-Inline Overlay Controls (Arc Cleaner Card) —
+            // no horizontal progress bar inside the card to avoid conflicting with HorizontalPager swipes.
+            Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .padding(horizontal = 10.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                ObsidianGlassPill(
+                    color = ObsidianOverlayOrb
                 ) {
-                    ObsidianGlassPill(
-                        color = ObsidianOverlayOrb
-                    ) {
-                        Text(
-                            text = "${formatVideoDuration(positionMs)} / ${formatVideoDuration(durationMs)}",
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        ObsidianIconOrb(
-                            icon = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                            contentDescription = if (isMuted) "开启声音" else "静音",
-                            onClick = { isMuted = !isMuted },
-                            size = 34.dp,
-                            iconSize = 16.dp,
-                            modifier = Modifier.testTag("card_video_mute_toggle")
-                        )
-
-                        if (onOpenFullscreen != null) {
-                            ObsidianIconOrb(
-                                icon = Icons.Filled.Fullscreen,
-                                contentDescription = "全屏播放",
-                                onClick = onOpenFullscreen,
-                                size = 34.dp,
-                                iconSize = 17.dp,
-                                modifier = Modifier.testTag("card_video_fullscreen_button")
-                            )
-                        }
-                    }
+                    Text(
+                        text = "${formatVideoDuration(positionMs)} / ${formatVideoDuration(durationMs)}",
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
                 }
 
-                // Hairline glass playback progress track
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.28f))
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(progress)
-                            .height(3.dp)
-                            .clip(CircleShape)
-                            .background(Color.White)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ObsidianIconOrb(
+                        icon = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                        contentDescription = if (isMuted) "取消静音" else "静音",
+                        onClick = { isMuted = !isMuted },
+                        size = 44.dp,
+                        iconSize = 18.dp,
+                        modifier = Modifier.testTag("card_video_mute_toggle")
                     )
+
+                    if (onOpenFullscreen != null) {
+                        ObsidianIconOrb(
+                            icon = Icons.Filled.Fullscreen,
+                            contentDescription = "全屏播放",
+                            onClick = onOpenFullscreen,
+                            size = 44.dp,
+                            iconSize = 18.dp,
+                            modifier = Modifier.testTag("card_video_fullscreen_button")
+                        )
+                    }
                 }
             }
         }
@@ -713,52 +691,32 @@ private fun SampleVideoInlinePreview(
                 }
             }
         } else {
-            Column(
+            Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .padding(horizontal = 10.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                ObsidianGlassPill(
+                    color = ObsidianOverlayOrb
                 ) {
-                    ObsidianGlassPill(
-                        color = ObsidianOverlayOrb
-                    ) {
-                        Text(
-                            text = "${formatVideoDuration(elapsedMs)} / ${formatVideoDuration(totalMs)}",
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 10.sp,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                    if (onOpenFullscreen != null) {
-                        ObsidianIconOrb(
-                            icon = Icons.Filled.Fullscreen,
-                            contentDescription = "全屏播放",
-                            onClick = onOpenFullscreen,
-                            size = 34.dp,
-                            iconSize = 17.dp
-                        )
-                    }
+                    Text(
+                        text = "${formatVideoDuration(elapsedMs)} / ${formatVideoDuration(totalMs)}",
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontSize = 10.sp,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
                 }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.28f))
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(progress)
-                            .height(3.dp)
-                            .clip(CircleShape)
-                            .background(Color.White)
+                if (onOpenFullscreen != null) {
+                    ObsidianIconOrb(
+                        icon = Icons.Filled.Fullscreen,
+                        contentDescription = "全屏播放",
+                        onClick = onOpenFullscreen,
+                        size = 44.dp,
+                        iconSize = 18.dp
                     )
                 }
             }

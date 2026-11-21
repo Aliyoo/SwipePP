@@ -1,6 +1,8 @@
 package com.example.data
 
 import android.app.PendingIntent
+import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -8,11 +10,11 @@ import android.graphics.Matrix
 import android.location.Geocoder
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.MediaStore
 import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
@@ -29,21 +31,21 @@ enum class CompressionPreset(
 ) {
     NEAR_LOSSLESS(
         title = "极臻近无损",
-        subtitle = "人眼几乎无损 · 保留原图细节与 EXIF",
+        subtitle = "90% 品质（肉眼几乎无差异）· 保留原图尺寸与 EXIF",
         jpegQuality = 90,
         maxLongEdgePx = 4096,
         estimatedSavingsRatio = 0.42f
     ),
     BALANCED(
         title = "均衡轻量化",
-        subtitle = "高清画质 (2560px) · 兼顾清晰度与省空间",
+        subtitle = "长边缩到 2560px · 兼顾高清画质与省空间",
         jpegQuality = 84,
         maxLongEdgePx = 2560,
         estimatedSavingsRatio = 0.62f
     ),
     COMPACT(
         title = "极致省空间",
-        subtitle = "日常浏览清晰 (1920px) · 释放最大空间",
+        subtitle = "长边缩到 1920px · 适合日常浏览，释放最大空间",
         jpegQuality = 76,
         maxLongEdgePx = 1920,
         estimatedSavingsRatio = 0.76f
@@ -55,7 +57,8 @@ data class CompressedPhotoUpdate(
     val newSizeBytes: Long,
     val newWidthPx: Int,
     val newHeightPx: Int,
-    val savedBytes: Long
+    val savedBytes: Long,
+    val newCompressedPhoto: PhotoItemEntity? = null
 )
 
 data class BatchCompressionResult(
@@ -199,7 +202,7 @@ class BatchMediaEditor(private val context: Context) {
             val outcome = if (photo.isSample || photo.contentUri.isNullOrBlank() || !photo.contentUri.startsWith("content://")) {
                 compressSamplePhotoMetadata(photo, preset)
             } else {
-                compressDevicePhotoInPlace(photo, preset)
+                compressDevicePhotoSafeCopy(photo, preset)
             }
 
             when (outcome) {
@@ -329,18 +332,39 @@ class BatchMediaEditor(private val context: Context) {
         }
         val newW = (photo.widthPx * scale).roundToInt().coerceAtLeast(1)
         val newH = (photo.heightPx * scale).roundToInt().coerceAtLeast(1)
+        val copyCaption = if (photo.caption.contains("已压缩")) {
+            photo.caption
+        } else {
+            "${photo.caption.ifBlank { "示例照片" }} · 已压缩"
+        }
+        val newCopy = photo.copy(
+            id = 0,
+            mediaStoreKey = null,
+            fileSizeBytes = targetBytes,
+            widthPx = newW,
+            heightPx = newH,
+            status = PhotoStatus.KEPT.name,
+            trashedAtMillis = null,
+            caption = copyCaption
+        )
         return SingleCompressOutcome.Compressed(
             CompressedPhotoUpdate(
                 id = photo.id,
                 newSizeBytes = targetBytes,
                 newWidthPx = newW,
                 newHeightPx = newH,
-                savedBytes = (photo.fileSizeBytes - targetBytes).coerceAtLeast(0L)
+                savedBytes = (photo.fileSizeBytes - targetBytes).coerceAtLeast(0L),
+                newCompressedPhoto = newCopy
             )
         )
     }
 
-    private fun compressDevicePhotoInPlace(
+    /**
+     * Safe non-destructive compression: writes compressed JPEG + preserved EXIF to a brand-new
+     * MediaStore file instead of overwriting the original in place. The original photo is moved
+     * into FlipYear's two-stage Trash Vault so the user can always restore the original if needed.
+     */
+    private fun compressDevicePhotoSafeCopy(
         photo: PhotoItemEntity,
         preset: CompressionPreset
     ): SingleCompressOutcome {
@@ -445,14 +469,40 @@ class BatchMediaEditor(private val context: Context) {
                 }
 
                 val compressedBytes = tempFile.length()
-                // Strict safety guard: never replace if compressed output isn't at least 4% smaller
+                // Strict safety guard: never write if compressed output isn't at least 4% smaller
                 if (compressedBytes <= 0L || compressedBytes >= (photo.fileSizeBytes * 0.96).toLong()) {
                     return SingleCompressOutcome.SkippedOptimal
                 }
 
-                // 4. Write compressed bytes back into MediaStore URI in-place
+                // 4. Insert a brand-new MediaStore JPEG file (original remains untouched & recoverable)
+                val safeBaseName = photo.caption
+                    .substringBeforeLast('.')
+                    .replace(Regex("[^A-Za-z0-9_\\-\u4e00-\u9fa5]"), "_")
+                    .take(32)
+                    .ifBlank { "FlipYear_${photo.id}" }
+                val displayName = "${safeBaseName}_cmp_${System.currentTimeMillis() % 100000}.jpg"
+                val values = ContentValues().apply {
+                    put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
+                    put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                    put(MediaStore.Images.Media.DATE_TAKEN, photo.takenAtMillis)
+                    put(MediaStore.Images.Media.WIDTH, finalW)
+                    put(MediaStore.Images.Media.HEIGHT, finalH)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val targetFolder = photo.bucketName?.takeIf { it.isNotBlank() } ?: "FlipYear"
+                        put(
+                            MediaStore.Images.Media.RELATIVE_PATH,
+                            "${Environment.DIRECTORY_PICTURES}/$targetFolder"
+                        )
+                        put(MediaStore.Images.Media.IS_PENDING, 1)
+                    }
+                }
+
+                val newUri = runCatching {
+                    resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                }.getOrNull() ?: return SingleCompressOutcome.Failed
+
                 val writeSuccess = runCatching {
-                    resolver.openOutputStream(uri, "wt")?.use { out ->
+                    resolver.openOutputStream(newUri, "w")?.use { out ->
                         tempFile.inputStream().use { input ->
                             input.copyTo(out)
                         }
@@ -461,7 +511,34 @@ class BatchMediaEditor(private val context: Context) {
                     } ?: false
                 }.getOrDefault(false)
 
-                if (!writeSuccess) return SingleCompressOutcome.Failed
+                if (!writeSuccess) {
+                    runCatching { resolver.delete(newUri, null, null) }
+                    return SingleCompressOutcome.Failed
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    runCatching {
+                        val doneValues = ContentValues().apply {
+                            put(MediaStore.Images.Media.IS_PENDING, 0)
+                        }
+                        resolver.update(newUri, doneValues, null, null)
+                    }
+                }
+
+                val newMediaId = runCatching { ContentUris.parseId(newUri) }.getOrNull()
+                val newMediaKey = newMediaId?.takeIf { it > 0L }?.let { "img_$it" }
+                val newCopy = photo.copy(
+                    id = 0,
+                    mediaStoreKey = newMediaKey,
+                    contentUri = newUri.toString(),
+                    fileSizeBytes = compressedBytes,
+                    widthPx = finalW,
+                    heightPx = finalH,
+                    status = PhotoStatus.KEPT.name,
+                    trashedAtMillis = null,
+                    isBestInStack = photo.isBestInStack,
+                    caption = if (photo.caption.contains("已压缩")) photo.caption else "${photo.caption.ifBlank { "照片" }} · 已压缩"
+                )
 
                 return SingleCompressOutcome.Compressed(
                     CompressedPhotoUpdate(
@@ -469,7 +546,8 @@ class BatchMediaEditor(private val context: Context) {
                         newSizeBytes = compressedBytes,
                         newWidthPx = finalW,
                         newHeightPx = finalH,
-                        savedBytes = (photo.fileSizeBytes - compressedBytes).coerceAtLeast(0L)
+                        savedBytes = (photo.fileSizeBytes - compressedBytes).coerceAtLeast(0L),
+                        newCompressedPhoto = newCopy
                     )
                 )
             } finally {

@@ -3,6 +3,7 @@ package com.example.ui
 import android.app.Activity
 import android.app.PendingIntent
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -58,8 +59,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -78,10 +81,17 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -95,11 +105,13 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.R
 import com.example.data.MediaAccessLevel
+import com.example.data.PhotoItemEntity
 import com.example.ui.components.FrostedGlassCard
 import com.example.ui.components.FullScreenOverlayHost
 import com.example.ui.components.FullScreenOverlayLayer
 import com.example.ui.components.LocalFullScreenOverlayHost
 import com.example.ui.components.ObsidianGlassCard
+import com.example.ui.components.OnboardingGestureGuideOverlay
 import com.example.ui.components.activeChromeSatinBrush
 import com.example.ui.components.monthChineseName
 import com.example.ui.screens.ArcCleanerScreen
@@ -119,6 +131,7 @@ import com.example.ui.theme.LocalFlipYearPalette
 import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.StudioCanvas
 import com.example.ui.theme.SurfacePure
+import com.example.ui.theme.ThemePreferences
 
 val LocalFloatingDockInset = compositionLocalOf { 0.dp }
 
@@ -128,18 +141,29 @@ object FlipYearRoutes {
     const val MAP = "footprint_map"
     const val VAULT = "trash_vault"
     const val FLIPBOOK = "flipbook/{year}"
-    const val CLEANER = "arc_cleaner?year={year}&month={month}&day={day}&location={location}&includeReviewed={includeReviewed}"
+    const val CLEANER = "arc_cleaner?year={year}&month={month}&day={day}&location={location}&includeReviewed={includeReviewed}&source={source}"
 
     fun flipbook(year: Int) = "flipbook/$year"
 
-    fun cleanerForYear(year: Int, includeReviewed: Boolean) =
-        "arc_cleaner?year=$year&month=-1&day=-1&location=&includeReviewed=$includeReviewed"
+    fun cleanerForYear(
+        year: Int,
+        includeReviewed: Boolean,
+        source: CleanerEntrySource = CleanerEntrySource.BOOKSHELF
+    ) = "arc_cleaner?year=$year&month=-1&day=-1&location=&includeReviewed=$includeReviewed&source=${source.routeKey}"
 
-    fun cleanerForMonth(year: Int, month: Int, includeReviewed: Boolean, focusDay: Int? = null) =
-        "arc_cleaner?year=$year&month=$month&day=${focusDay ?: -1}&location=&includeReviewed=$includeReviewed"
+    fun cleanerForMonth(
+        year: Int,
+        month: Int,
+        includeReviewed: Boolean,
+        focusDay: Int? = null,
+        source: CleanerEntrySource = CleanerEntrySource.FLIPBOOK
+    ) = "arc_cleaner?year=$year&month=$month&day=${focusDay ?: -1}&location=&includeReviewed=$includeReviewed&source=${source.routeKey}"
 
-    fun cleanerForLocation(location: String, includeReviewed: Boolean) =
-        "arc_cleaner?year=-1&month=-1&day=-1&location=${Uri.encode(location)}&includeReviewed=$includeReviewed"
+    fun cleanerForLocation(
+        location: String,
+        includeReviewed: Boolean,
+        source: CleanerEntrySource = CleanerEntrySource.MAP
+    ) = "arc_cleaner?year=-1&month=-1&day=-1&location=${Uri.encode(location)}&includeReviewed=$includeReviewed&source=${source.routeKey}"
 }
 
 private data class TopLevelTab(
@@ -159,8 +183,12 @@ fun FlipYearApp(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val navController = rememberNavController()
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+
+    val onboardingPrefs = remember(context) { ThemePreferences(context) }
+    val hasSeenOnboarding by onboardingPrefs.hasSeenOnboardingGuide.collectAsStateWithLifecycle()
 
     val mediaPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
@@ -169,14 +197,42 @@ fun FlipYearApp(
         }
     )
 
+    var pendingPurgeTargets by remember { mutableStateOf<List<PhotoItemEntity>>(emptyList()) }
+
     val systemTrashLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult(),
         onResult = { result ->
-            if (result.resultCode == Activity.RESULT_OK) {
-                viewModel.finalizePurgeTrashed()
+            val targets = pendingPurgeTargets
+            pendingPurgeTargets = emptyList()
+            if (result.resultCode == Activity.RESULT_OK && targets.isNotEmpty()) {
+                viewModel.finalizePurgeTrashed(targets)
             }
         }
     )
+
+    var pendingLegacyConsentSender by remember { mutableStateOf<android.content.IntentSender?>(null) }
+
+    val legacyDeleteConsentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult(),
+        onResult = { result ->
+            viewModel.continuePendingLegacyPurge(
+                granted = result.resultCode == Activity.RESULT_OK,
+                onNeedRecoverableConsent = { nextSender ->
+                    pendingLegacyConsentSender = nextSender
+                }
+            )
+        }
+    )
+
+    LaunchedEffect(pendingLegacyConsentSender) {
+        val sender = pendingLegacyConsentSender ?: return@LaunchedEffect
+        pendingLegacyConsentSender = null
+        legacyDeleteConsentLauncher.launch(IntentSenderRequest.Builder(sender).build())
+    }
+
+    val launchLegacyConsent: (android.content.IntentSender) -> Unit = { sender ->
+        pendingLegacyConsentSender = sender
+    }
 
     val systemWriteLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult(),
@@ -203,12 +259,26 @@ fun FlipYearApp(
         mediaPermissionLauncher.launch(viewModel.requiredMediaPermissions())
     }
 
-    val confirmVaultPurge = {
-        val pendingIntent = viewModel.buildSystemTrashIntentForVault()
-        if (pendingIntent != null) {
-            systemTrashLauncher.launch(IntentSenderRequest.Builder(pendingIntent.intentSender).build())
-        } else {
-            viewModel.finalizePurgeTrashed()
+    val confirmVaultPurgeTargets: (List<PhotoItemEntity>) -> Unit = { targets ->
+        if (targets.isNotEmpty()) {
+            val hasDeviceItems = targets.any { !it.isSample && !it.contentUri.isNullOrBlank() }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val pendingIntent = viewModel.buildSystemTrashIntentForVault(targets)
+                if (pendingIntent != null) {
+                    pendingPurgeTargets = targets
+                    systemTrashLauncher.launch(IntentSenderRequest.Builder(pendingIntent.intentSender).build())
+                } else {
+                    viewModel.finalizePurgeTrashed(targets)
+                }
+            } else if (hasDeviceItems) {
+                // Stage 1.1: Real per-item ContentResolver.delete + API 29 RecoverableSecurityException consent
+                viewModel.purgeLegacyPhotos(
+                    targets = targets,
+                    onNeedRecoverableConsent = launchLegacyConsent
+                )
+            } else {
+                viewModel.finalizePurgeTrashed(targets)
+            }
         }
     }
 
@@ -297,6 +367,12 @@ fun FlipYearApp(
                         ) {
                         tabs.forEach { tab ->
                             val selected = currentRoute == tab.route
+                            val tabLabel = stringResource(tab.labelRes)
+                            val railDesc = if (tab.route == FlipYearRoutes.VAULT && uiState.trashedPhotos.isNotEmpty()) {
+                                "$tabLabel，${uiState.trashedPhotos.size} 项待清理"
+                            } else {
+                                tabLabel
+                            }
                             NavigationRailItem(
                                 selected = selected,
                                 onClick = { navigateToTab(tab.route) },
@@ -305,12 +381,13 @@ fun FlipYearApp(
                                         tab = tab,
                                         selected = selected,
                                         trashedCount = uiState.trashedPhotos.size,
-                                        tint = if (selected) CobaltPrimary else InkSecondary
+                                        tint = if (selected) CobaltPrimary else InkSecondary,
+                                        decorative = true
                                     )
                                 },
                                 label = {
                                     Text(
-                                        text = stringResource(tab.labelRes),
+                                        text = tabLabel,
                                         style = MaterialTheme.typography.labelSmall
                                     )
                                 },
@@ -321,7 +398,13 @@ fun FlipYearApp(
                                     unselectedIconColor = InkSecondary,
                                     unselectedTextColor = InkSecondary
                                 ),
-                                modifier = Modifier.testTag(tab.testTag)
+                                modifier = Modifier
+                                    .semantics {
+                                        contentDescription = railDesc
+                                        role = Role.Tab
+                                        this.selected = selected
+                                    }
+                                    .testTag(tab.testTag)
                             )
                         }
                     }
@@ -351,15 +434,23 @@ fun FlipYearApp(
                                     navController.navigate(FlipYearRoutes.flipbook(year))
                                 },
                                 onStartYearCleanup = { year, includeReviewed ->
-                                    navController.navigate(FlipYearRoutes.cleanerForYear(year, includeReviewed))
+                                    navController.navigate(
+                                        FlipYearRoutes.cleanerForYear(
+                                            year = year,
+                                            includeReviewed = includeReviewed,
+                                            source = CleanerEntrySource.BOOKSHELF
+                                        )
+                                    )
                                 },
                                 onOpenVault = {
+                                    viewModel.setVaultSessionFilter(null)
                                     navigateToTab(FlipYearRoutes.VAULT)
                                 },
                                 onRequestMediaPermission = requestMediaAccess,
                                 onRescanDeviceMedia = { viewModel.scanDeviceMedia(silent = false) },
                                 onSelectFilter = viewModel::setMediaFilter,
                                 onLoadDemoArchive = viewModel::loadDemoArchive,
+                                onRemoveDemoArchive = viewModel::removeDemoArchive,
                                 onSaveYearbookCover = viewModel::saveYearbookCover,
                                 onResetYearbookCover = viewModel::resetYearbookCoverToSmart
                             )
@@ -370,8 +461,9 @@ fun FlipYearApp(
                                 uiState = uiState,
                                 onSelectBestInBurst = viewModel::selectBestInStack,
                                 onKeepBestInBurst = viewModel::keepBestInGalleryBurst,
-                                onKeepPhoto = viewModel::keepPhoto,
-                                onTrashPhoto = viewModel::swipeTrashPhoto,
+                                onKeepPhoto = { photo, fav -> viewModel.keepPhoto(photo, fav, fromCleanerSession = false) },
+                                onToggleFavorite = viewModel::toggleFavoritePhoto,
+                                onTrashPhoto = { photo -> viewModel.swipeTrashPhoto(photo, fromCleanerSession = false) },
                                 onLoadDemoArchive = viewModel::loadDemoArchive,
                                 onBulkTrashPhotos = viewModel::bulkTrashPhotos,
                                 onBulkKeepPhotos = viewModel::bulkKeepPhotos,
@@ -399,11 +491,16 @@ fun FlipYearApp(
                                 uiState = uiState,
                                 onCleanLocation = { locName, includeReviewed ->
                                     navController.navigate(
-                                        FlipYearRoutes.cleanerForLocation(locName, includeReviewed)
+                                        FlipYearRoutes.cleanerForLocation(
+                                            location = locName,
+                                            includeReviewed = includeReviewed,
+                                            source = CleanerEntrySource.MAP
+                                        )
                                     )
                                 },
-                                onKeepPhoto = viewModel::keepPhoto,
-                                onTrashPhoto = viewModel::swipeTrashPhoto,
+                                onKeepPhoto = { photo, fav -> viewModel.keepPhoto(photo, fav, fromCleanerSession = false) },
+                                onToggleFavorite = viewModel::toggleFavoritePhoto,
+                                onTrashPhoto = { photo -> viewModel.swipeTrashPhoto(photo, fromCleanerSession = false) },
                                 onRequestMediaLocationPermission = requestMediaAccess,
                                 onTriggerGpsBackfill = { forceRescan ->
                                     viewModel.startFullGpsBackfill(
@@ -429,8 +526,9 @@ fun FlipYearApp(
                             TrashVaultScreen(
                                 uiState = uiState,
                                 onRestorePhoto = viewModel::restoreFromVault,
-                                onRestoreAll = viewModel::restoreAllFromVault,
-                                onConfirmPurgeAll = confirmVaultPurge
+                                onRestoreAll = { targets -> viewModel.restoreAllFromVault(targets) },
+                                onConfirmPurgeTargets = confirmVaultPurgeTargets,
+                                onClearSessionFilter = { viewModel.setVaultSessionFilter(null) }
                             )
                         }
 
@@ -449,13 +547,20 @@ fun FlipYearApp(
                                 onBack = { navController.popBackStack() },
                                 onStartMonthCleanup = { y, m, includeReviewed, focusDay ->
                                     navController.navigate(
-                                        FlipYearRoutes.cleanerForMonth(y, m, includeReviewed, focusDay)
+                                        FlipYearRoutes.cleanerForMonth(
+                                            year = y,
+                                            month = m,
+                                            includeReviewed = includeReviewed,
+                                            focusDay = focusDay,
+                                            source = CleanerEntrySource.FLIPBOOK
+                                        )
                                     )
                                 },
                                 onSelectBestInBurst = viewModel::selectBestInStack,
                                 onKeepBestInBurst = viewModel::keepBestInGalleryBurst,
-                                onKeepPhoto = viewModel::keepPhoto,
-                                onTrashPhoto = viewModel::swipeTrashPhoto
+                                onKeepPhoto = { photo, fav -> viewModel.keepPhoto(photo, fav, fromCleanerSession = false) },
+                                onToggleFavorite = viewModel::toggleFavoritePhoto,
+                                onTrashPhoto = { photo -> viewModel.swipeTrashPhoto(photo, fromCleanerSession = false) }
                             )
                         }
 
@@ -466,7 +571,8 @@ fun FlipYearApp(
                                 navArgument("month") { type = NavType.IntType; defaultValue = -1 },
                                 navArgument("day") { type = NavType.IntType; defaultValue = -1 },
                                 navArgument("location") { type = NavType.StringType; defaultValue = "" },
-                                navArgument("includeReviewed") { type = NavType.BoolType; defaultValue = false }
+                                navArgument("includeReviewed") { type = NavType.BoolType; defaultValue = false },
+                                navArgument("source") { type = NavType.StringType; defaultValue = CleanerEntrySource.BOOKSHELF.routeKey }
                             )
                         ) { entry ->
                             val yearArg = entry.arguments?.getInt("year")?.takeIf { it > 0 }
@@ -474,6 +580,11 @@ fun FlipYearApp(
                             val dayArg = entry.arguments?.getInt("day")?.takeIf { it in 1..31 }
                             val locArg = entry.arguments?.getString("location")?.takeIf { it.isNotBlank() }
                             val includeReviewed = entry.arguments?.getBoolean("includeReviewed") ?: false
+                            val entrySource = CleanerEntrySource.fromRouteKey(entry.arguments?.getString("source"))
+
+                            LaunchedEffect(entry.id) {
+                                viewModel.resetCleanerSessionUndo()
+                            }
 
                             val queue = remember(yearArg, monthArg, locArg, includeReviewed, uiState.allPhotos) {
                                 viewModel.buildArcQueue(
@@ -497,16 +608,40 @@ fun FlipYearApp(
                                 title = headerTitle,
                                 monthNumber = monthArg,
                                 initialFocusDay = dayArg,
+                                includeReviewed = includeReviewed,
+                                entrySource = entrySource,
                                 queue = queue,
-                                pendingTrashBytes = uiState.pendingTrashBytes,
-                                undoStackDepth = uiState.undoStackDepth,
+                                undoStackDepth = uiState.cleanerSessionUndoDepth,
                                 onBack = { navController.popBackStack() },
-                                onKeepPhoto = viewModel::keepPhoto,
-                                onTrashPhoto = viewModel::swipeTrashPhoto,
-                                onKeepBestInStack = viewModel::keepBestAndTrashStackOthers,
-                                onTrashEntireStack = viewModel::trashEntireStack,
+                                onOpenVaultForSession = { sessionTrashedIds ->
+                                    viewModel.setVaultSessionFilter(sessionTrashedIds)
+                                    navController.navigate(FlipYearRoutes.VAULT) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = false
+                                    }
+                                },
+                                onKeepPhoto = { photo, fav ->
+                                    viewModel.keepPhoto(photo, fav, fromCleanerSession = true)
+                                },
+                                onTrashPhoto = { photo ->
+                                    viewModel.swipeTrashPhoto(photo, fromCleanerSession = true)
+                                },
+                                onKeepEntireStack = { stack, fav ->
+                                    viewModel.keepEntireBurstStack(stack, fav, fromCleanerSession = true)
+                                },
+                                onKeepBestInStack = { stack, chosen ->
+                                    viewModel.keepBestAndTrashStackOthers(stack, chosen, fromCleanerSession = true)
+                                },
+                                onTrashEntireStack = { stack ->
+                                    viewModel.trashEntireStack(stack, fromCleanerSession = true)
+                                },
                                 onSelectBestInStack = viewModel::selectBestInStack,
-                                onUndo = viewModel::undoLastAction
+                                onUndoSession = { triggeredByShake ->
+                                    viewModel.undoCleanerSessionAction(triggeredByShake = triggeredByShake)
+                                }
                             )
                         }
                     }
@@ -566,60 +701,65 @@ fun FlipYearApp(
                         }
                     }
 
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = uiState.feedbackBanner != null && uiState.batchTaskMessage == null,
-                        enter = fadeIn() + slideInVertically { -it },
-                        exit = fadeOut() + slideOutVertically { -it },
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .statusBarsPadding()
-                            .padding(top = 12.dp, start = 20.dp, end = 20.dp)
-                    ) {
-                        uiState.feedbackBanner?.let { message ->
-                            ObsidianGlassCard(
-                                onClick = viewModel::dismissBanner,
-                                shape = RoundedCornerShape(50),
-                                shadowElevation = 12.dp
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(
-                                        start = 16.dp,
-                                        end = if (uiState.undoStackDepth > 0) 8.dp else 16.dp,
-                                        top = 8.dp,
-                                        bottom = 8.dp
-                                    ),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Text(
-                                        text = message,
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = Color.White,
-                                        modifier = Modifier.weight(1f, fill = false)
-                                    )
-                                    if (uiState.undoStackDepth > 0) {
-                                        Surface(
-                                            onClick = {
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                viewModel.undoLastAction(triggeredByShake = false)
-                                            },
-                                            shape = RoundedCornerShape(50),
-                                            color = CobaltPrimary,
-                                            modifier = Modifier.testTag("banner_undo_button")
-                                        ) {
-                                            Text(
-                                                text = stringResource(R.string.action_undo),
-                                                style = MaterialTheme.typography.labelMedium,
-                                                color = Color.White,
-                                                modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp)
-                                            )
-                                        }
+                }
+                }
+
+                // Stage 1.4: Bottom Material 3 Snackbar positioned above the Floating Gallery Dock,
+                // carrying each message's own bound UndoSnapshot and explicit undo copy (>=4s).
+                val snackbarBottomPadding = when {
+                    showTopLevelNav && !useNavigationRail && !isGallerySelectionMode -> 84.dp
+                    isGallerySelectionMode -> 92.dp
+                    else -> 16.dp
+                }
+                AnimatedVisibility(
+                    visible = uiState.snackbarMessage != null && uiState.batchTaskMessage == null,
+                    enter = fadeIn(tween(180)) + slideInVertically(initialOffsetY = { it / 2 }),
+                    exit = fadeOut(tween(150)) + slideOutVertically(targetOffsetY = { it / 2 }),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(start = 16.dp, end = 16.dp, bottom = snackbarBottomPadding)
+                        .widthIn(max = 460.dp)
+                        .testTag("bottom_feedback_snackbar")
+                ) {
+                    uiState.snackbarMessage?.let { snack ->
+                        val isDark = LocalIsDarkTheme.current
+                        Snackbar(
+                            shape = RoundedCornerShape(18.dp),
+                            containerColor = if (isDark) Color(0xFF1F2636) else Color(0xFF1A1F2C),
+                            contentColor = Color.White,
+                            actionContentColor = Color(0xFF7CA7FF),
+                            action = snack.undoSnapshot?.let { boundSnapshot ->
+                                {
+                                    TextButton(
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            viewModel.undoBySnapshot(boundSnapshot)
+                                        },
+                                        modifier = Modifier.testTag("banner_undo_button")
+                                    ) {
+                                        Text(
+                                            text = snack.undoLabel ?: stringResource(R.string.action_undo),
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF8AB4FF),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                     }
                                 }
-                            }
+                            },
+                            modifier = Modifier.clickable { viewModel.dismissBanner() }
+                        ) {
+                            Text(
+                                text = snack.text,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
-                }
                 }
 
                 // Truly floating pill bar overlaid directly above full-bleed content (zero opaque dock background)
@@ -652,6 +792,13 @@ fun FlipYearApp(
                 // True full-screen edge-to-edge overlay layer (e.g. PhotoDetailLightbox) inside
                 // MainActivity's window so system bars, cutouts, and bottom docks never clip.
                 FullScreenOverlayLayer(host = fullScreenOverlayHost)
+
+                // Stage 4: One-time skippable gesture guide shown once on first launch
+                if (!hasSeenOnboarding && !uiState.isLoading) {
+                    OnboardingGestureGuideOverlay(
+                        onDismiss = { onboardingPrefs.markOnboardingGuideSeen() }
+                    )
+                }
             }
         }
     }
@@ -702,6 +849,12 @@ private fun FloatingGalleryDock(
         ) {
             tabs.forEach { tab ->
                 val selected = currentRoute == tab.route
+                val tabLabel = stringResource(tab.labelRes)
+                val tabAccessibilityDesc = if (tab.route == FlipYearRoutes.VAULT && trashedCount > 0) {
+                    "$tabLabel，${trashedCount} 项待清理"
+                } else {
+                    tabLabel
+                }
                 val contentColor by animateColorAsState(
                     targetValue = if (selected) Color.White else InkSecondary,
                     animationSpec = tween(200),
@@ -731,7 +884,12 @@ private fun FloatingGalleryDock(
                                 Modifier
                             }
                         )
-                        .clickable { onSelectTab(tab.route) }
+                        .semantics(mergeDescendants = true) {
+                            contentDescription = tabAccessibilityDesc
+                            role = Role.Tab
+                            this.selected = selected
+                        }
+                        .clickable(role = Role.Tab) { onSelectTab(tab.route) }
                         .animateContentSize(
                             animationSpec = spring(
                                 dampingRatio = Spring.DampingRatioLowBouncy,
@@ -745,13 +903,14 @@ private fun FloatingGalleryDock(
                         tab = tab,
                         selected = selected,
                         trashedCount = trashedCount,
-                        tint = contentColor
+                        tint = contentColor,
+                        decorative = true
                     )
                     AnimatedVisibility(visible = selected) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Spacer(modifier = Modifier.width(7.dp))
                             Text(
-                                text = stringResource(tab.labelRes),
+                                text = tabLabel,
                                 style = MaterialTheme.typography.labelLarge,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
@@ -771,9 +930,11 @@ private fun TabIconWithBadge(
     tab: TopLevelTab,
     selected: Boolean,
     trashedCount: Int,
-    tint: Color
+    tint: Color,
+    decorative: Boolean = false
 ) {
     val iconVector = if (selected) tab.selectedIcon else tab.unselectedIcon
+    val iconDesc = if (decorative) null else stringResource(tab.labelRes)
     if (tab.route == FlipYearRoutes.VAULT && trashedCount > 0) {
         BadgedBox(
             badge = {
@@ -787,7 +948,7 @@ private fun TabIconWithBadge(
         ) {
             Icon(
                 imageVector = iconVector,
-                contentDescription = stringResource(tab.labelRes),
+                contentDescription = iconDesc,
                 tint = tint,
                 modifier = Modifier.size(22.dp)
             )
@@ -795,7 +956,7 @@ private fun TabIconWithBadge(
     } else {
         Icon(
             imageVector = iconVector,
-            contentDescription = stringResource(tab.labelRes),
+            contentDescription = iconDesc,
             tint = tint,
             modifier = Modifier.size(22.dp)
         )

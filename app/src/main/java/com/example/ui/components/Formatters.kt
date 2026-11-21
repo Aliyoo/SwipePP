@@ -21,6 +21,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,19 +54,19 @@ fun formatVideoDuration(durationMs: Long): String {
 }
 
 fun monthEnglishName(month: Int): String = when (month) {
-    1 -> "JAN"
-    2 -> "FEB"
-    3 -> "MAR"
-    4 -> "APR"
-    5 -> "MAY"
-    6 -> "JUN"
-    7 -> "JUL"
-    8 -> "AUG"
-    9 -> "SEP"
-    10 -> "OCT"
-    11 -> "NOV"
-    12 -> "DEC"
-    else -> "MON"
+    1 -> "一月"
+    2 -> "二月"
+    3 -> "三月"
+    4 -> "四月"
+    5 -> "五月"
+    6 -> "六月"
+    7 -> "七月"
+    8 -> "八月"
+    9 -> "九月"
+    10 -> "十月"
+    11 -> "十一月"
+    12 -> "十二月"
+    else -> "${month}月"
 }
 
 fun formatMonthSummaryStamp(year: Int, month: Int): String = "${year}年${month}月"
@@ -81,14 +83,18 @@ fun formatShortTime(millis: Long): String {
     return sdf.format(Date(millis))
 }
 
-fun daysRemainingInVault(trashedAtMillis: Long?): Int {
-    if (trashedAtMillis == null) return 30
-    val elapsedDays = ((System.currentTimeMillis() - trashedAtMillis) / 86_400_000L).toInt()
-    return (30 - elapsedDays).coerceIn(1, 30)
+fun daysStagedInVault(trashedAtMillis: Long?, nowMillis: Long = System.currentTimeMillis()): Int {
+    if (trashedAtMillis == null) return 0
+    return ((nowMillis - trashedAtMillis) / 86_400_000L).toInt().coerceAtLeast(0)
+}
+
+fun formatVaultStagedLabel(trashedAtMillis: Long?, nowMillis: Long = System.currentTimeMillis()): String {
+    val days = daysStagedInVault(trashedAtMillis, nowMillis)
+    return if (days <= 0) "已暂存 <1 天" else "已暂存 $days 天"
 }
 
 /**
- * Clean, modern emerald completion seal badge for finished months (replaces vintage ink stamp).
+ * Clean, modern emerald completion seal badge for finished months (non-interactive status seal).
  */
 @Composable
 fun CleanedCompletionBadge(
@@ -113,17 +119,27 @@ fun CleanedCompletionBadge(
         }
     }
 
+    val statusDesc = if (freedBytes > 0L) {
+        "${month}月已整理完成，待释放或已释放 ${formatStorageSize(freedBytes)}"
+    } else {
+        "${month}月已整理完成，全部保留"
+    }
+
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = EmeraldSoft,
         border = BorderStroke(1.2.dp, EmeraldKeep.copy(alpha = 0.45f)),
         shadowElevation = 2.dp,
-        modifier = modifier.graphicsLayer {
-            scaleX = scale.value
-            scaleY = scale.value
-            this.alpha = alpha.value
-            rotationZ = -4f
-        }
+        modifier = modifier
+            .semantics(mergeDescendants = true) {
+                contentDescription = statusDesc
+            }
+            .graphicsLayer {
+                scaleX = scale.value
+                scaleY = scale.value
+                this.alpha = alpha.value
+                rotationZ = -4f
+            }
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),

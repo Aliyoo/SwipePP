@@ -50,6 +50,6 @@ class ShakeDetector(context: Context) {
 
     companion object {
         private const val SHAKE_THRESHOLD_G = 2.35f
-        private const val SHAKE_COOLDOWN_MS = 1000L
+        private const val SHAKE_COOLDOWN_MS = 3000L
     }
 }

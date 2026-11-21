@@ -321,16 +321,35 @@ class PhotoRepository(
     ): BatchCompressionResult = withContext(Dispatchers.IO) {
         val result = batchEditor.compressPhotosNearLossless(photos, preset, onProgress)
         if (result.compressedUpdates.isNotEmpty()) {
-            dao.applyCompressedPhotosBatch(result.compressedUpdates)
+            val newCopies = result.compressedUpdates.mapNotNull { it.newCompressedPhoto }
+            val originalIds = result.compressedUpdates.map { it.id }
+            if (newCopies.size == originalIds.size) {
+                dao.applySafeCompressedPhotosBatch(
+                    newCompressedPhotos = newCopies,
+                    originalPhotoIdsToTrash = originalIds,
+                    trashedAtMillis = System.currentTimeMillis()
+                )
+            } else {
+                dao.applyCompressedPhotosBatch(result.compressedUpdates)
+            }
             val saved = result.totalSavedBytes
             if (saved > 0L) {
                 val current = dao.getCleanupStatsSync() ?: CleanupStatsEntity()
                 dao.upsertCleanupStats(
-                    current.copy(totalPurgedBytes = current.totalPurgedBytes + saved)
+                    current.copy(
+                        totalCompressedSavedBytes = current.totalCompressedSavedBytes + saved,
+                        totalCompressedCount = current.totalCompressedCount + result.compressedUpdates.size
+                    )
                 )
             }
         }
         result
+    }
+
+    suspend fun removeSamplePhotos(): Int {
+        val removed = dao.deleteSamplePhotos()
+        dao.clearAllMonthStamps()
+        return removed
     }
 
     suspend fun applyManualLocationsBatch(
@@ -350,6 +369,18 @@ class PhotoRepository(
     suspend fun geocodeLocationQuery(query: String): ResolvedGeoLocation? {
         return batchEditor.geocodeLocationQuery(query)
     }
+
+    suspend fun purgeLegacyDevicePhotos(photos: List<PhotoItemEntity>): LegacyDeleteResult =
+        withContext(Dispatchers.IO) {
+            if (photos.isEmpty()) {
+                return@withContext LegacyDeleteResult(emptyList(), emptyList())
+            }
+            val deleteResult = scanner.deleteDevicePhotosLegacy(photos)
+            if (deleteResult.deletedPhotos.isNotEmpty()) {
+                purgeTrashedPhotos(deleteResult.deletedPhotos)
+            }
+            deleteResult
+        }
 
     suspend fun purgeTrashedPhotos(photos: List<PhotoItemEntity>): Long {
         if (photos.isEmpty()) return 0L
