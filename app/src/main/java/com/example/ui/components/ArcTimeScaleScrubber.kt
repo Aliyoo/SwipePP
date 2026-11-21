@@ -53,6 +53,7 @@ import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.SurfacePure
+import com.example.ui.theme.TimelineSortOrder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -71,6 +72,9 @@ private enum class ArcTimeGranularity {
  *
  * - Range adapts automatically to the active queue span (hours for 1 day, days for 1 month,
  *   months for full year / multi-month spans).
+ * - Direction strictly follows global [sortOrder]:
+ *   - [TimelineSortOrder.NEWEST_FIRST]: left = newest, right = oldest (progress fills left → right as deck advances)
+ *   - [TimelineSortOrder.OLDEST_FIRST]: left = oldest, right = newest
  * - A live cursor thumb reflects the current card's position along the arc.
  * - Dragging or tapping along the arc jumps to the card nearest that timestamp and triggers
  *   a light haptic tick on release.
@@ -80,6 +84,7 @@ fun ArcTimeScaleScrubber(
     queue: List<CleanupCardItem>,
     currentIndex: Int,
     onJumpToIndex: (Int) -> Unit,
+    sortOrder: TimelineSortOrder = TimelineSortOrder.NEWEST_FIRST,
     modifier: Modifier = Modifier
 ) {
     if (queue.isEmpty()) return
@@ -87,6 +92,7 @@ fun ArcTimeScaleScrubber(
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
     val isDark = LocalIsDarkTheme.current
+    val isDescending = sortOrder == TimelineSortOrder.NEWEST_FIRST
 
     val timestamps = remember(queue) {
         queue.map { it.primaryPhoto.takenAtMillis }
@@ -94,6 +100,8 @@ fun ArcTimeScaleScrubber(
     val minTs = remember(timestamps) { timestamps.minOrNull() ?: 0L }
     val maxTs = remember(timestamps) { timestamps.maxOrNull() ?: minTs }
     val spanMs = (maxTs - minTs).coerceAtLeast(1L)
+    val startTs = if (isDescending) maxTs else minTs
+    val endTs = if (isDescending) minTs else maxTs
 
     val granularity = remember(spanMs) {
         when {
@@ -106,14 +114,17 @@ fun ArcTimeScaleScrubber(
     val safeIndex = currentIndex.coerceIn(0, queue.lastIndex)
     val currentTs = timestamps[safeIndex]
 
-    val currentFractionFromQueue = remember(safeIndex, timestamps, minTs, maxTs, queue.size) {
-        if (queue.size <= 1) {
-            0.5f
-        } else if (maxTs > minTs) {
-            ((currentTs - minTs).toDouble() / (maxTs - minTs).toDouble()).toFloat().coerceIn(0f, 1f)
-        } else {
-            (safeIndex.toFloat() / queue.lastIndex.toFloat()).coerceIn(0f, 1f)
+    fun timestampToFraction(ts: Long, fallbackIndex: Int): Float {
+        if (queue.size <= 1) return 0.5f
+        if (maxTs <= minTs) {
+            return (fallbackIndex.toFloat() / queue.lastIndex.toFloat()).coerceIn(0f, 1f)
         }
+        val normalizedAsc = ((ts - minTs).toDouble() / (maxTs - minTs).toDouble()).toFloat().coerceIn(0f, 1f)
+        return if (isDescending) (1f - normalizedAsc) else normalizedAsc
+    }
+
+    val currentFractionFromQueue = remember(safeIndex, timestamps, minTs, maxTs, queue.size, isDescending) {
+        timestampToFraction(currentTs, safeIndex)
     }
 
     var isDragging by remember { mutableStateOf(false) }
@@ -123,22 +134,35 @@ fun ArcTimeScaleScrubber(
 
     val activeFraction = if (isDragging) dragFraction else currentFractionFromQueue
     val activeTimestamp = if (isDragging && maxTs > minTs) {
-        minTs + (spanMs * dragFraction).toLong()
+        val clamped = dragFraction.coerceIn(0f, 1f)
+        if (isDescending) {
+            maxTs - (spanMs * clamped).toLong()
+        } else {
+            minTs + (spanMs * clamped).toLong()
+        }
     } else {
         currentTs
     }
 
     val latestTimestamps by rememberUpdatedState(timestamps)
+    val latestMinTs by rememberUpdatedState(minTs)
+    val latestMaxTs by rememberUpdatedState(maxTs)
+    val latestSpanMs by rememberUpdatedState(spanMs)
+    val latestIsDescending by rememberUpdatedState(isDescending)
     val latestOnJump by rememberUpdatedState(onJumpToIndex)
 
     fun nearestIndexForFraction(t: Float): Int {
         val tsList = latestTimestamps
         if (tsList.size <= 1) return 0
         val clamped = t.coerceIn(0f, 1f)
-        if (maxTs <= minTs) {
+        if (latestMaxTs <= latestMinTs) {
             return (clamped * tsList.lastIndex).roundToInt().coerceIn(0, tsList.lastIndex)
         }
-        val targetTs = minTs + (spanMs * clamped).toLong()
+        val targetTs = if (latestIsDescending) {
+            latestMaxTs - (latestSpanMs * clamped).toLong()
+        } else {
+            latestMinTs + (latestSpanMs * clamped).toLong()
+        }
         var bestIdx = 0
         var bestDiff = Long.MAX_VALUE
         for (i in tsList.indices) {
@@ -151,28 +175,23 @@ fun ArcTimeScaleScrubber(
         return bestIdx
     }
 
-    val startLabel = remember(minTs, granularity) { formatArcTickLabel(minTs, granularity) }
+    val startLabel = remember(startTs, granularity) { formatArcTickLabel(startTs, granularity) }
     val midLabel = remember(minTs, maxTs, granularity) {
         formatArcTickLabel(minTs + (maxTs - minTs) / 2L, granularity)
     }
-    val endLabel = remember(maxTs, granularity) { formatArcTickLabel(maxTs, granularity) }
+    val endLabel = remember(endTs, granularity) { formatArcTickLabel(endTs, granularity) }
     val currentLabel = remember(activeTimestamp, granularity) {
         formatArcCursorLabel(activeTimestamp, granularity)
     }
 
-    val burstFractions = remember(queue, timestamps, minTs, maxTs) {
+    val burstFractions = remember(queue, timestamps, minTs, maxTs, isDescending) {
         if (queue.size <= 1) {
             emptyList()
         } else {
             val out = ArrayList<Float>()
             for (i in queue.indices) {
                 if (queue[i] is CleanupCardItem.BurstStack) {
-                    val frac = if (maxTs > minTs) {
-                        ((timestamps[i] - minTs).toDouble() / (maxTs - minTs).toDouble()).toFloat().coerceIn(0f, 1f)
-                    } else {
-                        (i.toFloat() / queue.lastIndex.toFloat()).coerceIn(0f, 1f)
-                    }
-                    out.add(frac)
+                    out.add(timestampToFraction(timestamps[i], i))
                 }
             }
             out
@@ -203,7 +222,7 @@ fun ArcTimeScaleScrubber(
                     true
                 }
             }
-            .pointerInput(queue.size, minTs, maxTs) {
+            .pointerInput(queue.size, minTs, maxTs, isDescending) {
                 detectTapGestures { offset ->
                     val padPx = with(density) { 14.dp.toPx() }
                     val usable = (size.width - padPx * 2f).coerceAtLeast(1f)
@@ -213,7 +232,7 @@ fun ArcTimeScaleScrubber(
                     latestOnJump(idx)
                 }
             }
-            .pointerInput(queue.size, minTs, maxTs) {
+            .pointerInput(queue.size, minTs, maxTs, isDescending) {
                 detectHorizontalDragGestures(
                     onDragStart = { startOffset ->
                         isDragging = true
@@ -345,6 +364,7 @@ fun ArcTimeScaleScrubber(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(start = 6.dp, bottom = 0.dp)
+                .testTag("arc_scrubber_start_label")
         )
         Text(
             text = if (isDragging) currentLabel else midLabel,
@@ -364,6 +384,7 @@ fun ArcTimeScaleScrubber(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 6.dp, bottom = 0.dp)
+                .testTag("arc_scrubber_end_label")
         )
 
         // Floating live timestamp callout while scrubbing

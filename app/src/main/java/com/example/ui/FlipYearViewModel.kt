@@ -284,7 +284,10 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = FlipYearUiState(isLoading = true)
+        initialValue = FlipYearUiState(
+            isLoading = true,
+            timelineSortOrder = timelineSortOrder.value
+        )
     )
 
     init {

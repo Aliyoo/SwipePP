@@ -127,6 +127,7 @@ import com.example.ui.theme.SolarAmber
 import com.example.ui.theme.SolarAmberSoft
 import com.example.ui.theme.SurfaceMuted
 import com.example.ui.theme.SurfacePure
+import com.example.ui.theme.TimelineSortOrder
 import com.example.ui.theme.VioletVideo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -166,6 +167,7 @@ fun ArcCleanerScreen(
     includeReviewed: Boolean = false,
     entrySource: CleanerEntrySource = CleanerEntrySource.BOOKSHELF,
     initialFocusDay: Int? = null,
+    timelineSortOrder: TimelineSortOrder = TimelineSortOrder.NEWEST_FIRST,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -699,6 +701,7 @@ fun ArcCleanerScreen(
                 ArcTimeScaleScrubber(
                     queue = displayedQueue,
                     currentIndex = safePage,
+                    sortOrder = timelineSortOrder,
                     onJumpToIndex = { targetIdx ->
                         if (targetIdx in displayedQueue.indices && targetIdx != pagerState.currentPage) {
                             scope.launch {

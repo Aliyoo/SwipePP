@@ -696,6 +696,7 @@ fun FlipYearApp(
                                 initialFocusDay = dayArg,
                                 includeReviewed = includeReviewed,
                                 entrySource = entrySource,
+                                timelineSortOrder = uiState.timelineSortOrder,
                                 queue = queue,
                                 undoStackDepth = uiState.cleanerSessionUndoDepth,
                                 onBack = { navController.popBackStack() },

@@ -1,20 +1,37 @@
 package com.example
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertRangeInfoEquals
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.runtime.mutableStateOf
 import com.example.data.MediaAccessLevel
 import com.example.data.PhotoItemEntity
 import com.example.data.PhotoStatus
+import androidx.compose.ui.geometry.Offset
 import com.example.ui.CleanupCardItem
 import com.example.ui.FlipYearUiState
+import com.example.ui.LocationCluster
 import com.example.ui.MediaFilter
+import com.example.ui.components.ArcTimeScaleScrubber
+import com.example.ui.components.CHINA_DEFAULT_LAT
+import com.example.ui.components.CHINA_DEFAULT_LON
+import com.example.ui.components.CHINA_DEFAULT_ZOOM
+import com.example.ui.components.ProjectedClusterMeta
+import com.example.ui.components.buildVisibleAggregatedPins
+import com.example.ui.components.computeChinaFocusTarget
 import com.example.ui.components.formatEditorialPhotoTitle
+import com.example.ui.components.isInsideChinaMainland
 import com.example.ui.components.isMachineGeneratedFilename
+import com.example.ui.components.latToNormY
+import com.example.ui.components.lonToNormX
 import com.example.ui.domain.LibraryDerivationEngine
 import com.example.ui.screens.BookshelfScreen
 import com.example.ui.screens.GalleryScreen
+import kotlin.math.hypot
 import androidx.test.core.app.ApplicationProvider
 import com.example.ui.theme.DefaultStartTab
 import com.example.ui.theme.FlipYearTheme
@@ -184,6 +201,44 @@ class RefactoringVerificationTest {
     }
 
     @Test
+    fun arcTimeScaleScrubber_followsGlobalSortOrderEndpointsAndProgress() {
+        val marMillis = java.util.Calendar.getInstance().apply { set(2026, 2, 10, 10, 0, 0) }.timeInMillis
+        val novMillis = java.util.Calendar.getInstance().apply { set(2026, 10, 20, 18, 0, 0) }.timeInMillis
+        val pMar = photo(201L, year = 2026, month = 3, day = 10).copy(takenAtMillis = marMillis)
+        val pNov = photo(202L, year = 2026, month = 11, day = 20).copy(takenAtMillis = novMillis)
+
+        val sortOrderState = mutableStateOf(TimelineSortOrder.NEWEST_FIRST)
+        composeRule.setContent {
+            val order = sortOrderState.value
+            val queue = LibraryDerivationEngine.buildArcQueue(
+                allPhotos = listOf(pMar, pNov),
+                sortOrder = order
+            )
+            FlipYearTheme {
+                ArcTimeScaleScrubber(
+                    queue = queue,
+                    currentIndex = 0,
+                    sortOrder = order,
+                    onJumpToIndex = {}
+                )
+            }
+        }
+
+        // NEWEST_FIRST: index 0 is Nov -> left label = 11月, right label = 3月, progress starts at 0f (left)
+        composeRule.onNodeWithTag("arc_scrubber_start_label").assertTextEquals("11月")
+        composeRule.onNodeWithTag("arc_scrubber_end_label").assertTextEquals("3月")
+        composeRule.onNodeWithTag("arc_time_scale_scrubber")
+            .assertRangeInfoEquals(ProgressBarRangeInfo(0f, 0f..1f))
+
+        // Switch to OLDEST_FIRST: index 0 is Mar -> left label = 3月, right label = 11月, progress starts at 0f (left)
+        composeRule.runOnIdle { sortOrderState.value = TimelineSortOrder.OLDEST_FIRST }
+        composeRule.onNodeWithTag("arc_scrubber_start_label").assertTextEquals("3月")
+        composeRule.onNodeWithTag("arc_scrubber_end_label").assertTextEquals("11月")
+        composeRule.onNodeWithTag("arc_time_scale_scrubber")
+            .assertRangeInfoEquals(ProgressBarRangeInfo(0f, 0f..1f))
+    }
+
+    @Test
     fun galleryScreen_quickSmartFilterAndSwipeCleanBridgeAndGlobalFilterBanner() {
         val b1 = photo(1L, burstGroupId = "g1", fileSizeBytes = 1_500_000L)
         val b2 = photo(2L, burstGroupId = "g1", fileSizeBytes = 1_500_000L)
@@ -279,5 +334,104 @@ class RefactoringVerificationTest {
 
         assertEquals(2026, openedFlipbookYear)
         assertEquals(2026, startedCleanupYear)
+    }
+
+    @Test
+    fun footprintMap_chinaFocusTarget_framesChinaEvenWithOverseasClusters() {
+        fun makeCluster(name: String, lat: Double, lon: Double, count: Int): LocationCluster {
+            val items = (1..count).map { photo(it.toLong() + name.hashCode(), locationName = name) }
+            return LocationCluster(
+                locationName = name,
+                latitude = lat,
+                longitude = lon,
+                photos = items,
+                unreviewedCount = count,
+                totalBytes = items.sumOf { it.fileSizeBytes },
+                coverPhoto = items.first()
+            )
+        }
+
+        // Empty -> canonical China overview
+        val emptyTarget = computeChinaFocusTarget(emptyList())
+        assertEquals(CHINA_DEFAULT_LAT, emptyTarget.lat, 0.01)
+        assertEquals(CHINA_DEFAULT_LON, emptyTarget.lon, 0.01)
+        assertEquals(CHINA_DEFAULT_ZOOM, emptyTarget.zoom, 0.01f)
+
+        // Overseas-only -> still frames China cleanly on Chinese layer
+        val overseasOnly = listOf(
+            makeCluster("巴黎", 48.8566, 2.3522, 6),
+            makeCluster("旧金山", 37.7749, -122.4194, 4)
+        )
+        val overseasTarget = computeChinaFocusTarget(overseasOnly)
+        assertEquals(CHINA_DEFAULT_LAT, overseasTarget.lat, 0.01)
+        assertEquals(CHINA_DEFAULT_LON, overseasTarget.lon, 0.01)
+        assertTrue(overseasTarget.zoom >= CHINA_DEFAULT_ZOOM)
+
+        // Mixed China + Overseas -> focuses China cities without zooming out to world level (2.0f)
+        val mixed = listOf(
+            makeCluster("北京", 39.9042, 116.4074, 15),
+            makeCluster("上海", 31.2304, 121.4737, 12),
+            makeCluster("巴黎", 48.8566, 2.3522, 9),
+            makeCluster("纽约", 40.7128, -74.0060, 8)
+        )
+        val mixedTarget = computeChinaFocusTarget(mixed)
+        assertTrue(isInsideChinaMainland(mixedTarget.lat, mixedTarget.lon))
+        assertTrue("Expected China zoom >= 3.45f, got ${mixedTarget.zoom}", mixedTarget.zoom >= CHINA_DEFAULT_ZOOM)
+    }
+
+    @Test
+    fun footprintMap_radialPinClustering_preventsOverlapAcrossGridBoundaries() {
+        fun makeMeta(name: String, count: Int, screenX: Float, screenY: Float): Pair<ProjectedClusterMeta, Offset> {
+            val items = (1..count).map { photo(it.toLong() + name.hashCode(), locationName = name) }
+            val cluster = LocationCluster(
+                locationName = name,
+                latitude = 31.2,
+                longitude = 121.4,
+                photos = items,
+                unreviewedCount = count,
+                totalBytes = items.sumOf { it.fileSizeBytes },
+                coverPhoto = items.first()
+            )
+            // Encode screenX/screenY via normX/normY for deterministic test projection
+            return ProjectedClusterMeta(cluster, screenX.toDouble(), screenY.toDouble()) to Offset(screenX, screenY)
+        }
+
+        // Two clusters sitting right across a 58px grid edge (57px vs 59px) plus nearby & distant clusters
+        val entries = listOf(
+            makeMeta("陆家嘴", 20, 57f, 100f),
+            makeMeta("外滩", 8, 59f, 101f),
+            makeMeta("静安寺", 5, 76f, 112f),
+            makeMeta("西湖", 14, 165f, 190f),
+            makeMeta("灵隐寺", 6, 178f, 198f),
+            makeMeta("夫子庙", 11, 260f, 120f)
+        )
+        val minSep = 48f
+        val pins = buildVisibleAggregatedPins(
+            metas = entries.map { it.first },
+            selectedLocationName = null,
+            viewportWidthPx = 400f,
+            viewportHeightPx = 600f,
+            minSeparationPx = minSep,
+            selectedSeparationPx = 56f,
+            maxVisiblePins = 12,
+            project = { nx, ny -> Offset(nx.toFloat(), ny.toFloat()) }
+        )
+
+        // Should cleanly merge into 3 well-separated stacks: 陆家嘴(+2), 西湖(+1), 夫子庙
+        assertEquals(3, pins.size)
+        val shanghaiPin = pins.first { it.primaryCluster.locationName == "陆家嘴" }
+        assertEquals(3, shanghaiPin.mergedClustersCount)
+        assertEquals(33, shanghaiPin.totalPhotosCount)
+
+        // Every pair of rendered pins must strictly respect minSeparationPx (zero overlaps)
+        for (i in pins.indices) {
+            for (j in i + 1 until pins.size) {
+                val dist = hypot(
+                    (pins[i].screenX - pins[j].screenX).toDouble(),
+                    (pins[i].screenY - pins[j].screenY).toDouble()
+                ).toFloat()
+                assertTrue("Pins overlapped: dist=$dist < minSep=$minSep", dist >= minSep)
+            }
+        }
     }
 }

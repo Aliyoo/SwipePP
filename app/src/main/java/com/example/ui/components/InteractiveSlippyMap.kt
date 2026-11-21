@@ -2,6 +2,9 @@ package com.example.ui.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -36,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -72,7 +76,6 @@ import com.example.ui.theme.EmeraldKeep
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LocalIsDarkTheme
-import com.example.ui.theme.ObsidianOverlayGlass
 import com.example.ui.theme.SurfacePure
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -101,9 +104,14 @@ enum class FootprintMapStyle(val label: String) {
 private const val MIN_ZOOM = 2.0f
 private const val MAX_ZOOM = 15.5f
 private const val BASE_TILE_DP = 256f
-private const val MAX_VISIBLE_PINS = 36
-private const val MAX_TRAVEL_ARCS = 28
+private const val MAX_TRAVEL_ARCS = 8
 private const val MAX_RENDERED_TILES = 120
+
+const val CHINA_DEFAULT_LAT = 35.4
+const val CHINA_DEFAULT_LON = 104.8
+const val CHINA_DEFAULT_ZOOM = 3.45f
+private const val CHINA_MIN_FIT_ZOOM = 3.45f
+private const val CHINA_MAX_FIT_ZOOM = 7.2f
 
 // Hue-preserving luminance inversion matrix (Invert * HueRotate180 scaled to 0.85 over #141822 obsidian base)
 // Turns daylight map tiles (AMap, ArcGIS, OSM) into sleek low-glare nocturnal darkroom cartography while keeping water blue and labels crisp.
@@ -131,7 +139,7 @@ fun latToNormY(lat: Double): Double {
     return if (ny.isFinite()) ny.coerceIn(0.0, 1.0) else 0.5
 }
 
-private fun isInsideChinaMainland(lat: Double, lon: Double): Boolean {
+fun isInsideChinaMainland(lat: Double, lon: Double): Boolean {
     return lat in 0.8293..55.8271 && lon in 72.004..137.8347
 }
 
@@ -166,13 +174,13 @@ private fun wrapNormX(x: Double): Double {
     return if (m < 0.0) m + 1.0 else m
 }
 
-private data class ProjectedClusterMeta(
+internal data class ProjectedClusterMeta(
     val cluster: LocationCluster,
     val normX: Double,
     val normY: Double
 )
 
-private data class DisplayedMapPin(
+internal data class DisplayedMapPin(
     val stableKey: String,
     val primaryCluster: LocationCluster,
     val mergedClustersCount: Int,
@@ -183,6 +191,67 @@ private data class DisplayedMapPin(
     val isSelected: Boolean
 )
 
+internal data class MapCameraTarget(
+    val lat: Double,
+    val lon: Double,
+    val zoom: Float,
+    val verticalBiasFraction: Float = 0.04f
+)
+
+internal fun computeChinaFocusTarget(clusters: List<LocationCluster>): MapCameraTarget {
+    val chinaClusters = clusters.filter { isInsideChinaMainland(it.latitude, it.longitude) }
+    if (chinaClusters.isEmpty()) {
+        return MapCameraTarget(
+            lat = CHINA_DEFAULT_LAT,
+            lon = CHINA_DEFAULT_LON,
+            zoom = CHINA_DEFAULT_ZOOM,
+            verticalBiasFraction = 0.04f
+        )
+    }
+    if (chinaClusters.size == 1) {
+        val only = chinaClusters.first()
+        return MapCameraTarget(
+            lat = only.latitude,
+            lon = only.longitude,
+            zoom = 5.8f,
+            verticalBiasFraction = 0.06f
+        )
+    }
+
+    var minX = Double.POSITIVE_INFINITY
+    var maxX = Double.NEGATIVE_INFINITY
+    var minY = Double.POSITIVE_INFINITY
+    var maxY = Double.NEGATIVE_INFINITY
+    var sumLat = 0.0
+    var sumLon = 0.0
+    for (c in chinaClusters) {
+        val x = lonToNormX(c.longitude)
+        val y = latToNormY(c.latitude)
+        if (x < minX) minX = x
+        if (x > maxX) maxX = x
+        if (y < minY) minY = y
+        if (y > maxY) maxY = y
+        sumLat += c.latitude
+        sumLon += c.longitude
+    }
+
+    val spanX = (maxX - minX).coerceAtLeast(0.01)
+    val spanY = (maxY - minY).coerceAtLeast(0.01)
+    val maxSpan = max(spanX * 1.48, spanY * 1.9)
+    val computedZoom = (ln(1.0 / maxSpan) / ln(2.0)).toFloat().coerceIn(CHINA_MIN_FIT_ZOOM, CHINA_MAX_FIT_ZOOM)
+    val centerLat = (chinaClusters.minOf { it.latitude } + chinaClusters.maxOf { it.latitude }) / 2.0
+    val centerLon = (chinaClusters.minOf { it.longitude } + chinaClusters.maxOf { it.longitude }) / 2.0
+    // Guard against degenerate coordinates
+    val safeLat = if (centerLat.isFinite()) centerLat else sumLat / chinaClusters.size
+    val safeLon = if (centerLon.isFinite()) centerLon else sumLon / chinaClusters.size
+    return MapCameraTarget(
+        lat = safeLat,
+        lon = safeLon,
+        zoom = computedZoom,
+        verticalBiasFraction = 0.05f
+    )
+}
+
 private data class TileCandidate(
     val url: String,
     val userAgent: String,
@@ -192,9 +261,9 @@ private data class TileCandidate(
 
 @Stable
 class SlippyMapCameraState(
-    initialLat: Double = 35.0,
-    initialLon: Double = 105.0,
-    initialZoom: Float = 3.2f
+    initialLat: Double = CHINA_DEFAULT_LAT,
+    initialLon: Double = CHINA_DEFAULT_LON,
+    initialZoom: Float = CHINA_DEFAULT_ZOOM
 ) {
     var centerX by mutableDoubleStateOf(lonToNormX(initialLon))
     var centerY by mutableDoubleStateOf(latToNormY(initialLat).coerceIn(0.08, 0.92))
@@ -299,6 +368,29 @@ class SlippyMapCameraState(
         animateToNorm(scope, targetX, targetY, computedZoom, durationMs)
     }
 
+    fun focusChinaRegion(
+        scope: CoroutineScope,
+        clusters: List<LocationCluster>,
+        durationMs: Int = 520
+    ) {
+        val target = computeChinaFocusTarget(clusters)
+        animateToLatLng(
+            scope = scope,
+            lat = target.lat,
+            lon = target.lon,
+            targetZoom = target.zoom,
+            verticalBiasFraction = target.verticalBiasFraction,
+            durationMs = durationMs
+        )
+    }
+
+    fun isFramingChinaOverview(): Boolean {
+        val chinaX = lonToNormX(CHINA_DEFAULT_LON)
+        val chinaY = latToNormY(CHINA_DEFAULT_LAT)
+        val inChinaBounds = abs(centerX - chinaX) < 0.095 && abs(centerY - chinaY) < 0.085
+        return inChinaBounds && zoom in (CHINA_DEFAULT_ZOOM - 0.35f)..(CHINA_DEFAULT_ZOOM + 1.2f)
+    }
+
     private fun animateToNorm(
         scope: CoroutineScope,
         targetX: Double,
@@ -336,9 +428,9 @@ class SlippyMapCameraState(
 
 @Composable
 fun rememberSlippyMapCameraState(
-    initialLat: Double = 35.0,
-    initialLon: Double = 105.0,
-    initialZoom: Float = 3.2f
+    initialLat: Double = CHINA_DEFAULT_LAT,
+    initialLon: Double = CHINA_DEFAULT_LON,
+    initialZoom: Float = CHINA_DEFAULT_ZOOM
 ): SlippyMapCameraState {
     return remember {
         SlippyMapCameraState(
@@ -514,9 +606,17 @@ fun InteractiveSlippyMap(
         val viewportWidthPx = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
         val viewportHeightPx = with(density) { maxHeight.toPx() }.coerceAtLeast(1f)
         val baseTilePx = with(density) { BASE_TILE_DP.dp.toPx() }.coerceAtLeast(128f)
-        val clusterCellPx = with(density) { 58.dp.toPx() }.coerceAtLeast(48f)
 
         val zoom = cameraState.zoom
+        val minPinSeparationPx = with(density) {
+            (if (zoom < 4.5f) 48.dp else 42.dp).toPx()
+        }.coerceAtLeast(40f)
+        val selectedSeparationPx = with(density) { 54.dp.toPx() }.coerceAtLeast(50f)
+        val maxVisiblePins = when {
+            zoom < 4.5f -> 12
+            zoom < 7.5f -> 16
+            else -> 22
+        }
         val centerX = cameraState.centerX
         val centerY = cameraState.centerY
         val worldPx = baseTilePx * 2.0.pow(zoom.toDouble())
@@ -740,33 +840,33 @@ fun InteractiveSlippyMap(
                 }
             }
 
-            // Layer 3: Curved Travel Footprint Arcs (capped to top major clusters, single reused Path)
+            // Layer 3: Subtle Curved Travel Footprint Arcs (restrained count & low alpha to keep roads/labels clear)
             if (topArcMeta.size >= 2) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val strokeStyle = Stroke(
-                        width = 2.dp.toPx(),
+                        width = 1.35.dp.toPx(),
                         pathEffect = arcDashEffect,
                         cap = StrokeCap.Round
                     )
                     var prev = projectToScreen(topArcMeta[0].normX, topArcMeta[0].normY)
                     for (i in 1 until topArcMeta.size) {
                         val curr = projectToScreen(topArcMeta[i].normX, topArcMeta[i].normY)
-                        if ((prev.x in -400f..(size.width + 400f) || curr.x in -400f..(size.width + 400f)) &&
-                            (prev.y in -400f..(size.height + 400f) || curr.y in -400f..(size.height + 400f))
+                        if ((prev.x in -300f..(size.width + 300f) || curr.x in -300f..(size.width + 300f)) &&
+                            (prev.y in -300f..(size.height + 300f) || curr.y in -300f..(size.height + 300f))
                         ) {
                             val dx = curr.x - prev.x
                             val dy = curr.y - prev.y
                             val dist = kotlin.math.hypot(dx.toDouble(), dy.toDouble()).toFloat()
-                            if (dist in 16f..2200f) {
+                            if (dist in 48f..1800f) {
                                 val midX = (prev.x + curr.x) * 0.5f
                                 val midY = (prev.y + curr.y) * 0.5f
-                                val lift = (dist * 0.16f).coerceIn(14f, 84f)
+                                val lift = (dist * 0.14f).coerceIn(12f, 64f)
                                 reusableArcPath.rewind()
                                 reusableArcPath.moveTo(prev.x, prev.y)
                                 reusableArcPath.quadraticTo(midX, midY - lift, curr.x, curr.y)
                                 drawPath(
                                     path = reusableArcPath,
-                                    color = cobaltAccent.copy(alpha = if (isDark) 0.65f else 0.45f),
+                                    color = cobaltAccent.copy(alpha = if (isDark) 0.36f else 0.24f),
                                     style = strokeStyle
                                 )
                             }
@@ -776,10 +876,10 @@ fun InteractiveSlippyMap(
                 }
             }
 
-            // Layer 4: Screen-Space Aggregated Photo Thumbnail Cluster Pins
-            // Prevents composing hundreds of overlapping AsyncImage pins on 10,000-photo libraries!
-            val pinHalfWidthPx = with(density) { 30.dp.toPx() }
-            val pinFullHeightPx = with(density) { 68.dp.toPx() }
+            // Layer 4: Overlap-Free Radial Screen-Space Aggregated Photo Thumbnail Pins
+            val hitWidthPx = with(density) { PIN_HIT_WIDTH_DP.dp.toPx() }
+            val hitHeightPx = with(density) { PIN_HIT_HEIGHT_DP.dp.toPx() }
+            val anchorOffsetYFromBottomPx = with(density) { PIN_ANCHOR_BOTTOM_OFFSET_DP.dp.toPx() }
             val selectedName = selectedCluster?.locationName
 
             val visiblePins = buildVisibleAggregatedPins(
@@ -787,25 +887,29 @@ fun InteractiveSlippyMap(
                 selectedLocationName = selectedName,
                 viewportWidthPx = viewportWidthPx,
                 viewportHeightPx = viewportHeightPx,
-                cellSizePx = clusterCellPx,
+                minSeparationPx = minPinSeparationPx,
+                selectedSeparationPx = selectedSeparationPx,
+                maxVisiblePins = maxVisiblePins,
                 project = ::projectToScreen
             )
 
             for (pin in visiblePins) {
                 key(pin.stableKey) {
                     Box(
+                        contentAlignment = Alignment.BottomCenter,
                         modifier = Modifier
                             .zIndex(if (pin.isSelected) 10f else 1f)
+                            .size(width = PIN_HIT_WIDTH_DP.dp, height = PIN_HIT_HEIGHT_DP.dp)
                             .offset {
                                 IntOffset(
-                                    x = (pin.screenX - pinHalfWidthPx).roundToInt(),
-                                    y = (pin.screenY - pinFullHeightPx).roundToInt()
+                                    x = (pin.screenX - hitWidthPx / 2f).roundToInt(),
+                                    y = (pin.screenY - (hitHeightPx - anchorOffsetYFromBottomPx)).roundToInt()
                                 )
                             }
                             .clickable {
                                 onSelectCluster(pin.primaryCluster)
                                 val targetZoom = if (pin.mergedClustersCount > 1) {
-                                    (cameraState.zoom + 2.2f).coerceIn(6.0f, 12.5f)
+                                    (cameraState.zoom + 2.0f).coerceIn(5.8f, 12.0f)
                                 } else {
                                     max(cameraState.zoom, 6.4f)
                                 }
@@ -832,96 +936,142 @@ fun InteractiveSlippyMap(
     }
 }
 
-private class PinBucketAcc(
-    var primary: LocationCluster,
-    var bestWeight: Int,
+private const val PIN_HIT_WIDTH_DP = 52f
+private const val PIN_HIT_HEIGHT_DP = 60f
+private const val PIN_ANCHOR_BOTTOM_OFFSET_DP = 4f
+
+private class RadialPinClusterAcc(
+    val primary: LocationCluster,
+    val anchorX: Float,
+    val anchorY: Float,
     var mergedCount: Int,
     var totalPhotos: Int,
     var totalUnreviewed: Int,
-    var sumX: Float,
-    var sumY: Float,
     var containsSelected: Boolean
 )
 
+private data class VisibleProjectedCandidate(
+    val cluster: LocationCluster,
+    val screenX: Float,
+    val screenY: Float,
+    val isSelected: Boolean
+)
+
 /**
- * Fast O(K) screen-space spatial bucketing so even 500+ GPS districts on a 10,000-photo library
- * compose at most [MAX_VISIBLE_PINS] crisp, non-overlapping thumbnail markers at 60/120fps.
+ * Overlap-free greedy Euclidean screen-space clustering:
+ * Guarantees every rendered pin maintains at least [minSeparationPx] (or [selectedSeparationPx]
+ * around the active pin) so adjacent locations across grid boundaries never collide or stack messily.
+ * Anchors remain locked to the primary cluster's true coordinate rather than drifting into open water.
  */
-private fun buildVisibleAggregatedPins(
+internal fun buildVisibleAggregatedPins(
     metas: List<ProjectedClusterMeta>,
     selectedLocationName: String?,
     viewportWidthPx: Float,
     viewportHeightPx: Float,
-    cellSizePx: Float,
+    minSeparationPx: Float,
+    selectedSeparationPx: Float = minSeparationPx * 1.2f,
+    maxVisiblePins: Int = 16,
     project: (Double, Double) -> Offset
 ): List<DisplayedMapPin> {
     if (metas.isEmpty()) return emptyList()
 
-    val margin = 120f
-    val buckets = HashMap<Long, PinBucketAcc>(64)
-
+    val margin = 72f
+    val candidates = ArrayList<VisibleProjectedCandidate>(metas.size)
     for (meta in metas) {
         val pos = project(meta.normX, meta.normY)
         if (pos.x < -margin || pos.x > viewportWidthPx + margin || pos.y < -margin || pos.y > viewportHeightPx + margin) {
             continue
         }
-        val gx = floor(pos.x / cellSizePx).toInt()
-        val gy = floor(pos.y / cellSizePx).toInt()
-        val bucketKey = (gx.toLong() shl 32) or (gy.toLong() and 0xffffffffL)
-
         val cluster = meta.cluster
-        val isSel = cluster.locationName == selectedLocationName
-        val weight = cluster.photos.size + (if (isSel) 10_000_000 else 0)
+        candidates.add(
+            VisibleProjectedCandidate(
+                cluster = cluster,
+                screenX = pos.x,
+                screenY = pos.y,
+                isSelected = cluster.locationName == selectedLocationName
+            )
+        )
+    }
+    if (candidates.isEmpty()) return emptyList()
 
-        val existing = buckets[bucketKey]
-        if (existing == null) {
-            buckets[bucketKey] = PinBucketAcc(
-                primary = cluster,
-                bestWeight = weight,
-                mergedCount = 1,
-                totalPhotos = cluster.photos.size,
-                totalUnreviewed = cluster.unreviewedCount,
-                sumX = pos.x,
-                sumY = pos.y,
-                containsSelected = isSel
+    // Deterministic priority: active selection first, then largest photo footprint, then name
+    candidates.sortWith(
+        compareByDescending<VisibleProjectedCandidate> { it.isSelected }
+            .thenByDescending { it.cluster.photos.size }
+            .thenBy { it.cluster.locationName }
+    )
+
+    val minSepSq = minSeparationPx * minSeparationPx
+    val selSepSq = selectedSeparationPx * selectedSeparationPx
+    val accepted = ArrayList<RadialPinClusterAcc>(min(candidates.size, maxVisiblePins))
+
+    for (cand in candidates) {
+        var nearestAcc: RadialPinClusterAcc? = null
+        var nearestDistSq = Float.POSITIVE_INFINITY
+
+        for (acc in accepted) {
+            val dx = cand.screenX - acc.anchorX
+            val dy = cand.screenY - acc.anchorY
+            val distSq = dx * dx + dy * dy
+            val thresholdSq = if (acc.containsSelected || cand.isSelected) selSepSq else minSepSq
+            if (distSq < thresholdSq && distSq < nearestDistSq) {
+                nearestDistSq = distSq
+                nearestAcc = acc
+            }
+        }
+
+        if (nearestAcc != null) {
+            nearestAcc.mergedCount++
+            nearestAcc.totalPhotos += cand.cluster.photos.size
+            nearestAcc.totalUnreviewed += cand.cluster.unreviewedCount
+            if (cand.isSelected) nearestAcc.containsSelected = true
+        } else if (accepted.size < maxVisiblePins) {
+            accepted.add(
+                RadialPinClusterAcc(
+                    primary = cand.cluster,
+                    anchorX = cand.screenX,
+                    anchorY = cand.screenY,
+                    mergedCount = 1,
+                    totalPhotos = cand.cluster.photos.size,
+                    totalUnreviewed = cand.cluster.unreviewedCount,
+                    containsSelected = cand.isSelected
+                )
             )
         } else {
-            existing.mergedCount++
-            existing.totalPhotos += cluster.photos.size
-            existing.totalUnreviewed += cluster.unreviewedCount
-            existing.sumX += pos.x
-            existing.sumY += pos.y
-            if (isSel) existing.containsSelected = true
-            if (weight > existing.bestWeight) {
-                existing.primary = cluster
-                existing.bestWeight = weight
+            // Once visual cap is reached, fold remaining distant minor points into the closest visible stack
+            // only if reasonably nearby (within 2.2x separation) so counts stay honest without distorting distant cities
+            val softFoldSq = minSepSq * 4.84f
+            var foldTarget: RadialPinClusterAcc? = null
+            var foldDistSq = softFoldSq
+            for (acc in accepted) {
+                val dx = cand.screenX - acc.anchorX
+                val dy = cand.screenY - acc.anchorY
+                val distSq = dx * dx + dy * dy
+                if (distSq < foldDistSq) {
+                    foldDistSq = distSq
+                    foldTarget = acc
+                }
+            }
+            if (foldTarget != null) {
+                foldTarget.mergedCount++
+                foldTarget.totalPhotos += cand.cluster.photos.size
+                foldTarget.totalUnreviewed += cand.cluster.unreviewedCount
             }
         }
     }
 
-    val pins = ArrayList<DisplayedMapPin>(buckets.size)
-    for (acc in buckets.values) {
-        val avgX = acc.sumX / acc.mergedCount
-        val avgY = acc.sumY / acc.mergedCount
-        pins.add(
-            DisplayedMapPin(
-                stableKey = acc.primary.locationName,
-                primaryCluster = acc.primary,
-                mergedClustersCount = acc.mergedCount,
-                totalPhotosCount = acc.totalPhotos,
-                totalUnreviewedCount = acc.totalUnreviewed,
-                screenX = avgX,
-                screenY = avgY,
-                isSelected = acc.containsSelected
-            )
+    return accepted.map { acc ->
+        DisplayedMapPin(
+            stableKey = acc.primary.locationName,
+            primaryCluster = acc.primary,
+            mergedClustersCount = acc.mergedCount,
+            totalPhotosCount = acc.totalPhotos,
+            totalUnreviewedCount = acc.totalUnreviewed,
+            screenX = acc.anchorX,
+            screenY = acc.anchorY,
+            isSelected = acc.containsSelected
         )
     }
-
-    if (pins.size > MAX_VISIBLE_PINS) {
-        pins.sortWith(compareByDescending<DisplayedMapPin> { it.isSelected }.thenByDescending { it.totalPhotosCount })
-        return pins.subList(0, MAX_VISIBLE_PINS)
-    }
-    return pins
 }
 
 private fun formatCompactPinCount(count: Int): String {
@@ -940,78 +1090,100 @@ private fun FootprintPinMarker(
     mergedClustersCount: Int,
     isSelected: Boolean
 ) {
+    val thumbSize by animateDpAsState(
+        targetValue = if (isSelected) 42.dp else 32.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "map_pin_thumb_size"
+    )
+    val cornerRadius = if (isSelected) 11.dp else 9.dp
+    val innerCornerRadius = if (isSelected) 9.dp else 7.dp
+    val badgeColor = if (totalUnreviewedCount > 0) CoralDanger else EmeraldKeep
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.size(width = 60.dp, height = 68.dp)
+        modifier = Modifier.padding(bottom = 1.dp)
     ) {
         Box(
-            modifier = Modifier
-                .size(if (isSelected) 56.dp else 48.dp)
-                .shadow(
-                    elevation = if (isSelected) 12.dp else 6.dp,
-                    shape = RoundedCornerShape(14.dp)
-                )
-                .clip(RoundedCornerShape(14.dp))
-                .background(SurfacePure)
-                .border(
-                    width = if (isSelected) 2.5.dp else 1.5.dp,
-                    color = if (isSelected) CobaltPrimary else SurfacePure,
-                    shape = RoundedCornerShape(14.dp)
-                )
-                .padding(3.dp)
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.size(thumbSize + 8.dp)
         ) {
-            PhotoArtwork(
-                photo = cluster.coverPhoto,
-                contentDescription = cluster.locationName,
-                showVideoBadge = false,
-                downsampleTier = ImageDownsampleTier.MICRO_THUMB,
-                targetSizePx = 144,
+            // Subtle rotated back-card cue when multiple nearby footprints are stacked here
+            if (mergedClustersCount > 1) {
+                Box(
+                    modifier = Modifier
+                        .size(thumbSize - 2.dp)
+                        .offset(x = 3.dp, y = (-2).dp)
+                        .rotate(7f)
+                        .clip(RoundedCornerShape(cornerRadius))
+                        .background(SurfacePure.copy(alpha = 0.85f))
+                        .border(
+                            width = 1.dp,
+                            color = if (isSelected) CobaltPrimary.copy(alpha = 0.55f) else InkPrimary.copy(alpha = 0.16f),
+                            shape = RoundedCornerShape(cornerRadius)
+                        )
+                )
+            }
+
+            // Compact framed photo thumbnail
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(10.dp))
-            )
+                    .size(thumbSize)
+                    .shadow(
+                        elevation = if (isSelected) 9.dp else 3.5.dp,
+                        shape = RoundedCornerShape(cornerRadius)
+                    )
+                    .clip(RoundedCornerShape(cornerRadius))
+                    .background(SurfacePure)
+                    .border(
+                        width = if (isSelected) 2.dp else 1.5.dp,
+                        color = if (isSelected) CobaltPrimary else SurfacePure,
+                        shape = RoundedCornerShape(cornerRadius)
+                    )
+                    .padding(if (isSelected) 2.dp else 1.5.dp)
+            ) {
+                PhotoArtwork(
+                    photo = cluster.coverPhoto,
+                    contentDescription = cluster.locationName,
+                    showVideoBadge = false,
+                    downsampleTier = ImageDownsampleTier.MICRO_THUMB,
+                    targetSizePx = 112,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(innerCornerRadius))
+                )
+            }
+
+            // Single ultra-compact count pill perched outside the top-end corner so photo remains unobstructed
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
+                    .offset(x = 1.dp, y = 1.dp)
                     .clip(CircleShape)
-                    .background(if (totalUnreviewedCount > 0) CoralDanger else EmeraldKeep)
-                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                    .background(badgeColor)
+                    .border(1.dp, Color.White, CircleShape)
+                    .padding(horizontal = 4.dp, vertical = 0.5.dp)
             ) {
                 Text(
                     text = formatCompactPinCount(totalPhotosCount),
                     fontFamily = JetBrainsMonoFontFamily,
-                    fontSize = 9.sp,
+                    fontSize = 8.5.sp,
+                    lineHeight = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
             }
-            if (mergedClustersCount > 1) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .clip(CircleShape)
-                        .background(ObsidianOverlayGlass)
-                        .padding(horizontal = 4.dp, vertical = 1.dp)
-                ) {
-                    Text(
-                        text = "+$mergedClustersCount",
-                        fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-            }
         }
 
-        // Pin Anchor Dot
+        // Delicate Pin Anchor Dot precisely aligned over lat/lon coordinate
         Box(
             modifier = Modifier
-                .padding(top = 2.dp)
-                .size(if (isSelected) 10.dp else 8.dp)
+                .size(if (isSelected) 7.dp else 5.5.dp)
                 .clip(CircleShape)
                 .background(if (isSelected) CobaltPrimary else InkPrimary)
-                .border(1.5.dp, Color.White, CircleShape)
+                .border(1.dp, Color.White, CircleShape)
         )
     }
 }

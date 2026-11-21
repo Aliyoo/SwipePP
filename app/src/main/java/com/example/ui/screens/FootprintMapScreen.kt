@@ -93,8 +93,11 @@ import com.example.ui.components.GallerySelectableChip
 import com.example.ui.components.InteractiveSlippyMap
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.PhotoDetailLightbox
+import com.example.ui.components.computeChinaFocusTarget
 import com.example.ui.components.formatStorageSize
+import com.example.ui.components.isInsideChinaMainland
 import com.example.ui.components.rememberSlippyMapCameraState
+import com.example.ui.theme.TimelineSortOrder
 import com.example.ui.theme.CobaltDark
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CoralDanger
@@ -141,12 +144,25 @@ fun FootprintMapScreen(
     var showBatchLocationSheet by remember { mutableStateOf(false) }
     val locationChipsState = rememberLazyListState()
 
+    var mapStyleName by rememberSaveable { mutableStateOf(FootprintMapStyle.AMAP_ZH.name) }
+    val mapStyle = remember(mapStyleName) {
+        runCatching { FootprintMapStyle.valueOf(mapStyleName) }.getOrDefault(FootprintMapStyle.AMAP_ZH)
+    }
+    var tileRetryTrigger by remember { mutableIntStateOf(0) }
+    var tileLoadedCount by remember(mapStyle, tileRetryTrigger) { mutableIntStateOf(0) }
+    var tileFailedCount by remember(mapStyle, tileRetryTrigger) { mutableIntStateOf(0) }
+
     val showingUnlocated = selectedLocationName == UNLOCATED_LOCATION_KEY && unlocatedPhotos.isNotEmpty()
-    val selectedCluster = remember(clusters, selectedLocationName, showingUnlocated) {
+    val selectedCluster = remember(clusters, selectedLocationName, showingUnlocated, mapStyle) {
         if (showingUnlocated) {
             null
         } else {
-            clusters.firstOrNull { it.locationName == selectedLocationName } ?: clusters.firstOrNull()
+            clusters.firstOrNull { it.locationName == selectedLocationName }
+                ?: if (mapStyle == FootprintMapStyle.AMAP_ZH) {
+                    clusters.firstOrNull { isInsideChinaMainland(it.latitude, it.longitude) } ?: clusters.firstOrNull()
+                } else {
+                    clusters.firstOrNull()
+                }
         }
     }
 
@@ -168,27 +184,33 @@ fun FootprintMapScreen(
         }
     }
 
-    var mapStyleName by rememberSaveable { mutableStateOf(FootprintMapStyle.AMAP_ZH.name) }
-    val mapStyle = remember(mapStyleName) {
-        runCatching { FootprintMapStyle.valueOf(mapStyleName) }.getOrDefault(FootprintMapStyle.AMAP_ZH)
+    val initialTarget = remember(mapStyle) {
+        if (mapStyle == FootprintMapStyle.AMAP_ZH) {
+            computeChinaFocusTarget(clusters)
+        } else {
+            val first = clusters.firstOrNull()
+            com.example.ui.components.MapCameraTarget(
+                lat = first?.latitude ?: 35.4,
+                lon = first?.longitude ?: 104.8,
+                zoom = if (clusters.size > 1) 3.2f else 5.4f
+            )
+        }
     }
-    var tileRetryTrigger by remember { mutableIntStateOf(0) }
-    var tileLoadedCount by remember(mapStyle, tileRetryTrigger) { mutableIntStateOf(0) }
-    var tileFailedCount by remember(mapStyle, tileRetryTrigger) { mutableIntStateOf(0) }
-
-    val initialLat = clusters.firstOrNull()?.latitude ?: 35.0
-    val initialLon = clusters.firstOrNull()?.longitude ?: 105.0
     val cameraState = rememberSlippyMapCameraState(
-        initialLat = initialLat,
-        initialLon = initialLon,
-        initialZoom = if (clusters.size > 1) 3.2f else 5.4f
+        initialLat = initialTarget.lat,
+        initialLon = initialTarget.lon,
+        initialZoom = initialTarget.zoom
     )
 
     var hasAutoFitted by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(clusters.size) {
+    LaunchedEffect(clusters.size, mapStyle) {
         if (clusters.isNotEmpty() && !hasAutoFitted) {
             hasAutoFitted = true
-            cameraState.fitClusters(scope, clusters, durationMs = 450)
+            if (mapStyle == FootprintMapStyle.AMAP_ZH) {
+                cameraState.focusChinaRegion(scope, clusters, durationMs = 450)
+            } else {
+                cameraState.fitClusters(scope, clusters, durationMs = 450)
+            }
         }
     }
 
@@ -206,12 +228,6 @@ fun FootprintMapScreen(
             onSelectCluster = { cluster ->
                 selectedLocationName = cluster.locationName
                 isCardExpanded = true
-                cameraState.animateToLatLng(
-                    scope = scope,
-                    lat = cluster.latitude,
-                    lon = cluster.longitude,
-                    targetZoom = 6.8f
-                )
             },
             tileRetryTrigger = tileRetryTrigger,
             onTileStatusChanged = { loaded, failed ->
@@ -319,6 +335,9 @@ fun FootprintMapScreen(
                         val entries = FootprintMapStyle.entries
                         val next = entries[(entries.indexOf(mapStyle) + 1) % entries.size]
                         mapStyleName = next.name
+                        if (next == FootprintMapStyle.AMAP_ZH && !cameraState.isFramingChinaOverview()) {
+                            cameraState.focusChinaRegion(scope, clusters, durationMs = 480)
+                        }
                     },
                     shape = RoundedCornerShape(16.dp),
                     shadowElevation = 6.dp,
@@ -621,14 +640,25 @@ fun FootprintMapScreen(
                             modifier = Modifier.size(20.dp)
                         )
                     }
-                    if (clusters.isNotEmpty()) {
+                    if (clusters.isNotEmpty() || mapStyle == FootprintMapStyle.AMAP_ZH) {
                         HorizontalDivider(
                             modifier = Modifier.width(24.dp),
                             thickness = 0.8.dp,
                             color = HairlineBorder.copy(alpha = 0.7f)
                         )
                         IconButton(
-                            onClick = { cameraState.fitClusters(scope, clusters) },
+                            onClick = {
+                                if (mapStyle == FootprintMapStyle.AMAP_ZH) {
+                                    val hasOverseas = clusters.any { !isInsideChinaMainland(it.latitude, it.longitude) }
+                                    if (hasOverseas && cameraState.isFramingChinaOverview()) {
+                                        cameraState.fitClusters(scope, clusters)
+                                    } else {
+                                        cameraState.focusChinaRegion(scope, clusters)
+                                    }
+                                } else {
+                                    cameraState.fitClusters(scope, clusters)
+                                }
+                            },
                             modifier = Modifier
                                 .size(48.dp)
                                 .testTag("map_fit_all_button")
@@ -805,18 +835,24 @@ fun FootprintMapScreen(
 
                     AnimatedVisibility(visible = isCardExpanded) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            val orderedUnlocated = remember(unlocatedPhotos, uiState.timelineSortOrder) {
+                                when (uiState.timelineSortOrder) {
+                                    TimelineSortOrder.NEWEST_FIRST -> unlocatedPhotos.sortedByDescending { it.takenAtMillis }
+                                    TimelineSortOrder.OLDEST_FIRST -> unlocatedPhotos.sortedBy { it.takenAtMillis }
+                                }
+                            }
                             LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                items(unlocatedPhotos.take(24), key = { it.id }) { photo ->
+                                items(orderedUnlocated.take(24), key = { it.id }) { photo ->
                                     Box(
                                         modifier = Modifier
                                             .size(width = 72.dp, height = 84.dp)
                                             .clip(RoundedCornerShape(12.dp))
                                             .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp))
                                             .clickable {
-                                                lightboxPhotos = unlocatedPhotos
+                                                lightboxPhotos = orderedUnlocated
                                                 lightboxPhoto = photo
                                             }
                                     ) {
@@ -1002,18 +1038,24 @@ fun FootprintMapScreen(
 
                     AnimatedVisibility(visible = isCardExpanded) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            val orderedClusterPhotos = remember(cluster.photos, uiState.timelineSortOrder) {
+                                when (uiState.timelineSortOrder) {
+                                    TimelineSortOrder.NEWEST_FIRST -> cluster.photos.sortedByDescending { it.takenAtMillis }
+                                    TimelineSortOrder.OLDEST_FIRST -> cluster.photos.sortedBy { it.takenAtMillis }
+                                }
+                            }
                             LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                items(cluster.photos.take(24), key = { it.id }) { photo ->
+                                items(orderedClusterPhotos.take(24), key = { it.id }) { photo ->
                                     Box(
                                         modifier = Modifier
                                             .size(width = 72.dp, height = 84.dp)
                                             .clip(RoundedCornerShape(12.dp))
                                             .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp))
                                             .clickable {
-                                                lightboxPhotos = cluster.photos
+                                                lightboxPhotos = orderedClusterPhotos
                                                 lightboxPhoto = photo
                                             }
                                     ) {
