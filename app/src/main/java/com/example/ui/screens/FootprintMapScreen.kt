@@ -1202,12 +1202,13 @@ private fun DecoFootprintChip(
                                 Modifier
                             }
                         )
-                        .padding(horizontal = 6.dp, vertical = 1.dp)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
                         text = "$count",
                         fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 11.sp,
+                        // 标签字号红线 ≥12sp：计数徽从原型 11px 升 12sp（原型例外已记录）
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (countTone == DecoChipBadgeTone.VERM) DecoPaperCream else ink
                     )

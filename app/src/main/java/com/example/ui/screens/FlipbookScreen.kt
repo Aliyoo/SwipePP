@@ -1045,7 +1045,7 @@ private fun DecoGoldFrame(
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .padding(3.dp)
+                .padding(8.dp)
                 .clip(RoundedCornerShape(2.dp))
                 .border(1.dp, gold.copy(alpha = 0.40f), RoundedCornerShape(2.dp))
         ) {
