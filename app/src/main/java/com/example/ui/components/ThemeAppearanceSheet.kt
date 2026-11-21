@@ -113,48 +113,54 @@ fun ThemeAppearanceSheet(
                 )
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                ThemePreviewCard(
-                    mode = AppThemeMode.SYSTEM,
-                    icon = Icons.Filled.Contrast,
-                    selected = currentMode == AppThemeMode.SYSTEM,
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onSelectMode(AppThemeMode.SYSTEM)
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("theme_option_system")
-                )
-                ThemePreviewCard(
-                    mode = AppThemeMode.LIGHT,
-                    icon = Icons.Filled.LightMode,
-                    selected = currentMode == AppThemeMode.LIGHT,
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onSelectMode(AppThemeMode.LIGHT)
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("theme_option_light")
-                )
-                ThemePreviewCard(
-                    mode = AppThemeMode.DARK,
-                    icon = Icons.Filled.DarkMode,
-                    selected = currentMode == AppThemeMode.DARK,
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onSelectMode(AppThemeMode.DARK)
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("theme_option_dark")
-                )
-            }
+            ThemePreviewCardsRow(
+                currentMode = currentMode,
+                onSelectMode = { mode ->
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onSelectMode(mode)
+                }
+            )
         }
+    }
+}
+
+@Composable
+internal fun ThemePreviewCardsRow(
+    currentMode: AppThemeMode,
+    onSelectMode: (AppThemeMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        ThemePreviewCard(
+            mode = AppThemeMode.SYSTEM,
+            icon = Icons.Filled.Contrast,
+            selected = currentMode == AppThemeMode.SYSTEM,
+            onClick = { onSelectMode(AppThemeMode.SYSTEM) },
+            modifier = Modifier
+                .weight(1f)
+                .testTag("theme_option_system")
+        )
+        ThemePreviewCard(
+            mode = AppThemeMode.LIGHT,
+            icon = Icons.Filled.LightMode,
+            selected = currentMode == AppThemeMode.LIGHT,
+            onClick = { onSelectMode(AppThemeMode.LIGHT) },
+            modifier = Modifier
+                .weight(1f)
+                .testTag("theme_option_light")
+        )
+        ThemePreviewCard(
+            mode = AppThemeMode.DARK,
+            icon = Icons.Filled.DarkMode,
+            selected = currentMode == AppThemeMode.DARK,
+            onClick = { onSelectMode(AppThemeMode.DARK) },
+            modifier = Modifier
+                .weight(1f)
+                .testTag("theme_option_dark")
+        )
     }
 }
 

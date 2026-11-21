@@ -1,12 +1,19 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -57,14 +64,18 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -90,10 +101,11 @@ import com.example.ui.components.GalleryHeaderOrbButton
 import com.example.ui.components.GallerySculptedHeroButton
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.PhotoDetailLightbox
+import com.example.ui.components.activeChromeSatinBrush
 import com.example.ui.components.formatStorageSize
 import com.example.ui.components.monthChineseName
-import com.example.ui.components.monthEnglishName
 import com.example.ui.theme.GlassSpecularRimStart
+import com.example.ui.theme.LocalFlipYearPalette
 import com.example.ui.theme.CobaltDark
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CobaltSoft
@@ -116,9 +128,11 @@ import com.example.ui.theme.StudioCanvasTop
 import com.example.ui.theme.SurfaceMuted
 import com.example.ui.theme.SurfacePure
 import com.example.ui.theme.SurfaceSubtle
+import com.example.ui.theme.TimelineSortOrder
 import com.example.ui.theme.VioletVideo
 import com.example.ui.theme.VioletVideoSoft
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.runtime.key
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
@@ -130,6 +144,9 @@ fun FlipbookScreen(
     year: Int,
     monthPages: List<MonthPageModel>,
     recentlyStampedMonthKey: String?,
+    timelineSortOrder: TimelineSortOrder = TimelineSortOrder.NEWEST_FIRST,
+    showEmptyMonths: Boolean = false,
+    defaultShowGalleryMode: Boolean = false,
     onBack: () -> Unit,
     onStartMonthCleanup: (year: Int, month: Int, includeReviewed: Boolean, focusDay: Int?) -> Unit,
     onSelectBestInBurst: (groupId: String, photoId: Long) -> Unit,
@@ -141,7 +158,7 @@ fun FlipbookScreen(
 ) {
     val scope = rememberCoroutineScope()
     val haptics = rememberHapticEngine()
-    var showGalleryMode by remember { mutableStateOf(false) }
+    var showGalleryMode by remember(year, defaultShowGalleryMode) { mutableStateOf(defaultShowGalleryMode) }
     var expandedBurstIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var lightboxPhoto by remember { mutableStateOf<PhotoItemEntity?>(null) }
     var lightboxContextPhotos by remember { mutableStateOf<List<PhotoItemEntity>>(emptyList()) }
@@ -208,79 +225,16 @@ fun FlipbookScreen(
                     }
                 }
 
-                // Frosted Hairline Calendar vs Gallery Switcher
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = if (isDarkTop) SurfacePure.copy(alpha = 0.68f) else SurfacePure.copy(alpha = 0.84f),
-                    border = BorderStroke(0.85.dp, if (isDarkTop) HairlineBorder else GlassSpecularRimStart),
-                    shadowElevation = if (isDarkTop) 2.dp else 3.dp
-                ) {
-                    Row(
-                        modifier = Modifier.padding(3.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Surface(
-                            onClick = {
-                                if (showGalleryMode) haptics.pageFlipLift()
-                                showGalleryMode = false
-                            },
-                            shape = RoundedCornerShape(50),
-                            color = if (!showGalleryMode) InkPrimary else Color.Transparent,
-                            modifier = Modifier.testTag("flipbook_mode_calendar")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.CalendarMonth,
-                                    contentDescription = "月历视图",
-                                    tint = if (!showGalleryMode) SolarAmber else InkSecondary,
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Text(
-                                    text = "月历",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (!showGalleryMode) SurfacePure else InkSecondary,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
-                            }
-                        }
-                        Surface(
-                            onClick = {
-                                if (!showGalleryMode) haptics.pageFlipLift()
-                                showGalleryMode = true
-                            },
-                            shape = RoundedCornerShape(50),
-                            color = if (showGalleryMode) InkPrimary else Color.Transparent,
-                            modifier = Modifier.testTag("flipbook_mode_gallery")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.GridView,
-                                    contentDescription = "连拍画廊视图",
-                                    tint = if (showGalleryMode) SolarAmber else InkSecondary,
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Text(
-                                    text = "画廊",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (showGalleryMode) SurfacePure else InkSecondary,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
-                            }
+                // Optically matched 38dp frosted pill switcher with sliding satin thumb (48dp touch target)
+                FlipbookViewModeSwitch(
+                    showGalleryMode = showGalleryMode,
+                    onSelectMode = { targetGallery ->
+                        if (targetGallery != showGalleryMode) {
+                            haptics.pageFlipLift()
+                            showGalleryMode = targetGallery
                         }
                     }
-                }
+                )
             }
 
             if (monthPages.isEmpty()) {
@@ -291,11 +245,12 @@ fun FlipbookScreen(
                     Text("该年份暂无照片或视频", color = InkSecondary)
                 }
             } else {
-                val defaultPage = remember(year) {
-                    monthPages.indexOfLast { it.totalPhotos > 0 }.takeIf { it >= 0 } ?: 0
-                }
-                val pagerState = rememberPagerState(initialPage = defaultPage, pageCount = { monthPages.size })
-                val monthPillListState = rememberLazyListState()
+                key(year, timelineSortOrder, showEmptyMonths) {
+                    val defaultPage = remember(year, timelineSortOrder, showEmptyMonths, monthPages.size) {
+                        monthPages.indexOfFirst { it.totalPhotos > 0 }.takeIf { it >= 0 } ?: 0
+                    }
+                    val pagerState = rememberPagerState(initialPage = defaultPage, pageCount = { monthPages.size })
+                    val monthPillListState = rememberLazyListState()
 
                 LaunchedEffect(pagerState.currentPage, monthPages.size) {
                     if (pagerState.currentPage in monthPages.indices) {
@@ -380,6 +335,7 @@ fun FlipbookScreen(
                             pageOffset = clamped,
                             animateBadge = isRecentStamp,
                             showGalleryMode = showGalleryMode,
+                            timelineSortOrder = timelineSortOrder,
                             expandedBurstIds = expandedBurstIds,
                             onToggleBurst = { gid ->
                                 expandedBurstIds = if (gid in expandedBurstIds) {
@@ -399,9 +355,12 @@ fun FlipbookScreen(
                                 onTrashPhoto(photo)
                             },
                             onPhotoClick = { photo ->
-                                lightboxContextPhotos = pageModel.photos
-                                    .filter { it.photoStatus != PhotoStatus.TRASHED }
-                                    .sortedByDescending { it.takenAtMillis }
+                                val visible = pageModel.photos.filter { it.photoStatus != PhotoStatus.TRASHED }
+                                lightboxContextPhotos = if (timelineSortOrder == TimelineSortOrder.NEWEST_FIRST) {
+                                    visible.sortedByDescending { it.takenAtMillis }
+                                } else {
+                                    visible.sortedBy { it.takenAtMillis }
+                                }
                                 lightboxPhoto = photo
                             },
                             onCleanClick = {
@@ -508,6 +467,7 @@ fun FlipbookScreen(
                         }
                     }
                 }
+                }
             }
         }
     }
@@ -527,12 +487,206 @@ fun FlipbookScreen(
     }
 }
 
+/**
+ * Precision 38dp-tall frosted segmented toggle optically aligned with [GalleryHeaderOrbButton],
+ * featuring a spring-sliding adaptive satin thumb (obsidian in light, sapphire-slate in dark)
+ * inside a 48dp accessible hit area with zero M3 minimum-size inflation bloat.
+ */
+@Composable
+private fun FlipbookViewModeSwitch(
+    showGalleryMode: Boolean,
+    onSelectMode: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isDark = LocalIsDarkTheme.current
+    val palette = LocalFlipYearPalette.current
+    val activeBrush = activeChromeSatinBrush()
+    val segmentWidth = 62.dp
+    val trackPadding = 3.dp
+    val trackHeight = 38.dp
+    val thumbHeight = trackHeight - trackPadding * 2
+    val totalWidth = segmentWidth * 2 + trackPadding * 2
+
+    val thumbOffsetX by animateDpAsState(
+        targetValue = if (showGalleryMode) segmentWidth else 0.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "flipbook_mode_thumb_x"
+    )
+    val thumbBorderBrush = remember(palette) {
+        Brush.linearGradient(
+            listOf(
+                palette.activeChromeBorderStart,
+                Color.White.copy(alpha = 0.14f),
+                palette.activeChromeBorderEnd
+            )
+        )
+    }
+
+    val calendarTextColor by animateColorAsState(
+        targetValue = if (!showGalleryMode) Color.White else InkSecondary,
+        animationSpec = tween(180),
+        label = "cal_txt_color"
+    )
+    val calendarIconColor by animateColorAsState(
+        targetValue = if (!showGalleryMode) SolarAmber else InkSecondary,
+        animationSpec = tween(180),
+        label = "cal_ico_color"
+    )
+    val galleryTextColor by animateColorAsState(
+        targetValue = if (showGalleryMode) Color.White else InkSecondary,
+        animationSpec = tween(180),
+        label = "gal_txt_color"
+    )
+    val galleryIconColor by animateColorAsState(
+        targetValue = if (showGalleryMode) SolarAmber else InkSecondary,
+        animationSpec = tween(180),
+        label = "gal_ico_color"
+    )
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .width(totalWidth)
+            .height(48.dp)
+    ) {
+        // Visual 38dp frosted glass housing (exact same height & finish as left back orb)
+        Box(
+            modifier = Modifier
+                .width(totalWidth)
+                .height(trackHeight)
+                .shadow(
+                    elevation = if (isDark) 2.dp else 3.dp,
+                    shape = CircleShape,
+                    spotColor = if (isDark) Color.Black.copy(alpha = 0.45f) else InkPrimary.copy(alpha = 0.14f)
+                )
+                .clip(CircleShape)
+                .background(if (isDark) SurfacePure.copy(alpha = 0.72f) else SurfacePure.copy(alpha = 0.90f))
+                .border(
+                    width = 0.85.dp,
+                    color = if (isDark) HairlineBorder else GlassSpecularRimStart,
+                    shape = CircleShape
+                )
+                .padding(trackPadding)
+        ) {
+            // Sliding sculpted satin active indicator
+            Box(
+                modifier = Modifier
+                    .offset(x = thumbOffsetX)
+                    .width(segmentWidth)
+                    .height(thumbHeight)
+                    .clip(CircleShape)
+                    .drawBehind {
+                        drawRect(brush = activeBrush)
+                        drawLine(
+                            color = Color.White.copy(alpha = if (isDark) 0.18f else 0.24f),
+                            start = Offset(0f, 0.7.dp.toPx()),
+                            end = Offset(size.width, 0.7.dp.toPx()),
+                            strokeWidth = 0.8.dp.toPx()
+                        )
+                    }
+                    .border(width = 0.75.dp, brush = thumbBorderBrush, shape = CircleShape)
+            )
+        }
+
+        // Full 48dp-tall accessible clickable tab segments layered cleanly over the 38dp track
+        Row(
+            modifier = Modifier
+                .width(totalWidth)
+                .height(48.dp)
+                .padding(horizontal = trackPadding),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .width(segmentWidth)
+                    .fillMaxHeight()
+                    .clip(CircleShape)
+                    .semantics(mergeDescendants = true) {
+                        selected = !showGalleryMode
+                        contentDescription = "月历视图"
+                    }
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Tab,
+                        onClick = { onSelectMode(false) }
+                    )
+                    .testTag("flipbook_mode_calendar")
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CalendarMonth,
+                        contentDescription = null,
+                        tint = calendarIconColor,
+                        modifier = Modifier.size(13.5.dp)
+                    )
+                    Text(
+                        text = "月历",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = calendarTextColor,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
+            }
+
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .width(segmentWidth)
+                    .fillMaxHeight()
+                    .clip(CircleShape)
+                    .semantics(mergeDescendants = true) {
+                        selected = showGalleryMode
+                        contentDescription = "连拍画廊视图"
+                    }
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Tab,
+                        onClick = { onSelectMode(true) }
+                    )
+                    .testTag("flipbook_mode_gallery")
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.GridView,
+                        contentDescription = null,
+                        tint = galleryIconColor,
+                        modifier = Modifier.size(13.5.dp)
+                    )
+                    Text(
+                        text = "画廊",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = galleryTextColor,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun ModernCalendarBookPage(
     page: MonthPageModel,
     pageOffset: Float,
     animateBadge: Boolean,
     showGalleryMode: Boolean,
+    timelineSortOrder: TimelineSortOrder,
     expandedBurstIds: Set<String>,
     onToggleBurst: (String) -> Unit,
     onSelectBestInBurst: (String, Long) -> Unit,
@@ -592,40 +746,40 @@ private fun ModernCalendarBookPage(
                 .padding(start = 22.dp, end = 18.dp, top = 16.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Clean Editorial Month Header (Giant Serif Numeral + Single-Line Month · Year)
+            // Clean Editorial Month Header (Single sculpted month lockup — no duplicate numeral)
             Box(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.align(Alignment.TopStart)) {
                     Row(
                         verticalAlignment = Alignment.Bottom,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        modifier = Modifier.semantics(mergeDescendants = true) {
+                            contentDescription = "${page.year}年${page.month}月"
+                        }
                     ) {
                         Text(
-                            text = page.month.toString().padStart(2, '0'),
+                            text = page.month.toString(),
                             fontFamily = EditorialSerifFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 38.sp,
                             lineHeight = 38.sp,
                             color = InkPrimary
                         )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = "月",
+                            fontFamily = OutfitFontFamily,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 16.sp,
+                            color = InkPrimary,
                             modifier = Modifier.padding(bottom = 5.dp)
-                        ) {
-                            Text(
-                                text = monthChineseName(page.month),
-                                fontFamily = OutfitFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 17.sp,
-                                color = InkPrimary
-                            )
-                            Text(
-                                text = "· ${page.year}",
-                                fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 12.sp,
-                                color = InkTertiary
-                            )
-                        }
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "· ${page.year}",
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontSize = 12.sp,
+                            color = InkTertiary,
+                            modifier = Modifier.padding(bottom = 5.dp)
+                        )
                     }
                     Spacer(modifier = Modifier.height(5.dp))
                     HorizontalDivider(thickness = 0.8.dp, color = HairlineBorder)
@@ -653,6 +807,7 @@ private fun ModernCalendarBookPage(
                         month = page.month,
                         freedBytes = page.stamp?.freedBytes ?: 0L,
                         animateEntry = animateBadge,
+                        showMonthPrefix = false,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .testTag("month_cleaned_stamp_${page.month}")
@@ -694,9 +849,10 @@ private fun ModernCalendarBookPage(
                     )
                 }
             } else if (showGalleryMode) {
-                val monthGalleryEntries = remember(page.photos) {
+                val monthGalleryEntries = remember(page.photos, timelineSortOrder) {
                     com.example.ui.domain.LibraryDerivationEngine.buildGalleryEntries(
-                        page.photos.filter { it.photoStatus != PhotoStatus.TRASHED }
+                        photos = page.photos.filter { it.photoStatus != PhotoStatus.TRASHED },
+                        sortOrder = timelineSortOrder
                     )
                 }
 

@@ -169,6 +169,7 @@ fun GalleryScreen(
     onStartCustomCleanup: (title: String, photoIds: Set<Long>, includeReviewed: Boolean) -> Unit = { _, _, _ -> },
     onStartMonthCleanup: (year: Int, month: Int, includeReviewed: Boolean) -> Unit = { _, _, _ -> },
     onResetGlobalMediaFilter: () -> Unit = {},
+    galleryColumns: Int = 3,
     modifier: Modifier = Modifier
 ) {
     val hapticEngine = rememberHapticEngine()
@@ -781,7 +782,7 @@ fun GalleryScreen(
                         onKeepBestInBurst = onKeepBestInBurstStable,
                         onTrashSinglePhoto = onTrashPhoto,
                         onPhotoClick = onPhotoClickStable,
-                        columns = 3,
+                        columns = galleryColumns.coerceIn(3, 4),
                         contentPadding = PaddingValues(
                             start = 20.dp,
                             end = 20.dp,

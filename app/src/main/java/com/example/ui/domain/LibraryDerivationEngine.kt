@@ -12,6 +12,7 @@ import com.example.ui.MonthPageModel
 import com.example.ui.UNLOCATED_LOCATION_KEY
 import com.example.ui.YearbookCoverCurator
 import com.example.ui.YearbookSummary
+import com.example.ui.theme.TimelineSortOrder
 
 /**
  * Pure, stateless O(N) domain derivation engine for FlipYear.
@@ -58,7 +59,8 @@ object LibraryDerivationEngine {
     fun buildYearbooksLinear(
         photos: List<PhotoItemEntity>,
         stamps: Map<String, MonthStampEntity>,
-        coverConfigs: Map<Int, YearbookCoverConfigEntity>
+        coverConfigs: Map<Int, YearbookCoverConfigEntity>,
+        sortOrder: TimelineSortOrder = TimelineSortOrder.NEWEST_FIRST
     ): List<YearbookSummary> {
         if (photos.isEmpty()) return emptyList()
         val byYear = HashMap<Int, YearAcc>(16)
@@ -84,7 +86,11 @@ object LibraryDerivationEngine {
             }
         }
 
-        val sortedYears = byYear.keys.sortedDescending()
+        val sortedYears = if (sortOrder == TimelineSortOrder.NEWEST_FIRST) {
+            byYear.keys.sortedDescending()
+        } else {
+            byYear.keys.sorted()
+        }
         return sortedYears.mapIndexed { idx, year ->
             val acc = byYear[year]!!
             var totalMonths = 0
@@ -127,26 +133,34 @@ object LibraryDerivationEngine {
      * Strictly O(N) linear gallery builder for 10,000+ items.
      * Pre-groups burst clusters in a single HashMap pass instead of scanning all items per burst group.
      */
-    fun buildGalleryEntries(photos: List<PhotoItemEntity>): List<GalleryEntry> {
+    fun buildGalleryEntries(
+        photos: List<PhotoItemEntity>,
+        sortOrder: TimelineSortOrder = TimelineSortOrder.NEWEST_FIRST
+    ): List<GalleryEntry> {
         if (photos.isEmpty()) return emptyList()
-        return buildGalleryEntriesLinear(photos.sortedByDescending { it.takenAtMillis })
+        val ordered = if (sortOrder == TimelineSortOrder.NEWEST_FIRST) {
+            photos.sortedByDescending { it.takenAtMillis }
+        } else {
+            photos.sortedBy { it.takenAtMillis }
+        }
+        return buildGalleryEntriesLinear(ordered)
     }
 
-    fun buildGalleryEntriesLinear(alreadySortedDesc: List<PhotoItemEntity>): List<GalleryEntry> {
-        if (alreadySortedDesc.isEmpty()) return emptyList()
+    fun buildGalleryEntriesLinear(alreadySortedPhotos: List<PhotoItemEntity>): List<GalleryEntry> {
+        if (alreadySortedPhotos.isEmpty()) return emptyList()
 
         val burstMembers = HashMap<String, ArrayList<PhotoItemEntity>>()
-        for (photo in alreadySortedDesc) {
+        for (photo in alreadySortedPhotos) {
             val gid = photo.burstGroupId
             if (gid != null && !photo.isVideo) {
                 burstMembers.getOrPut(gid) { ArrayList(4) }.add(photo)
             }
         }
 
-        val entries = ArrayList<GalleryEntry>(alreadySortedDesc.size)
+        val entries = ArrayList<GalleryEntry>(alreadySortedPhotos.size)
         val consumedGroups = HashSet<String>(burstMembers.size * 2)
 
-        for (photo in alreadySortedDesc) {
+        for (photo in alreadySortedPhotos) {
             val gid = photo.burstGroupId
             if (gid != null && !photo.isVideo) {
                 if (consumedGroups.add(gid)) {
@@ -235,12 +249,17 @@ object LibraryDerivationEngine {
     }
 
     /**
-     * Builds 12 monthly calendar spread models for [year] in ascending month order (1..12).
+     * Builds monthly calendar spread models for [year] unified with global [sortOrder]:
+     * - [TimelineSortOrder.NEWEST_FIRST]: 12 downTo 1 (matches Bookshelf newest-first swipe direction)
+     * - [TimelineSortOrder.OLDEST_FIRST]: 1..12 (matches Bookshelf oldest-first swipe direction)
+     * When [showEmptyMonths] is false (default), months without media are omitted.
      */
     fun buildMonthPagesForYear(
         year: Int,
         allPhotos: List<PhotoItemEntity>,
-        monthStamps: Map<String, MonthStampEntity>
+        monthStamps: Map<String, MonthStampEntity>,
+        sortOrder: TimelineSortOrder = TimelineSortOrder.NEWEST_FIRST,
+        showEmptyMonths: Boolean = false
     ): List<MonthPageModel> {
         val byMonth = HashMap<Int, ArrayList<PhotoItemEntity>>(16)
         for (photo in allPhotos) {
@@ -248,8 +267,24 @@ object LibraryDerivationEngine {
                 byMonth.getOrPut(photo.month) { ArrayList() }.add(photo)
             }
         }
-        return (1..12).map { month ->
-            val monthPhotos = byMonth[month].orEmpty()
+        val monthSequence = if (sortOrder == TimelineSortOrder.NEWEST_FIRST) {
+            (12 downTo 1).toList()
+        } else {
+            (1..12).toList()
+        }
+        val targetMonths = if (showEmptyMonths) {
+            monthSequence
+        } else {
+            monthSequence.filter { !byMonth[it].isNullOrEmpty() }
+        }
+
+        return targetMonths.map { month ->
+            val rawMonthPhotos = byMonth[month].orEmpty()
+            val monthPhotos = if (sortOrder == TimelineSortOrder.NEWEST_FIRST) {
+                rawMonthPhotos.sortedByDescending { it.takenAtMillis }
+            } else {
+                rawMonthPhotos.sortedBy { it.takenAtMillis }
+            }
             val photosByDay = HashMap<Int, ArrayList<PhotoItemEntity>>(32)
             var videoCount = 0
             var unreviewedCount = 0
@@ -262,7 +297,7 @@ object LibraryDerivationEngine {
 
             for (p in monthPhotos) {
                 if (p.isVideo) videoCount++
-                when (val st = p.photoStatus) {
+                when (p.photoStatus) {
                     PhotoStatus.UNREVIEWED -> {
                         unreviewedCount++
                         reclaimableBytes += p.fileSizeBytes
@@ -316,6 +351,7 @@ object LibraryDerivationEngine {
      * Builds an ordered [CleanupCardItem] queue for [ArcCleanerScreen], supporting:
      * - Year / Month / Location filtering
      * - Custom photo ID sets (e.g. launched directly from a Gallery search or smart filter!)
+     * - Global [sortOrder] (while keeping individual frames inside a BurstStack chronological)
      */
     fun buildArcQueue(
         allPhotos: List<PhotoItemEntity>,
@@ -323,7 +359,8 @@ object LibraryDerivationEngine {
         month: Int? = null,
         locationName: String? = null,
         includeReviewed: Boolean = false,
-        customPhotoIds: Set<Long>? = null
+        customPhotoIds: Set<Long>? = null,
+        sortOrder: TimelineSortOrder = TimelineSortOrder.NEWEST_FIRST
     ): List<CleanupCardItem> {
         val candidates = ArrayList<PhotoItemEntity>()
         for (photo in allPhotos) {
@@ -340,7 +377,11 @@ object LibraryDerivationEngine {
             val matchStatus = if (includeReviewed) st != PhotoStatus.TRASHED else st == PhotoStatus.UNREVIEWED
             if (matchStatus) candidates.add(photo)
         }
-        candidates.sortBy { it.takenAtMillis }
+        if (sortOrder == TimelineSortOrder.NEWEST_FIRST) {
+            candidates.sortByDescending { it.takenAtMillis }
+        } else {
+            candidates.sortBy { it.takenAtMillis }
+        }
 
         val burstGroups = HashMap<String, ArrayList<PhotoItemEntity>>()
         for (photo in candidates) {
@@ -357,8 +398,9 @@ object LibraryDerivationEngine {
             val gid = photo.burstGroupId
             if (gid != null && !photo.isVideo) {
                 if (consumedGroupIds.add(gid)) {
-                    val stackPhotos = burstGroups[gid].orEmpty()
-                    if (stackPhotos.size >= 2) {
+                    val rawStack = burstGroups[gid].orEmpty()
+                    if (rawStack.size >= 2) {
+                        val stackPhotos = rawStack.sortedBy { it.takenAtMillis }
                         var best = stackPhotos.first()
                         for (m in stackPhotos) {
                             if (m.isBestInStack) {

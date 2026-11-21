@@ -6,6 +6,7 @@ import com.example.data.MediaAccessLevel
 import com.example.data.MonthStampEntity
 import com.example.data.PhotoItemEntity
 import com.example.data.YearbookCoverMode
+import com.example.ui.theme.TimelineSortOrder
 
 enum class MediaFilter(val label: String) {
     ALL("全部"),
@@ -187,6 +188,7 @@ data class FlipYearUiState(
     val mediaAccessLevel: MediaAccessLevel = MediaAccessLevel.NONE,
     val hasMediaLocationPermission: Boolean = true,
     val mediaFilter: MediaFilter = MediaFilter.ALL,
+    val timelineSortOrder: TimelineSortOrder = TimelineSortOrder.NEWEST_FIRST,
     val allPhotos: List<PhotoItemEntity> = emptyList(),
     val galleryEntries: List<GalleryEntry> = emptyList(),
     val yearbooks: List<YearbookSummary> = emptyList(),

@@ -22,6 +22,8 @@ import com.example.data.SameDayLocationMatch
 import com.example.data.YearbookCoverConfigEntity
 import com.example.data.YearbookCoverMode
 import com.example.ui.domain.LibraryDerivationEngine
+import com.example.ui.theme.ThemePreferences
+import com.example.ui.theme.TimelineSortOrder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -48,6 +50,9 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     private val undoStack = MutableStateFlow<List<UndoSnapshot>>(emptyList())
     private val cleanerSessionUndoStack = MutableStateFlow<List<UndoSnapshot>>(emptyList())
     private val mediaFilter = MutableStateFlow(MediaFilter.ALL)
+    private val timelineSortOrder = MutableStateFlow(
+        ThemePreferences(application).userPreferences.value.timelineSortOrder
+    )
     private val mediaAccessLevel = MutableStateFlow(repository.checkMediaAccess())
     private val hasMediaLocationPermission = MutableStateFlow(repository.hasMediaLocationAccess())
     private val isScanningDevice = MutableStateFlow(false)
@@ -99,6 +104,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
 
     private data class DerivedLibraryData(
         val filter: MediaFilter,
+        val sortOrder: TimelineSortOrder,
         val allPhotos: List<PhotoItemEntity>,
         val galleryEntries: List<GalleryEntry>,
         val yearbooks: List<YearbookSummary>,
@@ -150,9 +156,10 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         repository.trashedPhotos,
         combine(repository.monthStamps, repository.yearbookCovers) { stamps, covers -> stamps to covers },
         repository.cleanupStats,
-        mediaFilter
-    ) { activePhotos, trashed, stampsAndCovers, stats, filter ->
+        combine(mediaFilter, timelineSortOrder) { filter, order -> filter to order }
+    ) { activePhotos, trashed, stampsAndCovers, stats, filterAndOrder ->
         val (stamps, coverConfigs) = stampsAndCovers
+        val (filter, sortOrder) = filterAndOrder
         var totalImageCount = 0
         var totalVideoCount = 0
         var hasDeviceMedia = false
@@ -186,7 +193,12 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             coverConfigMap[c.year] = c
         }
 
-        val yearbooks = LibraryDerivationEngine.buildYearbooksLinear(filtered, stampMap, coverConfigMap)
+        val yearbooks = LibraryDerivationEngine.buildYearbooksLinear(
+            photos = filtered,
+            stamps = stampMap,
+            coverConfigs = coverConfigMap,
+            sortOrder = sortOrder
+        )
 
         val visibleGallery = ArrayList<PhotoItemEntity>(filtered.size)
         for (p in filtered) {
@@ -195,7 +207,14 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
-        val galleryEntries = LibraryDerivationEngine.buildGalleryEntriesLinear(visibleGallery)
+        // Room already emits allActivePhotos ordered by takenAtMillis DESC;
+        // reversing in O(1) view for OLDEST_FIRST avoids an extra O(N log N) sort.
+        val orderedGallerySource = if (sortOrder == TimelineSortOrder.NEWEST_FIRST) {
+            visibleGallery
+        } else {
+            visibleGallery.asReversed()
+        }
+        val galleryEntries = LibraryDerivationEngine.buildGalleryEntriesLinear(orderedGallerySource)
         val (clusters, unlocated) = LibraryDerivationEngine.buildLocationClustersAndUnlocatedLinear(visibleGallery)
 
         var pendingBytes = 0L
@@ -205,6 +224,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
 
         DerivedLibraryData(
             filter = filter,
+            sortOrder = sortOrder,
             allPhotos = filtered,
             galleryEntries = galleryEntries,
             yearbooks = yearbooks,
@@ -236,6 +256,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             mediaAccessLevel = meta.access,
             hasMediaLocationPermission = meta.hasLocationPerm,
             mediaFilter = data.filter,
+            timelineSortOrder = data.sortOrder,
             allPhotos = data.allPhotos,
             galleryEntries = data.galleryEntries,
             yearbooks = data.yearbooks,
@@ -439,11 +460,21 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         customCleanerSession.value = null
     }
 
-    fun getMonthPagesForYear(year: Int, state: FlipYearUiState = uiState.value): List<MonthPageModel> {
+    fun setTimelineSortOrder(order: TimelineSortOrder) {
+        timelineSortOrder.value = order
+    }
+
+    fun getMonthPagesForYear(
+        year: Int,
+        state: FlipYearUiState = uiState.value,
+        showEmptyMonths: Boolean = false
+    ): List<MonthPageModel> {
         return LibraryDerivationEngine.buildMonthPagesForYear(
             year = year,
             allPhotos = state.allPhotos,
-            monthStamps = state.monthStamps
+            monthStamps = state.monthStamps,
+            sortOrder = state.timelineSortOrder,
+            showEmptyMonths = showEmptyMonths
         )
     }
 
@@ -461,7 +492,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             month = month,
             locationName = locationName,
             includeReviewed = includeReviewed,
-            customPhotoIds = customPhotoIds
+            customPhotoIds = customPhotoIds,
+            sortOrder = state.timelineSortOrder
         )
     }
 

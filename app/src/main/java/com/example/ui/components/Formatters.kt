@@ -160,6 +160,7 @@ fun CleanedCompletionBadge(
     month: Int,
     freedBytes: Long,
     animateEntry: Boolean = false,
+    showMonthPrefix: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val scale = remember(month, animateEntry) { Animatable(if (animateEntry) 1.6f else 1f) }
@@ -213,7 +214,7 @@ fun CleanedCompletionBadge(
             )
             Column {
                 Text(
-                    text = "${month}月已整理",
+                    text = if (showMonthPrefix) "${month}月已整理" else "已整理",
                     fontFamily = OutfitFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,

@@ -41,14 +41,9 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -93,6 +88,7 @@ import com.example.ui.FlipYearUiState
 import com.example.ui.LocalFloatingDockInset
 import com.example.ui.MediaFilter
 import com.example.ui.components.Adaptive3DBookshelfCarousel
+import com.example.ui.components.AppSettingsSheet
 import com.example.ui.components.ArtisticGalleryBackdrop
 import com.example.ui.components.ThemeAppearanceSheet
 import com.example.ui.components.YearbookCoverStudioSheet
@@ -106,7 +102,10 @@ import com.example.ui.theme.CobaltDark
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CobaltSoft
 import com.example.ui.theme.CoralDanger
+import com.example.ui.theme.DefaultStartTab
 import com.example.ui.theme.EmeraldKeep
+import com.example.ui.theme.FlipbookDefaultView
+import com.example.ui.theme.GalleryGridDensity
 import com.example.ui.theme.GlassSpecularRimStart
 import com.example.ui.theme.HairlineBorder
 import com.example.ui.theme.InkPrimary
@@ -118,6 +117,8 @@ import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.SolarAmber
 import com.example.ui.theme.SurfaceMuted
 import com.example.ui.theme.SurfacePure
+import com.example.ui.theme.TimelineSortOrder
+import com.example.ui.theme.UserPreferences
 import com.example.ui.theme.isReducedMotionEnabled
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -127,7 +128,13 @@ import kotlinx.coroutines.launch
 fun BookshelfScreen(
     uiState: FlipYearUiState,
     themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    userPreferences: UserPreferences = UserPreferences(themeMode = themeMode),
     onSelectThemeMode: (AppThemeMode) -> Unit = {},
+    onSelectTimelineSortOrder: (TimelineSortOrder) -> Unit = {},
+    onToggleShowEmptyMonths: (Boolean) -> Unit = {},
+    onSelectFlipbookDefaultView: (FlipbookDefaultView) -> Unit = {},
+    onSelectDefaultStartTab: (DefaultStartTab) -> Unit = {},
+    onSelectGalleryGridDensity: (GalleryGridDensity) -> Unit = {},
     onOpenYearbook: (Int) -> Unit,
     onStartYearCleanup: (year: Int, includeReviewed: Boolean) -> Unit = { _, _ -> },
     onOpenVault: () -> Unit = {},
@@ -146,7 +153,7 @@ fun BookshelfScreen(
     val context = LocalContext.current
     val reducedMotion = remember(context) { isReducedMotionEnabled(context) }
     val isDark = LocalIsDarkTheme.current
-    var menuExpanded by remember { mutableStateOf(false) }
+    var showSettingsSheet by remember { mutableStateOf(false) }
     var showThemeSheet by remember { mutableStateOf(false) }
     var showStorageLedger by remember { mutableStateOf(false) }
     var customizingYear by remember { mutableStateOf<Int?>(null) }
@@ -285,61 +292,16 @@ fun BookshelfScreen(
                         )
                     }
 
-                    Box {
-                        HeaderGlassOrbButton(
-                            onClick = { menuExpanded = true },
-                            modifier = Modifier.testTag("bookshelf_menu_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.MoreVert,
-                                contentDescription = "更多选项",
-                                tint = InkPrimary,
-                                modifier = Modifier.size(19.dp)
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = menuExpanded,
-                            onDismissRequest = { menuExpanded = false },
-                            containerColor = SurfacePure
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.action_scan_media), color = InkPrimary) },
-                                leadingIcon = {
-                                    Icon(Icons.Filled.Refresh, contentDescription = null, tint = CobaltPrimary)
-                                },
-                                onClick = {
-                                    menuExpanded = false
-                                    if (uiState.mediaAccessLevel == MediaAccessLevel.NONE) {
-                                        onRequestMediaPermission()
-                                    } else {
-                                        onRescanDeviceMedia()
-                                    }
-                                },
-                                modifier = Modifier.testTag("scan_media_button")
-                            )
-                            DropdownMenuItem(
-                                text = { Text("授权全部照片与视频权限", color = InkPrimary) },
-                                leadingIcon = {
-                                    Icon(Icons.Filled.FolderOpen, contentDescription = null, tint = CobaltPrimary)
-                                },
-                                onClick = {
-                                    menuExpanded = false
-                                    onRequestMediaPermission()
-                                }
-                            )
-                            if (uiState.hasSamplePhotos) {
-                                DropdownMenuItem(
-                                    text = { Text("移除示例影集", color = CoralDanger) },
-                                    leadingIcon = {
-                                        Icon(Icons.Outlined.RestartAlt, contentDescription = null, tint = CoralDanger)
-                                    },
-                                    onClick = {
-                                        menuExpanded = false
-                                        onRemoveDemoArchive()
-                                    }
-                                )
-                            }
-                        }
+                    HeaderGlassOrbButton(
+                        onClick = { showSettingsSheet = true },
+                        modifier = Modifier.testTag("bookshelf_settings_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = stringResource(R.string.cd_open_settings),
+                            tint = InkPrimary,
+                            modifier = Modifier.size(19.dp)
+                        )
                     }
                 }
             }
@@ -521,9 +483,9 @@ fun BookshelfScreen(
                     modifier = Modifier.weight(1f)
                 )
             } else {
-                // Scope PagerState cleanly per MediaFilter so switching All -> Videos -> Photos
-                // never carries over stale page indices, scroll offsets, or key maps across filters.
-                key(uiState.mediaFilter) {
+                // Scope PagerState cleanly per MediaFilter and global TimelineSortOrder so switching
+                // filters or reversing chronology cleanly anchors to index 0 without stale offsets.
+                key(uiState.mediaFilter, uiState.timelineSortOrder) {
                     val pagerState = rememberPagerState(initialPage = 0, pageCount = { books.size })
 
                     LaunchedEffect(pagerState) {
@@ -651,6 +613,27 @@ fun BookshelfScreen(
             currentMode = themeMode,
             onSelectMode = onSelectThemeMode,
             onDismiss = { showThemeSheet = false }
+        )
+    }
+
+    if (showSettingsSheet) {
+        AppSettingsSheet(
+            preferences = userPreferences,
+            mediaAccessLevel = uiState.mediaAccessLevel,
+            totalImageCount = uiState.totalImageCount,
+            totalVideoCount = uiState.totalVideoCount,
+            isScanningDevice = uiState.isScanningDevice,
+            hasSamplePhotos = uiState.hasSamplePhotos,
+            onSelectTimelineSortOrder = onSelectTimelineSortOrder,
+            onToggleShowEmptyMonths = onToggleShowEmptyMonths,
+            onSelectFlipbookDefaultView = onSelectFlipbookDefaultView,
+            onSelectDefaultStartTab = onSelectDefaultStartTab,
+            onSelectGalleryGridDensity = onSelectGalleryGridDensity,
+            onSelectThemeMode = onSelectThemeMode,
+            onRescanDeviceMedia = onRescanDeviceMedia,
+            onRequestMediaPermission = onRequestMediaPermission,
+            onRemoveDemoArchive = onRemoveDemoArchive,
+            onDismiss = { showSettingsSheet = false }
         )
     }
 }

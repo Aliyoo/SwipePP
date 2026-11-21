@@ -26,7 +26,8 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent {
-            val themeMode by themePreferences.themeMode.collectAsStateWithLifecycle()
+            val userPreferences by themePreferences.userPreferences.collectAsStateWithLifecycle()
+            val themeMode = userPreferences.themeMode
             val isDark = resolveIsDarkTheme(themeMode, isSystemInDarkTheme())
 
             DisposableEffect(isDark) {
@@ -48,7 +49,13 @@ class MainActivity : ComponentActivity() {
             FlipYearTheme(themeMode = themeMode) {
                 FlipYearApp(
                     themeMode = themeMode,
-                    onSelectThemeMode = themePreferences::setThemeMode
+                    userPreferences = userPreferences,
+                    onSelectThemeMode = themePreferences::setThemeMode,
+                    onSelectTimelineSortOrder = themePreferences::setTimelineSortOrder,
+                    onToggleShowEmptyMonths = themePreferences::setShowEmptyMonths,
+                    onSelectFlipbookDefaultView = themePreferences::setFlipbookDefaultView,
+                    onSelectDefaultStartTab = themePreferences::setDefaultStartTab,
+                    onSelectGalleryGridDensity = themePreferences::setGalleryGridDensity
                 )
             }
         }

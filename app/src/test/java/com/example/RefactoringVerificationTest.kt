@@ -15,7 +15,13 @@ import com.example.ui.components.isMachineGeneratedFilename
 import com.example.ui.domain.LibraryDerivationEngine
 import com.example.ui.screens.BookshelfScreen
 import com.example.ui.screens.GalleryScreen
+import androidx.test.core.app.ApplicationProvider
+import com.example.ui.theme.DefaultStartTab
 import com.example.ui.theme.FlipYearTheme
+import com.example.ui.theme.FlipbookDefaultView
+import com.example.ui.theme.GalleryGridDensity
+import com.example.ui.theme.ThemePreferences
+import com.example.ui.theme.TimelineSortOrder
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -88,17 +94,93 @@ class RefactoringVerificationTest {
         val s1 = photo(12L, status = PhotoStatus.UNREVIEWED)
         val excluded = photo(13L, status = PhotoStatus.UNREVIEWED)
 
-        val queue = LibraryDerivationEngine.buildArcQueue(
+        // Default NEWEST_FIRST: s1 (id=12) precedes burst b_kyoto (id=10,11), while burst internals stay chronological
+        val newestQueue = LibraryDerivationEngine.buildArcQueue(
             allPhotos = listOf(b1, b2, s1, excluded),
             includeReviewed = true,
-            customPhotoIds = setOf(10L, 11L, 12L)
+            customPhotoIds = setOf(10L, 11L, 12L),
+            sortOrder = TimelineSortOrder.NEWEST_FIRST
         )
+        assertEquals(2, newestQueue.size)
+        assertTrue(newestQueue[0] is CleanupCardItem.SinglePhoto)
+        assertEquals(12L, (newestQueue[0] as CleanupCardItem.SinglePhoto).photo.id)
+        assertTrue(newestQueue[1] is CleanupCardItem.BurstStack)
+        assertEquals(listOf(10L, 11L), (newestQueue[1] as CleanupCardItem.BurstStack).photos.map { it.id })
 
-        assertEquals(2, queue.size)
-        assertTrue(queue[0] is CleanupCardItem.BurstStack)
-        assertEquals(2, (queue[0] as CleanupCardItem.BurstStack).photos.size)
-        assertTrue(queue[1] is CleanupCardItem.SinglePhoto)
-        assertEquals(12L, (queue[1] as CleanupCardItem.SinglePhoto).photo.id)
+        // OLDEST_FIRST: burst b_kyoto precedes s1
+        val oldestQueue = LibraryDerivationEngine.buildArcQueue(
+            allPhotos = listOf(b1, b2, s1, excluded),
+            includeReviewed = true,
+            customPhotoIds = setOf(10L, 11L, 12L),
+            sortOrder = TimelineSortOrder.OLDEST_FIRST
+        )
+        assertEquals(2, oldestQueue.size)
+        assertTrue(oldestQueue[0] is CleanupCardItem.BurstStack)
+        assertEquals(listOf(10L, 11L), (oldestQueue[0] as CleanupCardItem.BurstStack).photos.map { it.id })
+        assertTrue(oldestQueue[1] is CleanupCardItem.SinglePhoto)
+        assertEquals(12L, (oldestQueue[1] as CleanupCardItem.SinglePhoto).photo.id)
+    }
+
+    @Test
+    fun unifiedTimelineOrdering_alignsYearbooksAndMonthPagesAndEmptyMonthToggle() {
+        val pJan2025 = photo(1L, year = 2025, month = 1, day = 5)
+        val pMar2026 = photo(2L, year = 2026, month = 3, day = 8)
+        val pNov2026 = photo(3L, year = 2026, month = 11, day = 18)
+        val all = listOf(pJan2025, pMar2026, pNov2026)
+
+        // Yearbooks order
+        val yearsDesc = LibraryDerivationEngine.buildYearbooksLinear(all, emptyMap(), emptyMap(), TimelineSortOrder.NEWEST_FIRST)
+        val yearsAsc = LibraryDerivationEngine.buildYearbooksLinear(all, emptyMap(), emptyMap(), TimelineSortOrder.OLDEST_FIRST)
+        assertEquals(listOf(2026, 2025), yearsDesc.map { it.year })
+        assertEquals(listOf(2025, 2026), yearsAsc.map { it.year })
+
+        // Month pages default: populated only, newest first
+        val monthsDescPopulated = LibraryDerivationEngine.buildMonthPagesForYear(
+            year = 2026,
+            allPhotos = all,
+            monthStamps = emptyMap(),
+            sortOrder = TimelineSortOrder.NEWEST_FIRST,
+            showEmptyMonths = false
+        )
+        assertEquals(listOf(11, 3), monthsDescPopulated.map { it.month })
+
+        // Month pages populated only, oldest first
+        val monthsAscPopulated = LibraryDerivationEngine.buildMonthPagesForYear(
+            year = 2026,
+            allPhotos = all,
+            monthStamps = emptyMap(),
+            sortOrder = TimelineSortOrder.OLDEST_FIRST,
+            showEmptyMonths = false
+        )
+        assertEquals(listOf(3, 11), monthsAscPopulated.map { it.month })
+
+        // Month pages with empty months enabled, newest first (12..1)
+        val monthsDescAll = LibraryDerivationEngine.buildMonthPagesForYear(
+            year = 2026,
+            allPhotos = all,
+            monthStamps = emptyMap(),
+            sortOrder = TimelineSortOrder.NEWEST_FIRST,
+            showEmptyMonths = true
+        )
+        assertEquals((12 downTo 1).toList(), monthsDescAll.map { it.month })
+    }
+
+    @Test
+    fun userPreferences_persistsChronologyAndViewSettings() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val prefs = ThemePreferences(context)
+        prefs.setTimelineSortOrder(TimelineSortOrder.OLDEST_FIRST)
+        prefs.setShowEmptyMonths(true)
+        prefs.setFlipbookDefaultView(FlipbookDefaultView.GALLERY)
+        prefs.setDefaultStartTab(DefaultStartTab.GALLERY)
+        prefs.setGalleryGridDensity(GalleryGridDensity.COMPACT)
+
+        val reloaded = ThemePreferences(context).userPreferences.value
+        assertEquals(TimelineSortOrder.OLDEST_FIRST, reloaded.timelineSortOrder)
+        assertTrue(reloaded.showEmptyMonths)
+        assertEquals(FlipbookDefaultView.GALLERY, reloaded.flipbookDefaultView)
+        assertEquals(DefaultStartTab.GALLERY, reloaded.defaultStartTab)
+        assertEquals(GalleryGridDensity.COMPACT, reloaded.galleryGridDensity)
     }
 
     @Test

@@ -121,6 +121,11 @@ import com.example.ui.screens.FootprintMapScreen
 import com.example.ui.screens.GalleryScreen
 import com.example.ui.screens.TrashVaultScreen
 import com.example.ui.theme.AppThemeMode
+import com.example.ui.theme.DefaultStartTab
+import com.example.ui.theme.FlipbookDefaultView
+import com.example.ui.theme.GalleryGridDensity
+import com.example.ui.theme.TimelineSortOrder
+import com.example.ui.theme.UserPreferences
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CobaltSoft
 import com.example.ui.theme.CoralDanger
@@ -182,7 +187,13 @@ private data class TopLevelTab(
 @Composable
 fun FlipYearApp(
     themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    userPreferences: UserPreferences = UserPreferences(themeMode = themeMode),
     onSelectThemeMode: (AppThemeMode) -> Unit = {},
+    onSelectTimelineSortOrder: (TimelineSortOrder) -> Unit = {},
+    onToggleShowEmptyMonths: (Boolean) -> Unit = {},
+    onSelectFlipbookDefaultView: (FlipbookDefaultView) -> Unit = {},
+    onSelectDefaultStartTab: (DefaultStartTab) -> Unit = {},
+    onSelectGalleryGridDensity: (GalleryGridDensity) -> Unit = {},
     viewModel: FlipYearViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -191,6 +202,12 @@ fun FlipYearApp(
     val context = LocalContext.current
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+
+    LaunchedEffect(userPreferences.timelineSortOrder) {
+        viewModel.setTimelineSortOrder(userPreferences.timelineSortOrder)
+    }
+
+    val initialStartDestination = remember { userPreferences.defaultStartTab.route }
 
     val onboardingPrefs = remember(context) { ThemePreferences(context) }
     val hasSeenOnboarding by onboardingPrefs.hasSeenOnboardingGuide.collectAsStateWithLifecycle()
@@ -418,7 +435,7 @@ fun FlipYearApp(
                 Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
                     NavHost(
                         navController = navController,
-                        startDestination = FlipYearRoutes.BOOKSHELF,
+                        startDestination = initialStartDestination,
                         enterTransition = {
                             fadeIn(animationSpec = tween(220)) + scaleIn(
                                 initialScale = 0.97f,
@@ -434,7 +451,16 @@ fun FlipYearApp(
                             BookshelfScreen(
                                 uiState = uiState,
                                 themeMode = themeMode,
+                                userPreferences = userPreferences,
                                 onSelectThemeMode = onSelectThemeMode,
+                                onSelectTimelineSortOrder = { order ->
+                                    onSelectTimelineSortOrder(order)
+                                    viewModel.setTimelineSortOrder(order)
+                                },
+                                onToggleShowEmptyMonths = onToggleShowEmptyMonths,
+                                onSelectFlipbookDefaultView = onSelectFlipbookDefaultView,
+                                onSelectDefaultStartTab = onSelectDefaultStartTab,
+                                onSelectGalleryGridDensity = onSelectGalleryGridDensity,
                                 onOpenYearbook = { year ->
                                     navController.navigate(FlipYearRoutes.flipbook(year))
                                 },
@@ -464,6 +490,7 @@ fun FlipYearApp(
                         composable(FlipYearRoutes.GALLERY) {
                             GalleryScreen(
                                 uiState = uiState,
+                                galleryColumns = userPreferences.galleryGridDensity.columns,
                                 onSelectBestInBurst = viewModel::selectBestInStack,
                                 onKeepBestInBurst = viewModel::keepBestInGalleryBurst,
                                 onKeepPhoto = { photo, fav -> viewModel.keepPhoto(photo, fav, fromCleanerSession = false) },
@@ -570,13 +597,26 @@ fun FlipYearApp(
                             arguments = listOf(navArgument("year") { type = NavType.IntType })
                         ) { entry ->
                             val year = entry.arguments?.getInt("year") ?: 2026
-                            val pages = remember(year, uiState.allPhotos, uiState.monthStamps) {
-                                viewModel.getMonthPagesForYear(year, uiState)
+                            val pages = remember(
+                                year,
+                                uiState.allPhotos,
+                                uiState.monthStamps,
+                                uiState.timelineSortOrder,
+                                userPreferences.showEmptyMonths
+                            ) {
+                                viewModel.getMonthPagesForYear(
+                                    year = year,
+                                    state = uiState,
+                                    showEmptyMonths = userPreferences.showEmptyMonths
+                                )
                             }
                             FlipbookScreen(
                                 year = year,
                                 monthPages = pages,
                                 recentlyStampedMonthKey = uiState.recentlyStampedMonthKey,
+                                timelineSortOrder = uiState.timelineSortOrder,
+                                showEmptyMonths = userPreferences.showEmptyMonths,
+                                defaultShowGalleryMode = userPreferences.flipbookDefaultView == FlipbookDefaultView.GALLERY,
                                 onBack = { navController.popBackStack() },
                                 onStartMonthCleanup = { y, m, includeReviewed, focusDay ->
                                     navController.navigate(
@@ -628,7 +668,8 @@ fun FlipYearApp(
                                 locArg,
                                 includeReviewed,
                                 customSession,
-                                uiState.allPhotos
+                                uiState.allPhotos,
+                                uiState.timelineSortOrder
                             ) {
                                 viewModel.buildArcQueue(
                                     year = yearArg,
