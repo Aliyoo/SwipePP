@@ -136,6 +136,7 @@ fun BurstGalleryGrid(
     selectedPhotoIds: Set<Long> = emptySet(),
     onToggleSelectPhotos: (List<PhotoItemEntity>) -> Unit = {},
     onLongPressSelectPhotos: (List<PhotoItemEntity>) -> Unit = {},
+    onCleanMonth: ((year: Int, month: Int, isCleaned: Boolean) -> Unit)? = null,
     monthStamps: Map<String, MonthStampEntity> = emptyMap(),
     showMonthStampOverlay: Boolean = false,
     modifier: Modifier = Modifier
@@ -154,6 +155,22 @@ fun BurstGalleryGrid(
     if (showMonthStampOverlay) {
         val clusterLayout = remember(entries, monthStamps) {
             buildTimelineClusterLayout(entries, monthStamps)
+        }
+        val monthPhotosMap = remember(entries, isSelectionMode) {
+            if (!isSelectionMode) {
+                emptyMap()
+            } else {
+                val map = HashMap<String, ArrayList<PhotoItemEntity>>()
+                for (entry in entries) {
+                    val key = "${entry.primaryPhoto.year}-${entry.primaryPhoto.month.toString().padStart(2, '0')}"
+                    val list = map.getOrPut(key) { ArrayList() }
+                    when (entry) {
+                        is GalleryEntry.Single -> list.add(entry.photo)
+                        is GalleryEntry.Burst -> list.addAll(entry.photos)
+                    }
+                }
+                map
+            }
         }
 
         Box(modifier = modifier) {
@@ -188,7 +205,23 @@ fun BurstGalleryGrid(
                 ) { item ->
                     when (item) {
                         is TimelineGridItem.MonthDivider -> {
-                            MonthlyClusterHeaderStamp(cluster = item.cluster)
+                            val monthPhotos = monthPhotosMap[item.cluster.yearMonthKey].orEmpty()
+                            val isMonthAllSelected = isSelectionMode && monthPhotos.isNotEmpty() &&
+                                monthPhotos.all { it.id in selectedPhotoIds }
+                            MonthlyClusterHeaderStamp(
+                                cluster = item.cluster,
+                                isSelectionMode = isSelectionMode,
+                                isMonthAllSelected = isMonthAllSelected,
+                                onToggleSelectMonth = if (isSelectionMode && monthPhotos.isNotEmpty()) {
+                                    {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onToggleSelectPhotos(monthPhotos)
+                                    }
+                                } else null,
+                                onCleanMonth = onCleanMonth?.let { cb ->
+                                    { cb(item.cluster.year, item.cluster.month, item.cluster.isCleaned) }
+                                }
+                            )
                         }
 
                         is TimelineGridItem.MediaEntry -> {

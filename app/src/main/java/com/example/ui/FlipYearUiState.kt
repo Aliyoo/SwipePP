@@ -171,6 +171,13 @@ sealed interface GalleryEntry {
 const val UNLOCATED_LOCATION_KEY = "__UNLOCATED__"
 
 @Immutable
+data class CustomCleanerSession(
+    val title: String,
+    val photoIds: Set<Long>,
+    val includeReviewed: Boolean = true
+)
+
+@Immutable
 data class FlipYearUiState(
     val isLoading: Boolean = true,
     val isScanningDevice: Boolean = false,
@@ -199,6 +206,7 @@ data class FlipYearUiState(
     val feedbackBanner: String? = null,
     val recentlyStampedMonthKey: String? = null,
     val vaultSessionFilterIds: Set<Long>? = null,
+    val customCleanerSession: CustomCleanerSession? = null,
     val batchTaskMessage: String? = null,
     val batchTaskProcessed: Int = 0,
     val batchTaskTotal: Int = 0

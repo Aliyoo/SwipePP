@@ -491,12 +491,11 @@ private fun ModernCalendarBookPage(
     onDayClick: (Int) -> Unit
 ) {
     val absOffset = pageOffset.absoluteValue.coerceIn(0f, 1f)
-    // Restrained center-axis 3D folio turn: keeps projected near-edge strictly inside
-    // vertical viewport bounds at every scroll fraction so pages never bleed over the
-    // top header or bottom month selector pills while gliding edge-to-edge cleanly.
-    val rotationDeg = (-pageOffset * 18f).coerceIn(-22f, 22f)
-    val scale = lerp(1f, 0.90f, absOffset)
-    val pageAlpha = lerp(1f, 0.74f, absOffset)
+    // Realistic left-spine hardcover hinge: turning pages pivot along the bound left spine (x=0.06f)
+    // with restrained perspective angle so the page glides cleanly without clipping header/footer chrome.
+    val rotationDeg = (-pageOffset * 20f).coerceIn(-24f, 24f)
+    val scale = lerp(1f, 0.92f, absOffset)
+    val pageAlpha = lerp(1f, 0.76f, absOffset)
     val pageShape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 22.dp, bottomEnd = 22.dp)
 
     val isDark = LocalIsDarkTheme.current
@@ -508,12 +507,12 @@ private fun ModernCalendarBookPage(
             .fillMaxSize()
             .zIndex(1f - absOffset)
             .graphicsLayer {
-                transformOrigin = TransformOrigin.Center
+                transformOrigin = TransformOrigin(0.06f, 0.5f)
                 rotationY = rotationDeg
                 scaleX = scale
                 scaleY = scale
                 alpha = pageAlpha
-                cameraDistance = 24f * density
+                cameraDistance = 26f * density
             }
             .shadow(elevation = lerp(12f, 4f, absOffset).dp, shape = pageShape, spotColor = pageShadowColor)
             .clip(pageShape)
@@ -691,36 +690,9 @@ private fun ModernCalendarBookPage(
                 }
             } else if (showGalleryMode) {
                 val monthGalleryEntries = remember(page.photos) {
-                    val visible = page.photos.filter { it.photoStatus != PhotoStatus.TRASHED }
-                        .sortedByDescending { it.takenAtMillis }
-                    val burstMap = HashMap<String, ArrayList<PhotoItemEntity>>()
-                    for (photo in visible) {
-                        val gid = photo.burstGroupId
-                        if (gid != null && !photo.isVideo) {
-                            burstMap.getOrPut(gid) { ArrayList(4) }.add(photo)
-                        }
-                    }
-                    val entries = ArrayList<GalleryEntry>(visible.size)
-                    val consumed = HashSet<String>(burstMap.size * 2)
-                    for (photo in visible) {
-                        val gid = photo.burstGroupId
-                        if (gid != null && !photo.isVideo) {
-                            if (consumed.add(gid)) {
-                                val members = burstMap[gid].orEmpty().sortedBy { it.takenAtMillis }
-                                if (members.size >= 2) {
-                                    val best = members.firstOrNull { it.isBestInStack }
-                                        ?: members.maxByOrNull { it.qualityScore }
-                                        ?: members.first()
-                                    entries += GalleryEntry.Burst(gid, members, best)
-                                } else {
-                                    entries += GalleryEntry.Single(photo)
-                                }
-                            }
-                        } else {
-                            entries += GalleryEntry.Single(photo)
-                        }
-                    }
-                    entries
+                    com.example.ui.domain.LibraryDerivationEngine.buildGalleryEntries(
+                        page.photos.filter { it.photoStatus != PhotoStatus.TRASHED }
+                    )
                 }
 
                 BurstGalleryGrid(

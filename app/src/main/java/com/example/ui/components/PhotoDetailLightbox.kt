@@ -446,20 +446,38 @@ private fun PhotoDetailLightboxContent(
                             .pointerInput(pagePhoto.id) {
                                 detectTapGestures(
                                     onTap = { showChrome = !showChrome },
-                                    onDoubleTap = {
+                                    onDoubleTap = { tapOffset ->
                                         if (!isCurrentPage) return@detectTapGestures
                                         scope.launch {
-                                            val target = if (scale > 1.4f) 1f else 2.5f
-                                            scaleAnim.snapTo(scale)
+                                            val targetScale = if (scale > 1.4f) 1f else 2.5f
+                                            val startScale = scale
+                                            val startOffset = offset
+                                            val targetOffset = if (targetScale > 1.05f) {
+                                                val centerX = size.width / 2f
+                                                val centerY = size.height / 2f
+                                                val maxShiftX = (size.width * (targetScale - 1f)) / 2f
+                                                val maxShiftY = (size.height * (targetScale - 1f)) / 2f
+                                                Offset(
+                                                    x = ((centerX - tapOffset.x) * (targetScale - 1f)).coerceIn(-maxShiftX, maxShiftX),
+                                                    y = ((centerY - tapOffset.y) * (targetScale - 1f)).coerceIn(-maxShiftY, maxShiftY)
+                                                )
+                                            } else {
+                                                Offset.Zero
+                                            }
+                                            scaleAnim.snapTo(0f)
                                             scaleAnim.animateTo(
-                                                targetValue = target,
+                                                targetValue = 1f,
                                                 animationSpec = spring(
                                                     dampingRatio = Spring.DampingRatioNoBouncy,
                                                     stiffness = Spring.StiffnessMedium
                                                 )
                                             ) {
-                                                scale = value
-                                                if (value <= 1.05f) offset = Offset.Zero
+                                                val t = value
+                                                scale = startScale + (targetScale - startScale) * t
+                                                offset = Offset(
+                                                    x = startOffset.x + (targetOffset.x - startOffset.x) * t,
+                                                    y = startOffset.y + (targetOffset.y - startOffset.y) * t
+                                                )
                                             }
                                         }
                                     }
@@ -654,29 +672,44 @@ private fun LightboxBottomHud(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
+                        val editorialTitle = remember(photo.id, photo.caption, photo.locationName, photo.takenAtMillis) {
+                            formatEditorialPhotoTitle(photo)
+                        }
                         Text(
-                            text = photo.caption.ifBlank { if (photo.isVideo) "本地视频" else "本地照片" },
+                            text = editorialTitle,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        if (!photo.locationName.isNullOrBlank()) {
+                        val showRawFilename = photo.caption.isNotBlank() && isMachineGeneratedFilename(photo.caption)
+                        if (!photo.locationName.isNullOrBlank() || showRawFilename) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.LocationOn,
-                                    contentDescription = null,
-                                    tint = Color(0xFF7FA6FF),
-                                    modifier = Modifier.size(13.dp)
-                                )
+                                if (!photo.locationName.isNullOrBlank()) {
+                                    Icon(
+                                        imageVector = Icons.Filled.LocationOn,
+                                        contentDescription = null,
+                                        tint = Color(0xFF7FA6FF),
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                }
+                                val subLabel = buildString {
+                                    if (!photo.locationName.isNullOrBlank()) {
+                                        append(photo.locationName)
+                                    }
+                                    if (showRawFilename) {
+                                        if (isNotEmpty()) append(" · ")
+                                        append(photo.caption)
+                                    }
+                                }
                                 Text(
-                                    text = photo.locationName,
+                                    text = subLabel,
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = Color.White.copy(alpha = 0.82f),
+                                    color = Color.White.copy(alpha = 0.78f),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )

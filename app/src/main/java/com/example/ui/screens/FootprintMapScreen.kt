@@ -3,10 +3,12 @@ package com.example.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +36,7 @@ import androidx.compose.material.icons.filled.EditLocationAlt
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocationOff
@@ -48,6 +51,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -78,6 +82,7 @@ import com.example.data.SameDayLocationMatch
 import com.example.data.inferSameDayLocations
 import com.example.ui.FlipYearUiState
 import com.example.ui.LocalFloatingDockInset
+import com.example.ui.MediaFilter
 import com.example.ui.UNLOCATED_LOCATION_KEY
 import com.example.ui.components.BatchLocationEditorSheet
 import com.example.ui.components.FootprintMapStyle
@@ -90,6 +95,7 @@ import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.PhotoDetailLightbox
 import com.example.ui.components.formatStorageSize
 import com.example.ui.components.rememberSlippyMapCameraState
+import com.example.ui.theme.CobaltDark
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CoralDanger
 import com.example.ui.theme.CoralSoft
@@ -118,6 +124,7 @@ fun FootprintMapScreen(
     onBatchSameDayLocation: (List<SameDayLocationMatch>, Boolean) -> Unit = { _, _ -> },
     onGeocodeLocation: suspend (String) -> ResolvedGeoLocation? = { null },
     onToggleFavorite: (PhotoItemEntity, Boolean) -> Unit = { p, f -> onKeepPhoto(p, f) },
+    onResetGlobalMediaFilter: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -464,6 +471,49 @@ fun FootprintMapScreen(
                 }
             }
 
+            // Global MediaFilter active notice when user filtered to Photos/Videos on Bookshelf
+            if (uiState.mediaFilter != MediaFilter.ALL) {
+                FrostedGlassCard(
+                    shape = RoundedCornerShape(16.dp),
+                    borderAccent = CobaltPrimary,
+                    shadowElevation = 6.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .testTag("map_global_filter_banner")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 12.dp, end = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.FilterList,
+                                contentDescription = null,
+                                tint = CobaltPrimary,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Text(
+                                text = "当前仅显示${uiState.mediaFilter.label}",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = CobaltDark
+                            )
+                        }
+                        TextButton(onClick = onResetGlobalMediaFilter) {
+                            Text("显示全部", color = CobaltPrimary, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
             // Subtle retry pill only shown when online tiles fail to load (e.g. temporary offline state)
             if (mapStyle != FootprintMapStyle.VECTOR && tileFailedCount > 0 && tileLoadedCount == 0) {
                 FrostedGlassCard(
@@ -496,13 +546,23 @@ fun FootprintMapScreen(
             }
         }
 
-        // Right-side Floating Zoom, Fit-All & GPS Re-Index Controls
+        // Right-side Floating Zoom, Fit-All & GPS Re-Index Controls (dynamically clears expanded bottom card)
+        val hasBottomCard = selectedCluster != null || showingUnlocated
+        val controlsBottomPadding by animateDpAsState(
+            targetValue = when {
+                hasBottomCard && isCardExpanded -> 268.dp + floatingDockInset * 0.45f
+                hasBottomCard -> 132.dp + floatingDockInset * 0.4f
+                else -> 0.dp
+            },
+            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+            label = "map_controls_clearance"
+        )
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(
                     end = 14.dp,
-                    bottom = if (selectedCluster != null || showingUnlocated) 140.dp + floatingDockInset * 0.4f else 0.dp
+                    bottom = controlsBottomPadding
                 )
                 .pointerInput(Unit) {},
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -683,12 +743,31 @@ fun FootprintMapScreen(
                             stiffness = Spring.StiffnessMediumLow
                         )
                     )
+                    .pointerInput(Unit) {
+                        var totalDrag = 0f
+                        detectVerticalDragGestures(
+                            onDragStart = { totalDrag = 0f },
+                            onVerticalDrag = { _, dragAmount -> totalDrag += dragAmount },
+                            onDragEnd = {
+                                if (totalDrag < -36f) isCardExpanded = true
+                                else if (totalDrag > 36f) isCardExpanded = false
+                            }
+                        )
+                    }
                     .testTag("unlocated_detail_card")
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .width(36.dp)
+                            .height(4.dp)
+                            .clip(CircleShape)
+                            .background(InkTertiary.copy(alpha = 0.35f))
+                    )
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -833,12 +912,31 @@ fun FootprintMapScreen(
                             stiffness = Spring.StiffnessMediumLow
                         )
                     )
+                    .pointerInput(Unit) {
+                        var totalDrag = 0f
+                        detectVerticalDragGestures(
+                            onDragStart = { totalDrag = 0f },
+                            onVerticalDrag = { _, dragAmount -> totalDrag += dragAmount },
+                            onDragEnd = {
+                                if (totalDrag < -36f) isCardExpanded = true
+                                else if (totalDrag > 36f) isCardExpanded = false
+                            }
+                        )
+                    }
                     .testTag("location_detail_card")
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .width(36.dp)
+                            .height(4.dp)
+                            .clip(CircleShape)
+                            .background(InkTertiary.copy(alpha = 0.35f))
+                    )
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

@@ -26,11 +26,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.PhotoItemEntity
 import com.example.ui.theme.EmeraldKeep
 import com.example.ui.theme.EmeraldSoft
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.OutfitFontFamily
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -86,6 +88,63 @@ fun formatShortTime(millis: Long): String {
 fun daysStagedInVault(trashedAtMillis: Long?, nowMillis: Long = System.currentTimeMillis()): Int {
     if (trashedAtMillis == null) return 0
     return ((nowMillis - trashedAtMillis) / 86_400_000L).toInt().coerceAtLeast(0)
+}
+
+private val MACHINE_FILENAME_REGEX = Regex(
+    pattern = "^(?:" +
+        "(?:IMG|DSC|PXL|VID|MOV|MVIMG|Screenshot|Screenrecorder|wx_camera|mmexport|RPReplay|DJI)[-_\\d A-Za-z]*|" +
+        "\\d{6,8}[_-]\\d{4,6}(?:[_-][A-Za-z0-9]+)*|" +
+        "\\d{10,16}" +
+        ")$",
+    option = RegexOption.IGNORE_CASE
+)
+
+private val GENERIC_FOLDER_NAMES = setOf(
+    "camera", "dcim", "screenshots", "pictures", "movies", "video", "videos", "download", "downloads"
+)
+
+fun isMachineGeneratedFilename(raw: String?): Boolean {
+    val trimmed = raw?.trim().orEmpty()
+    if (trimmed.isEmpty()) return true
+    return MACHINE_FILENAME_REGEX.matches(trimmed)
+}
+
+fun formatTimeOfDayLabel(millis: Long): String {
+    if (millis <= 0L) return "日常"
+    val cal = Calendar.getInstance().apply { timeInMillis = millis }
+    return when (cal.get(Calendar.HOUR_OF_DAY)) {
+        in 5..8 -> "清晨"
+        in 9..11 -> "上午"
+        in 12..16 -> "午后"
+        in 17..19 -> "黄昏"
+        else -> "夜晚"
+    }
+}
+
+/**
+ * Converts raw camera/system filenames (e.g. "20261109_091925", "IMG_20250812_183000")
+ * into warm editorial titles while preserving user/curated captions untouched.
+ */
+fun formatEditorialPhotoTitle(photo: PhotoItemEntity): String {
+    val raw = photo.caption.trim()
+    if (raw.isNotEmpty() && !isMachineGeneratedFilename(raw)) {
+        return raw
+    }
+    val lowerRaw = raw.lowercase(Locale.ROOT)
+    val lowerBucket = photo.bucketName?.trim()?.lowercase(Locale.ROOT).orEmpty()
+    if (lowerRaw.startsWith("screenshot") || lowerBucket == "screenshots") {
+        return "屏幕截图 · ${photo.month}月${photo.day}日"
+    }
+    val timeMood = formatTimeOfDayLabel(photo.takenAtMillis)
+    val mediaNoun = if (photo.isVideo) "动态影像" else "光影记录"
+    val cleanLoc = photo.locationName?.trim()?.takeIf {
+        it.isNotEmpty() && it.lowercase(Locale.ROOT) !in GENERIC_FOLDER_NAMES
+    }
+    return if (cleanLoc != null) {
+        "$cleanLoc · ${timeMood}${mediaNoun}"
+    } else {
+        "${photo.month}月${photo.day}日 · ${timeMood}${mediaNoun}"
+    }
 }
 
 fun formatVaultStagedLabel(trashedAtMillis: Long?, nowMillis: Long = System.currentTimeMillis()): String {

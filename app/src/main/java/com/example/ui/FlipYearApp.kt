@@ -141,7 +141,7 @@ object FlipYearRoutes {
     const val MAP = "footprint_map"
     const val VAULT = "trash_vault"
     const val FLIPBOOK = "flipbook/{year}"
-    const val CLEANER = "arc_cleaner?year={year}&month={month}&day={day}&location={location}&includeReviewed={includeReviewed}&source={source}"
+    const val CLEANER = "arc_cleaner?year={year}&month={month}&day={day}&location={location}&includeReviewed={includeReviewed}&source={source}&custom={custom}"
 
     fun flipbook(year: Int) = "flipbook/$year"
 
@@ -149,7 +149,7 @@ object FlipYearRoutes {
         year: Int,
         includeReviewed: Boolean,
         source: CleanerEntrySource = CleanerEntrySource.BOOKSHELF
-    ) = "arc_cleaner?year=$year&month=-1&day=-1&location=&includeReviewed=$includeReviewed&source=${source.routeKey}"
+    ) = "arc_cleaner?year=$year&month=-1&day=-1&location=&includeReviewed=$includeReviewed&source=${source.routeKey}&custom=false"
 
     fun cleanerForMonth(
         year: Int,
@@ -157,13 +157,18 @@ object FlipYearRoutes {
         includeReviewed: Boolean,
         focusDay: Int? = null,
         source: CleanerEntrySource = CleanerEntrySource.FLIPBOOK
-    ) = "arc_cleaner?year=$year&month=$month&day=${focusDay ?: -1}&location=&includeReviewed=$includeReviewed&source=${source.routeKey}"
+    ) = "arc_cleaner?year=$year&month=$month&day=${focusDay ?: -1}&location=&includeReviewed=$includeReviewed&source=${source.routeKey}&custom=false"
 
     fun cleanerForLocation(
         location: String,
         includeReviewed: Boolean,
         source: CleanerEntrySource = CleanerEntrySource.MAP
-    ) = "arc_cleaner?year=-1&month=-1&day=-1&location=${Uri.encode(location)}&includeReviewed=$includeReviewed&source=${source.routeKey}"
+    ) = "arc_cleaner?year=-1&month=-1&day=-1&location=${Uri.encode(location)}&includeReviewed=$includeReviewed&source=${source.routeKey}&custom=false"
+
+    fun cleanerForCustom(
+        includeReviewed: Boolean = true,
+        source: CleanerEntrySource = CleanerEntrySource.GALLERY
+    ) = "arc_cleaner?year=-1&month=-1&day=-1&location=&includeReviewed=$includeReviewed&source=${source.routeKey}&custom=true"
 }
 
 private data class TopLevelTab(
@@ -482,7 +487,34 @@ fun FlipYearApp(
                                     )
                                 },
                                 onGeocodeLocation = viewModel::geocodeLocationQuery,
-                                onSelectionModeChanged = { isGallerySelectionMode = it }
+                                onSelectionModeChanged = { isGallerySelectionMode = it },
+                                onStartCustomCleanup = { sessionTitle, photoIds, includeRev ->
+                                    if (photoIds.isNotEmpty()) {
+                                        viewModel.setCustomCleanerSession(
+                                            title = sessionTitle,
+                                            photoIds = photoIds,
+                                            includeReviewed = includeRev
+                                        )
+                                        navController.navigate(
+                                            FlipYearRoutes.cleanerForCustom(
+                                                includeReviewed = includeRev,
+                                                source = CleanerEntrySource.GALLERY
+                                            )
+                                        )
+                                    }
+                                },
+                                onStartMonthCleanup = { y, m, includeRev ->
+                                    navController.navigate(
+                                        FlipYearRoutes.cleanerForMonth(
+                                            year = y,
+                                            month = m,
+                                            includeReviewed = includeRev,
+                                            focusDay = null,
+                                            source = CleanerEntrySource.GALLERY
+                                        )
+                                    )
+                                },
+                                onResetGlobalMediaFilter = { viewModel.setMediaFilter(MediaFilter.ALL) }
                             )
                         }
 
@@ -518,7 +550,8 @@ fun FlipYearApp(
                                         viewModel.requestBatchSameDayLocation(matches, writeExif)
                                     )
                                 },
-                                onGeocodeLocation = viewModel::geocodeLocationQuery
+                                onGeocodeLocation = viewModel::geocodeLocationQuery,
+                                onResetGlobalMediaFilter = { viewModel.setMediaFilter(MediaFilter.ALL) }
                             )
                         }
 
@@ -572,7 +605,8 @@ fun FlipYearApp(
                                 navArgument("day") { type = NavType.IntType; defaultValue = -1 },
                                 navArgument("location") { type = NavType.StringType; defaultValue = "" },
                                 navArgument("includeReviewed") { type = NavType.BoolType; defaultValue = false },
-                                navArgument("source") { type = NavType.StringType; defaultValue = CleanerEntrySource.BOOKSHELF.routeKey }
+                                navArgument("source") { type = NavType.StringType; defaultValue = CleanerEntrySource.BOOKSHELF.routeKey },
+                                navArgument("custom") { type = NavType.BoolType; defaultValue = false }
                             )
                         ) { entry ->
                             val yearArg = entry.arguments?.getInt("year")?.takeIf { it > 0 }
@@ -581,22 +615,33 @@ fun FlipYearApp(
                             val locArg = entry.arguments?.getString("location")?.takeIf { it.isNotBlank() }
                             val includeReviewed = entry.arguments?.getBoolean("includeReviewed") ?: false
                             val entrySource = CleanerEntrySource.fromRouteKey(entry.arguments?.getString("source"))
+                            val isCustomSession = entry.arguments?.getBoolean("custom") ?: false
+                            val customSession = if (isCustomSession) uiState.customCleanerSession else null
 
                             LaunchedEffect(entry.id) {
                                 viewModel.resetCleanerSessionUndo()
                             }
 
-                            val queue = remember(yearArg, monthArg, locArg, includeReviewed, uiState.allPhotos) {
+                            val queue = remember(
+                                yearArg,
+                                monthArg,
+                                locArg,
+                                includeReviewed,
+                                customSession,
+                                uiState.allPhotos
+                            ) {
                                 viewModel.buildArcQueue(
                                     year = yearArg,
                                     month = monthArg,
                                     locationName = locArg,
-                                    includeReviewed = includeReviewed,
-                                    state = uiState
+                                    includeReviewed = customSession?.includeReviewed ?: includeReviewed,
+                                    state = uiState,
+                                    customPhotoIds = customSession?.photoIds
                                 )
                             }
 
                             val headerTitle = when {
+                                customSession != null -> customSession.title
                                 locArg == UNLOCATED_LOCATION_KEY -> "清理无定位媒体"
                                 locArg != null -> "清理足迹 · $locArg"
                                 yearArg != null && monthArg != null -> "整理 ${yearArg}年${monthChineseName(monthArg)}"
@@ -843,8 +888,8 @@ private fun FloatingGalleryDock(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 7.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .padding(horizontal = 6.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             tabs.forEach { tab ->
@@ -861,12 +906,13 @@ private fun FloatingGalleryDock(
                     label = "dock_content_color"
                 )
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                     modifier = Modifier
-                        .height(48.dp)
-                        .clip(CircleShape)
+                        .weight(1f)
+                        .height(50.dp)
+                        .clip(RoundedCornerShape(25.dp))
                         .then(
                             if (selected) {
                                 Modifier
@@ -879,7 +925,7 @@ private fun FloatingGalleryDock(
                                             strokeWidth = 0.9.dp.toPx()
                                         )
                                     }
-                                    .border(width = 1.dp, brush = activeRimBrush, shape = CircleShape)
+                                    .border(width = 1.dp, brush = activeRimBrush, shape = RoundedCornerShape(25.dp))
                             } else {
                                 Modifier
                             }
@@ -890,13 +936,7 @@ private fun FloatingGalleryDock(
                             this.selected = selected
                         }
                         .clickable(role = Role.Tab) { onSelectTab(tab.route) }
-                        .animateContentSize(
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioLowBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            )
-                        )
-                        .padding(horizontal = if (selected) 16.dp else 14.dp)
+                        .padding(horizontal = 4.dp, vertical = 4.dp)
                         .testTag(tab.testTag)
                 ) {
                     TabIconWithBadge(
@@ -906,19 +946,16 @@ private fun FloatingGalleryDock(
                         tint = contentColor,
                         decorative = true
                     )
-                    AnimatedVisibility(visible = selected) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Spacer(modifier = Modifier.width(7.dp))
-                            Text(
-                                text = tabLabel,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = contentColor,
-                                maxLines = 1
-                            )
-                        }
-                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = tabLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        color = contentColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }

@@ -4,9 +4,11 @@ import android.os.Build
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
@@ -195,160 +198,34 @@ fun TrashVaultScreen(
                 }
             }
 
-            // Reclaimable Storage Frosted Glass Summary Card (split deletion vs compression stats)
-            FrostedGlassCard(
-                shape = RoundedCornerShape(22.dp),
-                borderAccent = if (displayedTrashed.isNotEmpty()) CoralDanger else null,
-                shadowElevation = 6.dp,
-                enableAmbientBlur = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Column {
-                        Text(
-                            text = if (isPartialSelection) "已选待释放空间" else "待释放空间",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = InkSecondary
-                        )
-                        Text(
-                            text = formatStorageSize(if (isPartialSelection) targetBytes else displayedBytes),
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 30.sp,
-                            color = if (displayedTrashed.isNotEmpty()) CoralDanger else EmeraldKeep
-                        )
-                    }
-
-                    HorizontalDivider(thickness = 0.8.dp, color = HairlineBorder)
-
-                    // Two-column split: Deletion freed vs Compression saved (Stage 1.3)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "删除累计释放",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = InkTertiary
-                            )
-                            Text(
-                                text = formatStorageSize(uiState.stats.totalPurgedBytes),
-                                fontFamily = JetBrainsMonoFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = CobaltPrimary
-                            )
-                            Text(
-                                text = "已清理 ${uiState.stats.totalPurgedCount} 项",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = InkSecondary
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "压缩累计节省",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = InkTertiary
-                            )
-                            Text(
-                                text = formatStorageSize(uiState.stats.totalCompressedSavedBytes),
-                                fontFamily = JetBrainsMonoFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = EmeraldKeep
-                            )
-                            Text(
-                                text = "已压缩 ${uiState.stats.totalCompressedCount} 张",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = InkSecondary
-                            )
-                        }
-                    }
-
-                    if (displayedTrashed.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            GalleryActionButton(
-                                text = if (isPartialSelection) "还原已选 (${targets.size})" else stringResource(R.string.action_restore_all),
-                                onClick = {
-                                    haptics.undoPulse()
-                                    onRestoreAll(targets)
-                                    selectedIds = emptySet()
-                                },
-                                tone = GalleryButtonTone.GLASS,
-                                leadingIcon = Icons.Filled.Restore,
-                                height = 48.dp,
-                                shape = RoundedCornerShape(14.dp),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("vault_restore_all_button")
-                            )
-
-                            GalleryActionButton(
-                                text = if (isPartialSelection) "清理已选 (${targets.size})" else "确认清理 (${displayedTrashed.size})",
-                                onClick = { showPurgeDialog = true },
-                                tone = GalleryButtonTone.DANGER,
-                                leadingIcon = Icons.Filled.DeleteForever,
-                                height = 48.dp,
-                                shape = RoundedCornerShape(14.dp),
-                                modifier = Modifier
-                                    .weight(1.35f)
-                                    .testTag("vault_purge_button")
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (displayedTrashed.isNotEmpty()) {
-                Row(
+            if (displayedTrashed.isEmpty()) {
+                // Reclaimable Storage Frosted Glass Summary Card (empty state)
+                FrostedGlassCard(
+                    shape = RoundedCornerShape(22.dp),
+                    borderAccent = null,
+                    shadowElevation = 6.dp,
+                    enableAmbientBlur = true,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(horizontal = 20.dp)
                 ) {
-                    Text(
-                        text = if (isPartialSelection) {
-                            "已勾选 ${selectedIds.size} / ${displayedTrashed.size} 项"
-                        } else {
-                            "勾选卡片可仅清理或还原部分项目"
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = InkSecondary
+                    VaultSummaryCardContent(
+                        isPartialSelection = false,
+                        hasItems = false,
+                        displayBytes = 0L,
+                        totalPurgedBytes = uiState.stats.totalPurgedBytes,
+                        totalPurgedCount = uiState.stats.totalPurgedCount,
+                        totalCompressedSavedBytes = uiState.stats.totalCompressedSavedBytes,
+                        totalCompressedCount = uiState.stats.totalCompressedCount,
+                        targetsCount = 0,
+                        totalDisplayedCount = 0,
+                        onRestoreTargets = {},
+                        onRequestPurge = {}
                     )
-                    TextButton(
-                        onClick = {
-                            selectedIds = if (allSelected) {
-                                emptySet()
-                            } else {
-                                displayedTrashed.map { it.id }.toSet()
-                            }
-                        },
-                        modifier = Modifier
-                            .heightIn(min = 48.dp)
-                            .testTag("vault_toggle_select_all")
-                    ) {
-                        Text(
-                            text = if (allSelected) "取消全选" else "全选",
-                            color = CobaltPrimary,
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                    }
                 }
-            } else {
-                Spacer(modifier = Modifier.height(14.dp))
-            }
 
-            if (displayedTrashed.isEmpty()) {
+                Spacer(modifier = Modifier.height(14.dp))
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -401,15 +278,91 @@ fun TrashVaultScreen(
                         .weight(1f)
                         .testTag("vault_photo_grid")
                 ) {
+                    // Scrollable Summary Header Card: scrolls smoothly with the grid so users get maximum
+                    // photo visibility while browsing large trash batches.
+                    item(key = "vault_summary_header", span = { GridItemSpan(maxLineSpan) }) {
+                        FrostedGlassCard(
+                            shape = RoundedCornerShape(22.dp),
+                            borderAccent = CoralDanger,
+                            shadowElevation = 6.dp,
+                            enableAmbientBlur = true,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            VaultSummaryCardContent(
+                                isPartialSelection = isPartialSelection,
+                                hasItems = true,
+                                displayBytes = if (isPartialSelection) targetBytes else displayedBytes,
+                                totalPurgedBytes = uiState.stats.totalPurgedBytes,
+                                totalPurgedCount = uiState.stats.totalPurgedCount,
+                                totalCompressedSavedBytes = uiState.stats.totalCompressedSavedBytes,
+                                totalCompressedCount = uiState.stats.totalCompressedCount,
+                                targetsCount = targets.size,
+                                totalDisplayedCount = displayedTrashed.size,
+                                onRestoreTargets = {
+                                    haptics.undoPulse()
+                                    onRestoreAll(targets)
+                                    selectedIds = emptySet()
+                                },
+                                onRequestPurge = { showPurgeDialog = true }
+                            )
+                        }
+                    }
+
+                    item(key = "vault_select_bar", span = { GridItemSpan(maxLineSpan) }) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (isPartialSelection) {
+                                    "已勾选 ${selectedIds.size} / ${displayedTrashed.size} 项"
+                                } else {
+                                    "长按或勾选卡片可批量还原或清理"
+                                },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = InkSecondary
+                            )
+                            TextButton(
+                                onClick = {
+                                    selectedIds = if (allSelected) {
+                                        emptySet()
+                                    } else {
+                                        displayedTrashed.map { it.id }.toSet()
+                                    }
+                                },
+                                modifier = Modifier
+                                    .heightIn(min = 48.dp)
+                                    .testTag("vault_toggle_select_all")
+                            ) {
+                                Text(
+                                    text = if (allSelected) "取消全选" else "全选",
+                                    color = CobaltPrimary,
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
+                        }
+                    }
+
                     items(displayedTrashed, key = { it.id }) { photo ->
                         val isSelected = photo.id in selectedIds
                         ModernVaultMediaCard(
                             photo = photo,
                             isSelected = isSelected,
                             onToggleSelect = {
+                                haptics.bookshelfDetent()
                                 selectedIds = if (isSelected) selectedIds - photo.id else selectedIds + photo.id
                             },
-                            onPreview = { lightboxPhoto = photo },
+                            onPreview = {
+                                if (isPartialSelection) {
+                                    haptics.bookshelfDetent()
+                                    selectedIds = if (isSelected) selectedIds - photo.id else selectedIds + photo.id
+                                } else {
+                                    lightboxPhoto = photo
+                                }
+                            },
                             onRestore = {
                                 haptics.undoPulse()
                                 selectedIds = selectedIds - photo.id
@@ -501,6 +454,119 @@ fun TrashVaultScreen(
 }
 
 @Composable
+private fun VaultSummaryCardContent(
+    isPartialSelection: Boolean,
+    hasItems: Boolean,
+    displayBytes: Long,
+    totalPurgedBytes: Long,
+    totalPurgedCount: Int,
+    totalCompressedSavedBytes: Long,
+    totalCompressedCount: Int,
+    targetsCount: Int,
+    totalDisplayedCount: Int,
+    onRestoreTargets: () -> Unit,
+    onRequestPurge: () -> Unit
+) {
+    Column(
+        modifier = Modifier.padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Column {
+            Text(
+                text = if (isPartialSelection) "已选待释放空间" else "待释放空间",
+                style = MaterialTheme.typography.labelMedium,
+                color = InkSecondary
+            )
+            Text(
+                text = formatStorageSize(displayBytes),
+                fontFamily = JetBrainsMonoFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 30.sp,
+                color = if (hasItems) CoralDanger else EmeraldKeep
+            )
+        }
+
+        HorizontalDivider(thickness = 0.8.dp, color = HairlineBorder)
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "删除累计释放",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = InkTertiary
+                )
+                Text(
+                    text = formatStorageSize(totalPurgedBytes),
+                    fontFamily = JetBrainsMonoFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = CobaltPrimary
+                )
+                Text(
+                    text = "已清理 $totalPurgedCount 项",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = InkSecondary
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "压缩累计节省",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = InkTertiary
+                )
+                Text(
+                    text = formatStorageSize(totalCompressedSavedBytes),
+                    fontFamily = JetBrainsMonoFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = EmeraldKeep
+                )
+                Text(
+                    text = "已压缩 $totalCompressedCount 张",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = InkSecondary
+                )
+            }
+        }
+
+        if (hasItems) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                GalleryActionButton(
+                    text = if (isPartialSelection) "还原已选 ($targetsCount)" else stringResource(R.string.action_restore_all),
+                    onClick = onRestoreTargets,
+                    tone = GalleryButtonTone.GLASS,
+                    leadingIcon = Icons.Filled.Restore,
+                    height = 48.dp,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("vault_restore_all_button")
+                )
+
+                GalleryActionButton(
+                    text = if (isPartialSelection) "清理已选 ($targetsCount)" else "确认清理 ($totalDisplayedCount)",
+                    onClick = onRequestPurge,
+                    tone = GalleryButtonTone.DANGER,
+                    leadingIcon = Icons.Filled.DeleteForever,
+                    height = 48.dp,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .weight(1.35f)
+                        .testTag("vault_purge_button")
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
 private fun ModernVaultMediaCard(
     photo: PhotoItemEntity,
     isSelected: Boolean,
@@ -525,7 +591,10 @@ private fun ModernVaultMediaCard(
                     .fillMaxWidth()
                     .aspectRatio(0.95f)
                     .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
-                    .clickable(onClick = onPreview)
+                    .combinedClickable(
+                        onClick = onPreview,
+                        onLongClick = onToggleSelect
+                    )
             ) {
                 PhotoArtwork(
                     photo = photo,

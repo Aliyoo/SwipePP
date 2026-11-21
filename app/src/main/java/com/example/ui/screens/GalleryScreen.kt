@@ -12,8 +12,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,53 +34,31 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.filled.BurstMode
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckBox
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Compress
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.EditLocationAlt
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.LocationOff
-import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SelectAll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -102,9 +78,8 @@ import com.example.ui.DateRangeFilter
 import com.example.ui.FlipYearUiState
 import com.example.ui.GalleryEntry
 import com.example.ui.LocalFloatingDockInset
+import com.example.ui.MediaFilter
 import com.example.ui.TimelineSearchQuery
-import com.example.ui.extractDescriptiveKeywordTags
-import com.example.ui.filterGalleryEntriesBySearch
 import com.example.ui.components.ArtisticGalleryBackdrop
 import com.example.ui.components.BatchCompressBottomSheet
 import com.example.ui.components.BatchLocationEditorSheet
@@ -114,31 +89,26 @@ import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.GallerySelectableChip
 import com.example.ui.components.GallerySmartFilter
-import com.example.ui.components.ObsidianGlassCard
 import com.example.ui.components.PhotoDetailLightbox
 import com.example.ui.components.TimelineDateRangePickerDialog
 import com.example.ui.components.TimelineGlobalSearchBar
 import com.example.ui.components.TimelineSearchFilterSheet
-import com.example.ui.components.formatStorageSize
-import com.example.ui.components.monthChineseName
-import kotlinx.coroutines.delay
-import java.util.Calendar
+import com.example.ui.extractDescriptiveKeywordTags
+import com.example.ui.filterGalleryEntriesBySearch
+import com.example.ui.screens.gallery.BulkMoveDestinationSheet
+import com.example.ui.screens.gallery.FloatingBulkActionBar
+import com.example.ui.screens.gallery.GalleryMoreBatchActionsSheet
+import com.example.ui.screens.gallery.GallerySelectionTopBar
 import com.example.ui.theme.CobaltDark
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CobaltSoft
-import com.example.ui.theme.CoralDanger
-import com.example.ui.theme.EmeraldKeep
-import com.example.ui.theme.HairlineBorder
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
-import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.ObsidianSatinBottom
-import com.example.ui.theme.ObsidianSatinTop
 import com.example.ui.theme.SolarAmber
 import com.example.ui.theme.SurfaceMuted
-import com.example.ui.theme.SurfacePure
+import kotlinx.coroutines.delay
+import java.util.Calendar
 
-private val CURATED_ALBUM_PRESETS = listOf("精选珍藏", "旅行日记", "家庭相册", "灵感素材")
 private const val LARGE_PHOTO_THRESHOLD_BYTES = 3_000_000L
 
 internal fun filterGalleryEntriesBySmartAndAlbum(
@@ -196,6 +166,9 @@ fun GalleryScreen(
     onGeocodeLocation: suspend (String) -> ResolvedGeoLocation? = { null },
     onSelectionModeChanged: (Boolean) -> Unit = {},
     onToggleFavorite: (PhotoItemEntity, Boolean) -> Unit = { p, f -> onKeepPhoto(p, f) },
+    onStartCustomCleanup: (title: String, photoIds: Set<Long>, includeReviewed: Boolean) -> Unit = { _, _, _ -> },
+    onStartMonthCleanup: (year: Int, month: Int, includeReviewed: Boolean) -> Unit = { _, _, _ -> },
+    onResetGlobalMediaFilter: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val hapticEngine = rememberHapticEngine()
@@ -211,7 +184,6 @@ fun GalleryScreen(
     var showCompressSheet by remember { mutableStateOf(false) }
     var showLocationSheet by remember { mutableStateOf(false) }
 
-    // Global Timeline Search & Structured Filter State (date range, location, descriptive tags)
     var rawSearchKeyword by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf(TimelineSearchQuery()) }
     var showSearchFilterSheet by remember { mutableStateOf(false) }
@@ -269,7 +241,6 @@ fun GalleryScreen(
     }
 
     val allEntries = uiState.galleryEntries
-    // Compute album list in a single pass without allocating an intermediate flat 10k+ photo list
     val existingAlbums = remember(allEntries) {
         val counts = HashMap<String, Int>(16)
         for (entry in allEntries) {
@@ -289,7 +260,6 @@ fun GalleryScreen(
         counts.entries.sortedByDescending { it.value }.map { it.key }
     }
 
-    // Clear stale album filter if all items were moved/deleted out of it
     LaunchedEffect(existingAlbums, selectedAlbumFilter) {
         if (selectedAlbumFilter != null && selectedAlbumFilter !in existingAlbums) {
             selectedAlbumFilter = null
@@ -297,7 +267,6 @@ fun GalleryScreen(
     }
 
     val burstEntries = remember(allEntries) { allEntries.filterIsInstance<GalleryEntry.Burst>() }
-    val burstPhotosTotal = remember(burstEntries) { burstEntries.sumOf { it.photos.size } }
     val largePhotoEntries = remember(allEntries) {
         allEntries.filter { entry ->
             when (entry) {
@@ -343,7 +312,6 @@ fun GalleryScreen(
         filterGalleryEntriesBySearch(chipFilteredEntries, searchQuery)
     }
 
-    // Defer flattening 10k+ photos & building lookup maps until multi-select mode is actually active
     val displayedPhotos = remember(displayedEntries, isSelectionMode) {
         if (!isSelectionMode) {
             emptyList()
@@ -362,7 +330,6 @@ fun GalleryScreen(
         if (displayedPhotos.isEmpty()) emptyMap() else displayedPhotos.associateBy { it.id }
     }
 
-    // Prune any selected IDs that are no longer visible (e.g. after deletion or filter switch)
     LaunchedEffect(displayedPhotoMap, isSelectionMode) {
         if (isSelectionMode && selectedPhotoIds.isNotEmpty()) {
             val valid = selectedPhotoIds.filterTo(mutableSetOf()) { it in displayedPhotoMap }
@@ -448,7 +415,6 @@ fun GalleryScreen(
                     .widthIn(max = 680.dp)
                     .align(Alignment.TopCenter)
             ) {
-                // Top Header swaps cleanly into sculpted Frosted Glass Selection Bar during multi-select
                 AnimatedContent(
                     targetState = isSelectionMode,
                     transitionSpec = {
@@ -480,7 +446,7 @@ fun GalleryScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                                    .padding(horizontal = 20.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -504,43 +470,148 @@ fun GalleryScreen(
                                 }
 
                                 if (displayedEntries.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    FrostedGlassCard(
-                                        onClick = {
-                                            hapticEngine.bookshelfDetent()
-                                            explicitSelectionMode = true
-                                        },
-                                        shape = RoundedCornerShape(50),
-                                        borderAccent = CobaltPrimary,
-                                        shadowElevation = 4.dp,
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // One-tap Gallery -> ArcCleaner bridge for current filtered/visible entries
+                                        FrostedGlassCard(
+                                            onClick = {
+                                                hapticEngine.pageFlipLift()
+                                                val ids = LinkedHashSet<Long>(displayedEntries.size)
+                                                for (entry in displayedEntries) {
+                                                    when (entry) {
+                                                        is GalleryEntry.Single -> ids.add(entry.photo.id)
+                                                        is GalleryEntry.Burst -> entry.photos.forEach { ids.add(it.id) }
+                                                    }
+                                                }
+                                                val sessionTitle = when {
+                                                    selectedAlbumFilter != null -> "整理「$selectedAlbumFilter」"
+                                                    smartFilter != GallerySmartFilter.ALL -> "整理 · ${smartFilter.label}"
+                                                    searchQuery.keyword.isNotBlank() -> "整理 · ${searchQuery.keyword.trim()}"
+                                                    searchQuery.isActive -> "整理筛选结果"
+                                                    else -> "整理画廊媒体"
+                                                }
+                                                onStartCustomCleanup(sessionTitle, ids, true)
+                                            },
+                                            shape = RoundedCornerShape(50),
+                                            borderAccent = SolarAmber,
+                                            shadowElevation = 4.dp,
+                                            modifier = Modifier
+                                                .heightIn(min = 44.dp)
+                                                .testTag("gallery_swipe_clean_button")
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.CleaningServices,
+                                                    contentDescription = "滑动清理",
+                                                    tint = SolarAmber,
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                                Text(
+                                                    text = "滑动理",
+                                                    style = MaterialTheme.typography.labelLarge,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = InkPrimary
+                                                )
+                                            }
+                                        }
+
+                                        FrostedGlassCard(
+                                            onClick = {
+                                                hapticEngine.bookshelfDetent()
+                                                explicitSelectionMode = true
+                                            },
+                                            shape = RoundedCornerShape(50),
+                                            borderAccent = CobaltPrimary,
+                                            shadowElevation = 4.dp,
+                                            modifier = Modifier
+                                                .heightIn(min = 44.dp)
+                                                .testTag("gallery_enter_multiselect_button")
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.CheckBox,
+                                                    contentDescription = null,
+                                                    tint = CobaltPrimary,
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                                Text(
+                                                    text = stringResource(R.string.action_enter_multiselect),
+                                                    style = MaterialTheme.typography.labelLarge,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = CobaltDark
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Explicit notice when Bookshelf global MediaFilter (Photos/Videos) is active
+                            if (uiState.mediaFilter != MediaFilter.ALL) {
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = CobaltSoft,
+                                    border = BorderStroke(1.dp, CobaltPrimary.copy(alpha = 0.24f)),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 20.dp)
+                                        .padding(bottom = 8.dp)
+                                        .testTag("gallery_global_filter_banner")
+                                ) {
+                                    Row(
                                         modifier = Modifier
-                                            .heightIn(min = 48.dp)
-                                            .testTag("gallery_enter_multiselect_button")
+                                            .fillMaxWidth()
+                                            .padding(start = 12.dp, end = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Row(
-                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            modifier = Modifier.weight(1f)
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Filled.CheckBox,
+                                                imageVector = Icons.Filled.FilterList,
                                                 contentDescription = null,
                                                 tint = CobaltPrimary,
-                                                modifier = Modifier.size(16.dp)
+                                                modifier = Modifier.size(15.dp)
                                             )
                                             Text(
-                                                text = stringResource(R.string.action_enter_multiselect),
-                                                style = MaterialTheme.typography.labelLarge,
-                                                fontSize = 12.5.sp,
-                                                fontWeight = FontWeight.Bold,
+                                                text = "全局筛选：仅显示${uiState.mediaFilter.label}",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.SemiBold,
                                                 color = CobaltDark
+                                            )
+                                        }
+                                        TextButton(
+                                            onClick = onResetGlobalMediaFilter,
+                                            modifier = Modifier
+                                                .heightIn(min = 40.dp)
+                                                .testTag("gallery_reset_global_filter_button")
+                                        ) {
+                                            Text(
+                                                text = "显示全部",
+                                                color = CobaltPrimary,
+                                                fontWeight = FontWeight.Bold
                                             )
                                         }
                                     }
                                 }
                             }
 
-                            // Unified Search Bar + Single Filter Button (smart views & albums folded inside)
+                            // Unified Search Bar + Filter Drawer trigger
                             if (allEntries.isNotEmpty()) {
                                 TimelineGlobalSearchBar(
                                     rawKeyword = rawSearchKeyword,
@@ -576,7 +647,52 @@ fun GalleryScreen(
                                     onClearSmartFilter = { smartFilter = GallerySmartFilter.ALL },
                                     onClearAlbum = { selectedAlbumFilter = null }
                                 )
-                                Spacer(modifier = Modifier.height(6.dp))
+
+                                // One-tap Quick Smart Filter Strip right below Search Bar
+                                val quickSmartChoices = remember(
+                                    burstEntries.size,
+                                    largePhotoEntries.size,
+                                    missingLocationEntries.size
+                                ) {
+                                    buildList {
+                                        add(GallerySmartFilter.ALL to "全部")
+                                        if (burstEntries.isNotEmpty()) add(GallerySmartFilter.BURSTS to "连拍组 (${burstEntries.size})")
+                                        if (largePhotoEntries.isNotEmpty()) add(GallerySmartFilter.LARGE_PHOTOS to "大图 (${largePhotoEntries.size})")
+                                        if (missingLocationEntries.isNotEmpty()) add(GallerySmartFilter.MISSING_LOCATION to "缺定位 (${missingLocationEntries.size})")
+                                    }
+                                }
+                                if (quickSmartChoices.size > 1) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 20.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("gallery_quick_smart_strip")
+                                    ) {
+                                        items(quickSmartChoices, key = { it.first.name }) { (filterOption, label) ->
+                                            val isSel = smartFilter == filterOption
+                                            GallerySelectableChip(
+                                                selected = isSel,
+                                                onClick = {
+                                                    hapticEngine.pageFlipLift()
+                                                    smartFilter = filterOption
+                                                },
+                                                modifier = Modifier.testTag("gallery_quick_${filterOption.name.lowercase()}")
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontSize = 11.5.sp,
+                                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (isSel) Color.White else InkPrimary
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
                             }
                         }
                     }
@@ -656,6 +772,12 @@ fun GalleryScreen(
                                 },
                                 modifier = Modifier.testTag("timeline_search_empty_reset_button")
                             )
+                        } else if (uiState.mediaFilter != MediaFilter.ALL) {
+                            GalleryActionButton(
+                                text = "显示全部照片与视频",
+                                tone = GalleryButtonTone.OBSIDIAN,
+                                onClick = onResetGlobalMediaFilter
+                            )
                         } else {
                             GalleryActionButton(
                                 text = stringResource(R.string.action_load_demo),
@@ -684,6 +806,9 @@ fun GalleryScreen(
                         selectedPhotoIds = selectedPhotoIds,
                         onToggleSelectPhotos = toggleSelectPhotos,
                         onLongPressSelectPhotos = longPressSelectPhotos,
+                        onCleanMonth = { y, m, isCleaned ->
+                            onStartMonthCleanup(y, m, isCleaned)
+                        },
                         monthStamps = uiState.monthStamps,
                         showMonthStampOverlay = true,
                         modifier = Modifier
@@ -694,7 +819,7 @@ fun GalleryScreen(
                 }
             }
 
-            // Floating 4-Action Obsidian Glass Bulk Action Capsule (Keep / Favorite / Trash / More)
+            // Floating 4-Action Obsidian Glass Bulk Action Capsule
             AnimatedVisibility(
                 visible = isSelectionMode,
                 enter = fadeIn(tween(200)) + slideInVertically(
@@ -921,605 +1046,5 @@ fun GalleryScreen(
             onTrash = onTrashPhoto,
             onToggleFavorite = onToggleFavorite
         )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun GalleryMoreBatchActionsSheet(
-    selectedCount: Int,
-    compressibleCount: Int,
-    missingLocationCount: Int,
-    onCompress: () -> Unit,
-    onEditLocation: () -> Unit,
-    onMove: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = SurfacePure,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        modifier = Modifier.testTag("gallery_more_actions_sheet")
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text(
-                text = "更多批量操作（已选 $selectedCount 项）",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = InkPrimary
-            )
-
-            Surface(
-                onClick = { if (compressibleCount > 0) onCompress() },
-                shape = RoundedCornerShape(16.dp),
-                color = SurfaceMuted.copy(alpha = if (compressibleCount > 0) 0.7f else 0.35f),
-                border = BorderStroke(1.dp, HairlineBorder),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 56.dp)
-                    .testTag("bulk_compress_button")
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Compress,
-                        contentDescription = null,
-                        tint = if (compressibleCount > 0) EmeraldKeep else InkSecondary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (compressibleCount > 0) {
-                                "${stringResource(R.string.action_batch_compress)}（$compressibleCount 张照片）"
-                            } else {
-                                "批量压缩（当前所选无照片）"
-                            },
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (compressibleCount > 0) InkPrimary else InkSecondary
-                        )
-                        Text(
-                            text = "另存压缩新图，原图安全暂存回收站",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = InkSecondary
-                        )
-                    }
-                }
-            }
-
-            Surface(
-                onClick = onEditLocation,
-                shape = RoundedCornerShape(16.dp),
-                color = SurfaceMuted.copy(alpha = 0.7f),
-                border = BorderStroke(1.dp, HairlineBorder),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 56.dp)
-                    .testTag("bulk_location_button")
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.EditLocationAlt,
-                        contentDescription = null,
-                        tint = SolarAmber,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (missingLocationCount > 0) {
-                                "${stringResource(R.string.action_batch_location)}（含 $missingLocationCount 项缺定位）"
-                            } else {
-                                stringResource(R.string.action_batch_location)
-                            },
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = InkPrimary
-                        )
-                        Text(
-                            text = "按同日足迹推断或手动搜索地点补全定位",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = InkSecondary
-                        )
-                    }
-                }
-            }
-
-            Surface(
-                onClick = onMove,
-                shape = RoundedCornerShape(16.dp),
-                color = SurfaceMuted.copy(alpha = 0.7f),
-                border = BorderStroke(1.dp, HairlineBorder),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 56.dp)
-                    .testTag("bulk_move_button")
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.DriveFileMove,
-                        contentDescription = null,
-                        tint = CobaltPrimary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "移动至相册 / 归档年月",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = InkPrimary
-                        )
-                        Text(
-                            text = "归类到自定义相册或重新指定年度月份",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = InkSecondary
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun GallerySelectionTopBar(
-    selectedCount: Int,
-    selectedBytes: Long,
-    allSelected: Boolean,
-    onCancel: () -> Unit,
-    onToggleSelectAll: () -> Unit
-) {
-    FrostedGlassCard(
-        shape = RoundedCornerShape(22.dp),
-        borderAccent = CobaltPrimary,
-        shadowElevation = 10.dp,
-        enableAmbientBlur = true,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 10.dp)
-            .testTag("gallery_selection_top_bar")
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            IconButton(
-                onClick = onCancel,
-                modifier = Modifier
-                    .size(48.dp)
-                    .testTag("gallery_selection_cancel")
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = stringResource(R.string.cd_exit_selection),
-                    tint = InkPrimary,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "已选 $selectedCount 项",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = InkPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "合计 ${formatStorageSize(selectedBytes)} · 点击可增减项目",
-                    fontFamily = JetBrainsMonoFontFamily,
-                    fontSize = 11.sp,
-                    color = InkSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            GallerySelectableChip(
-                selected = allSelected,
-                onClick = onToggleSelectAll,
-                modifier = Modifier
-                    .heightIn(min = 48.dp)
-                    .testTag("gallery_selection_toggle_all")
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.SelectAll,
-                    contentDescription = null,
-                    tint = if (allSelected) SolarAmber else CobaltPrimary,
-                    modifier = Modifier.size(15.dp)
-                )
-                Text(
-                    text = stringResource(
-                        if (allSelected) R.string.action_deselect_all else R.string.action_select_all
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontSize = 12.sp,
-                    color = if (allSelected) Color.White else InkPrimary
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FloatingBulkActionBar(
-    selectedCount: Int,
-    onKeep: () -> Unit,
-    onFavorite: () -> Unit,
-    onTrash: () -> Unit,
-    onMore: () -> Unit
-) {
-    ObsidianGlassCard(
-        shape = RoundedCornerShape(22.dp),
-        topColor = ObsidianSatinTop,
-        bottomColor = ObsidianSatinBottom,
-        shadowElevation = 18.dp,
-        modifier = Modifier
-            .widthIn(max = 420.dp)
-            .fillMaxWidth()
-            .alpha(if (selectedCount > 0) 1f else 0.58f)
-            .testTag("gallery_bulk_action_bar")
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 7.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            BulkActionPillItem(
-                icon = Icons.Filled.CheckCircle,
-                label = stringResource(R.string.action_bulk_keep),
-                iconTint = EmeraldKeep,
-                onClick = onKeep,
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("bulk_keep_button")
-            )
-
-            BulkActionPillItem(
-                icon = Icons.Filled.Favorite,
-                label = stringResource(R.string.action_bulk_favorite),
-                iconTint = SolarAmber,
-                onClick = onFavorite,
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("bulk_favorite_button")
-            )
-
-            BulkActionPillItem(
-                icon = Icons.Filled.DeleteOutline,
-                label = if (selectedCount > 0) "回收站($selectedCount)" else stringResource(R.string.action_bulk_delete),
-                iconTint = Color(0xFFFF7A8A),
-                containerHighlight = CoralDanger.copy(alpha = 0.24f),
-                onClick = onTrash,
-                modifier = Modifier
-                    .weight(1.22f)
-                    .testTag("bulk_delete_button")
-            )
-
-            BulkActionPillItem(
-                icon = Icons.Filled.MoreHoriz,
-                label = "更多",
-                iconTint = Color(0xFF8FB0FF),
-                onClick = onMore,
-                modifier = Modifier
-                    .weight(0.92f)
-                    .testTag("bulk_more_button")
-            )
-        }
-    }
-}
-
-@Composable
-private fun BulkActionPillItem(
-    icon: ImageVector,
-    label: String,
-    iconTint: Color,
-    onClick: () -> Unit,
-    containerHighlight: Color = Color.Transparent,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-        modifier = modifier
-            .heightIn(min = 52.dp)
-            .clip(RoundedCornerShape(22.dp))
-            .background(containerHighlight)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 6.dp)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = iconTint,
-            modifier = Modifier.size(21.dp)
-        )
-        Spacer(modifier = Modifier.height(3.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun BulkMoveDestinationSheet(
-    selectedCount: Int,
-    selectedBytes: Long,
-    existingAlbums: List<String>,
-    availableYears: List<Int>,
-    defaultYear: Int,
-    defaultMonth: Int,
-    onDismiss: () -> Unit,
-    onConfirmMove: (albumName: String?, targetYear: Int?, targetMonth: Int?) -> Unit
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val albumSuggestions = remember(existingAlbums) {
-        (CURATED_ALBUM_PRESETS + existingAlbums).distinct()
-    }
-    var albumInput by remember { mutableStateOf(albumSuggestions.firstOrNull() ?: "精选珍藏") }
-    var changeYearMonth by remember { mutableStateOf(false) }
-    var chosenYear by remember { mutableIntStateOf(defaultYear) }
-    var chosenMonth by remember { mutableIntStateOf(defaultMonth.coerceIn(1, 12)) }
-
-    val canConfirm = albumInput.isNotBlank() || changeYearMonth
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = SurfacePure,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        modifier = Modifier.testTag("bulk_move_sheet")
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .imePadding()
-                .verticalScroll(rememberScrollState())
-                .navigationBarsPadding()
-                .padding(horizontal = 22.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.bulk_move_title),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = InkPrimary
-                    )
-                    Text(
-                        text = "已选 $selectedCount 项媒体 · 共 ${formatStorageSize(selectedBytes)}",
-                        fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 11.5.sp,
-                        color = InkSecondary
-                    )
-                }
-                Surface(
-                    shape = CircleShape,
-                    color = CobaltSoft,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.DriveFileMove,
-                            contentDescription = null,
-                            tint = CobaltPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
-
-            Text(
-                text = "快速选择目标相册",
-                style = MaterialTheme.typography.labelLarge,
-                color = InkSecondary
-            )
-
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                items(albumSuggestions, key = { it }) { album ->
-                    val selected = albumInput.trim() == album
-                    GallerySelectableChip(
-                        selected = selected,
-                        onClick = { albumInput = album },
-                        modifier = Modifier.testTag("bulk_move_preset_$album")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Folder,
-                            contentDescription = null,
-                            tint = if (selected) SolarAmber else CobaltPrimary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = album,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontSize = 12.sp,
-                            color = if (selected) Color.White else InkPrimary
-                        )
-                    }
-                }
-            }
-
-            OutlinedTextField(
-                value = albumInput,
-                onValueChange = { albumInput = it },
-                singleLine = true,
-                label = { Text(stringResource(R.string.bulk_move_album_label)) },
-                placeholder = { Text(stringResource(R.string.bulk_move_album_placeholder)) },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.Folder,
-                        contentDescription = null,
-                        tint = CobaltPrimary
-                    )
-                },
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = CobaltPrimary,
-                    unfocusedBorderColor = HairlineBorder,
-                    focusedContainerColor = SurfaceMuted.copy(alpha = 0.45f),
-                    unfocusedContainerColor = SurfaceMuted.copy(alpha = 0.35f)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("bulk_move_album_input")
-            )
-
-            // Optional Year / Month Yearbook Re-filing Toggle
-            FrostedGlassCard(
-                shape = RoundedCornerShape(18.dp),
-                shadowElevation = 2.dp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.CalendarMonth,
-                                contentDescription = null,
-                                tint = CobaltPrimary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = stringResource(R.string.bulk_move_date_toggle),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = InkPrimary
-                            )
-                        }
-                        Switch(
-                            checked = changeYearMonth,
-                            onCheckedChange = { changeYearMonth = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = CobaltPrimary
-                            ),
-                            modifier = Modifier.testTag("bulk_move_date_switch")
-                        )
-                    }
-
-                    AnimatedVisibility(visible = changeYearMonth) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                items(availableYears, key = { it }) { yr ->
-                                    val isSel = yr == chosenYear
-                                    GallerySelectableChip(
-                                        selected = isSel,
-                                        onClick = { chosenYear = yr }
-                                    ) {
-                                        Text(
-                                            text = "${yr}年",
-                                            fontFamily = JetBrainsMonoFontFamily,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isSel) Color.White else InkPrimary
-                                        )
-                                    }
-                                }
-                            }
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                items((1..12).toList(), key = { it }) { month ->
-                                    val isSel = month == chosenMonth
-                                    GallerySelectableChip(
-                                        selected = isSel,
-                                        onClick = { chosenMonth = month }
-                                    ) {
-                                        Text(
-                                            text = monthChineseName(month),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontSize = 11.5.sp,
-                                            color = if (isSel) Color.White else InkPrimary
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                GalleryActionButton(
-                    text = "取消",
-                    tone = GalleryButtonTone.GLASS,
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .weight(0.9f)
-                        .testTag("bulk_move_cancel_button")
-                )
-                GalleryActionButton(
-                    text = "确认移动 ($selectedCount)",
-                    leadingIcon = Icons.AutoMirrored.Filled.DriveFileMove,
-                    tone = GalleryButtonTone.OBSIDIAN,
-                    enabled = canConfirm,
-                    onClick = {
-                        onConfirmMove(
-                            albumInput.trim().takeIf { it.isNotBlank() },
-                            if (changeYearMonth) chosenYear else null,
-                            if (changeYearMonth) chosenMonth else null
-                        )
-                    },
-                    modifier = Modifier
-                        .weight(1.4f)
-                        .testTag("bulk_move_confirm_button")
-                )
-            }
-        }
     }
 }

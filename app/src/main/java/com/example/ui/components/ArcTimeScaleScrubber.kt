@@ -160,8 +160,28 @@ fun ArcTimeScaleScrubber(
         formatArcCursorLabel(activeTimestamp, granularity)
     }
 
+    val burstFractions = remember(queue, timestamps, minTs, maxTs) {
+        if (queue.size <= 1) {
+            emptyList()
+        } else {
+            val out = ArrayList<Float>()
+            for (i in queue.indices) {
+                if (queue[i] is CleanupCardItem.BurstStack) {
+                    val frac = if (maxTs > minTs) {
+                        ((timestamps[i] - minTs).toDouble() / (maxTs - minTs).toDouble()).toFloat().coerceIn(0f, 1f)
+                    } else {
+                        (i.toFloat() / queue.lastIndex.toFloat()).coerceIn(0f, 1f)
+                    }
+                    out.add(frac)
+                }
+            }
+            out
+        }
+    }
+
     val trackBaseColor = if (isDark) CobaltPrimary.copy(alpha = 0.24f) else CobaltPrimary.copy(alpha = 0.20f)
     val activeArcColor = CobaltPrimary
+    val burstMarkerColor = com.example.ui.theme.SolarAmber
     val tickColor = if (isDark) Color.White.copy(alpha = 0.28f) else InkSecondary.copy(alpha = 0.34f)
     val thumbHalo = if (isDark) CobaltPrimary.copy(alpha = 0.34f) else CobaltSoft
 
@@ -293,6 +313,17 @@ fun ArcTimeScaleScrubber(
                     end = Offset(pt.x, pt.y + halfLen),
                     strokeWidth = if (isMajor) 1.6.dp.toPx() else 1.dp.toPx(),
                     cap = StrokeCap.Round
+                )
+            }
+
+            // Amber radar dots marking BurstStack locations along the arc
+            val burstDotRadius = 3.dp.toPx()
+            for (bf in burstFractions) {
+                val pt = pointOnArc(bf)
+                drawCircle(
+                    color = burstMarkerColor,
+                    radius = burstDotRadius,
+                    center = Offset(pt.x, pt.y - 6.dp.toPx())
                 )
             }
 

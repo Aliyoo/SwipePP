@@ -272,6 +272,10 @@ fun buildTimelineClusterLayout(
 @Composable
 fun MonthlyClusterHeaderStamp(
     cluster: MonthlyClusterSummary,
+    isSelectionMode: Boolean = false,
+    isMonthAllSelected: Boolean = false,
+    onToggleSelectMonth: (() -> Unit)? = null,
+    onCleanMonth: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val isDark = LocalIsDarkTheme.current
@@ -285,7 +289,7 @@ fun MonthlyClusterHeaderStamp(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Editorial archival postage-style month badge ("Jan 2026")
+        // Editorial archival postage-style month badge ("2026年1月")
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -329,7 +333,7 @@ fun MonthlyClusterHeaderStamp(
                 .background(HairlineBorder)
         )
 
-        // Compact cluster metrics + optional cleaned seal
+        // Compact cluster metrics + optional cleaned seal / contextual action pill
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp)
@@ -343,7 +347,39 @@ fun MonthlyClusterHeaderStamp(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            if (cluster.isCleaned) {
+            if (isSelectionMode && onToggleSelectMonth != null) {
+                androidx.compose.material3.Surface(
+                    onClick = onToggleSelectMonth,
+                    shape = JumpChipShape,
+                    color = if (isMonthAllSelected) CobaltPrimary else CobaltSoft,
+                    modifier = Modifier.testTag("timeline_select_month_${cluster.yearMonthKey}")
+                ) {
+                    Text(
+                        text = if (isMonthAllSelected) "已选本月" else "选本月",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isMonthAllSelected) Color.White else CobaltDark,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+            } else if (!isSelectionMode && onCleanMonth != null) {
+                androidx.compose.material3.Surface(
+                    onClick = onCleanMonth,
+                    shape = JumpChipShape,
+                    color = if (cluster.isCleaned) EmeraldSoft else CobaltSoft,
+                    modifier = Modifier.testTag("timeline_clean_month_${cluster.yearMonthKey}")
+                ) {
+                    Text(
+                        text = if (cluster.isCleaned) "重温" else "整理",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (cluster.isCleaned) EmeraldKeep else CobaltDark,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+            } else if (cluster.isCleaned) {
                 Icon(
                     imageVector = Icons.Filled.CheckCircle,
                     contentDescription = stringResource(R.string.timeline_month_cleaned_tag),

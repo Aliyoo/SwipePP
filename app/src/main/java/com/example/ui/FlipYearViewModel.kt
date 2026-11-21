@@ -21,6 +21,7 @@ import com.example.data.ResolvedGeoLocation
 import com.example.data.SameDayLocationMatch
 import com.example.data.YearbookCoverConfigEntity
 import com.example.data.YearbookCoverMode
+import com.example.ui.domain.LibraryDerivationEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -55,6 +56,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     private val snackbarMessage = MutableStateFlow<SnackbarMessage?>(null)
     private val recentlyStampedMonthKey = MutableStateFlow<String?>(null)
     private val vaultSessionFilterIds = MutableStateFlow<Set<Long>?>(null)
+    private val customCleanerSession = MutableStateFlow<CustomCleanerSession?>(null)
     private var gpsBackfillJob: Job? = null
     private var snackbarDismissJob: Job? = null
     private var pendingBatchWriteTask: PendingBatchWriteTask? = null
@@ -91,7 +93,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         val batchProgress: BatchTaskProgress,
         val snackbar: SnackbarMessage?,
         val recentStamp: String?,
-        val vaultSessionFilter: Set<Long>?
+        val vaultSessionFilter: Set<Long>?,
+        val customSession: CustomCleanerSession?
     )
 
     private data class DerivedLibraryData(
@@ -117,10 +120,11 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         combine(isScanningDevice, gpsIndexProgress, batchTaskProgress) { scan, gps, batch ->
             Triple(scan, gps, batch)
         },
-        combine(snackbarMessage, recentlyStampedMonthKey, vaultSessionFilterIds) { snack, stamp, filterIds ->
-            Triple(snack, stamp, filterIds)
+        combine(snackbarMessage, recentlyStampedMonthKey, vaultSessionFilterIds, customCleanerSession) { snack, stamp, filterIds, custom ->
+            listOf(snack, stamp, filterIds, custom)
         }
-    ) { undoPair, accessPair, workTriple, feedbackTriple ->
+    ) { undoPair, accessPair, workTriple, feedbackList ->
+        @Suppress("UNCHECKED_CAST")
         UiMeta(
             undoDepth = undoPair.first,
             cleanerSessionUndoDepth = undoPair.second,
@@ -129,9 +133,10 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             scanning = workTriple.first,
             gpsProgress = workTriple.second,
             batchProgress = workTriple.third,
-            snackbar = feedbackTriple.first,
-            recentStamp = feedbackTriple.second,
-            vaultSessionFilter = feedbackTriple.third
+            snackbar = feedbackList[0] as SnackbarMessage?,
+            recentStamp = feedbackList[1] as String?,
+            vaultSessionFilter = feedbackList[2] as Set<Long>?,
+            customSession = feedbackList[3] as CustomCleanerSession?
         )
     }
 
@@ -181,7 +186,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             coverConfigMap[c.year] = c
         }
 
-        val yearbooks = buildYearbooksLinear(filtered, stampMap, coverConfigMap)
+        val yearbooks = LibraryDerivationEngine.buildYearbooksLinear(filtered, stampMap, coverConfigMap)
 
         val visibleGallery = ArrayList<PhotoItemEntity>(filtered.size)
         for (p in filtered) {
@@ -190,8 +195,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
-        val galleryEntries = buildGalleryEntriesLinear(visibleGallery)
-        val (clusters, unlocated) = buildLocationClustersAndUnlocatedLinear(visibleGallery)
+        val galleryEntries = LibraryDerivationEngine.buildGalleryEntriesLinear(visibleGallery)
+        val (clusters, unlocated) = LibraryDerivationEngine.buildLocationClustersAndUnlocatedLinear(visibleGallery)
 
         var pendingBytes = 0L
         for (t in trashed) {
@@ -250,6 +255,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             feedbackBanner = meta.snackbar?.text,
             recentlyStampedMonthKey = meta.recentStamp,
             vaultSessionFilterIds = meta.vaultSessionFilter,
+            customCleanerSession = meta.customSession,
             batchTaskMessage = meta.batchProgress.message,
             batchTaskProcessed = meta.batchProgress.processed,
             batchTaskTotal = meta.batchProgress.total
@@ -417,79 +423,28 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun getMonthPagesForYear(year: Int, state: FlipYearUiState = uiState.value): List<MonthPageModel> {
-        val byMonth = HashMap<Int, ArrayList<PhotoItemEntity>>(16)
-        for (photo in state.allPhotos) {
-            if (photo.year == year) {
-                byMonth.getOrPut(photo.month) { ArrayList() }.add(photo)
-            }
-        }
-        // Stage 4: Always list months 1..12 in ascending order so empty months render gracefully
-        // instead of disappearing, and FlipbookScreen opens on the most recent active month.
-        val allMonths = (1..12).toList()
-        return allMonths.map { month ->
-            val monthPhotos = byMonth[month].orEmpty()
-            val photosByDay = HashMap<Int, ArrayList<PhotoItemEntity>>(32)
-            var videoCount = 0
-            var unreviewedCount = 0
-            var keptCount = 0
-            var trashedCount = 0
-            var reclaimableBytes = 0L
-            val burstIds = HashSet<String>()
-            var favoriteCover: PhotoItemEntity? = null
-            var bestQualityCover: PhotoItemEntity? = null
-
-            for (p in monthPhotos) {
-                if (p.isVideo) videoCount++
-                val st = p.photoStatus
-                when (st) {
-                    PhotoStatus.UNREVIEWED -> {
-                        unreviewedCount++
-                        reclaimableBytes += p.fileSizeBytes
-                        p.burstGroupId?.let { burstIds.add(it) }
-                    }
-                    PhotoStatus.KEPT -> keptCount++
-                    PhotoStatus.TRASHED -> trashedCount++
-                    PhotoStatus.PURGED -> Unit
-                }
-                if (st != PhotoStatus.TRASHED) {
-                    photosByDay.getOrPut(p.day) { ArrayList() }.add(p)
-                    if (favoriteCover == null && p.isFavorite) {
-                        favoriteCover = p
-                    }
-                    if (bestQualityCover == null || p.qualityScore > bestQualityCover.qualityScore) {
-                        bestQualityCover = p
-                    }
-                }
-            }
-
-            val cleanedDays = HashSet<Int>(photosByDay.size)
-            for ((day, dayList) in photosByDay) {
-                if (dayList.isNotEmpty() && dayList.none { it.photoStatus == PhotoStatus.UNREVIEWED }) {
-                    cleanedDays.add(day)
-                }
-            }
-
-            val key = PhotoRepository.yearMonthKey(year, month)
-            val cover = favoriteCover ?: bestQualityCover ?: monthPhotos.firstOrNull()
-
-            MonthPageModel(
-                year = year,
-                month = month,
-                photos = monthPhotos,
-                photosByDay = photosByDay,
-                cleanedDays = cleanedDays,
-                totalPhotos = monthPhotos.size,
-                videoCount = videoCount,
-                unreviewedCount = unreviewedCount,
-                keptCount = keptCount,
-                trashedCount = trashedCount,
-                burstGroupCount = burstIds.size,
-                reclaimableBytes = reclaimableBytes,
-                stamp = state.monthStamps[key],
-                coverPhoto = cover
+    fun setCustomCleanerSession(title: String, photoIds: Set<Long>, includeReviewed: Boolean = true) {
+        customCleanerSession.value = if (photoIds.isEmpty()) {
+            null
+        } else {
+            CustomCleanerSession(
+                title = title,
+                photoIds = photoIds,
+                includeReviewed = includeReviewed
             )
         }
+    }
+
+    fun clearCustomCleanerSession() {
+        customCleanerSession.value = null
+    }
+
+    fun getMonthPagesForYear(year: Int, state: FlipYearUiState = uiState.value): List<MonthPageModel> {
+        return LibraryDerivationEngine.buildMonthPagesForYear(
+            year = year,
+            allPhotos = state.allPhotos,
+            monthStamps = state.monthStamps
+        )
     }
 
     fun buildArcQueue(
@@ -497,73 +452,17 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         month: Int?,
         locationName: String?,
         includeReviewed: Boolean = false,
-        state: FlipYearUiState = uiState.value
+        state: FlipYearUiState = uiState.value,
+        customPhotoIds: Set<Long>? = null
     ): List<CleanupCardItem> {
-        val candidates = ArrayList<PhotoItemEntity>()
-        for (photo in state.allPhotos) {
-            if (year != null && photo.year != year) continue
-            if (month != null && photo.month != month) continue
-            val matchLocation = when (locationName) {
-                null -> true
-                UNLOCATED_LOCATION_KEY -> !hasValidLocation(photo)
-                else -> photo.locationName == locationName
-            }
-            if (!matchLocation) continue
-            val st = photo.photoStatus
-            val matchStatus = if (includeReviewed) st != PhotoStatus.TRASHED else st == PhotoStatus.UNREVIEWED
-            if (matchStatus) candidates.add(photo)
-        }
-        candidates.sortBy { it.takenAtMillis }
-
-        // O(N) pre-grouping of burst members (eliminates O(N^2) inner filter)
-        val burstGroups = HashMap<String, ArrayList<PhotoItemEntity>>()
-        for (photo in candidates) {
-            val gid = photo.burstGroupId
-            if (gid != null && !photo.isVideo) {
-                burstGroups.getOrPut(gid) { ArrayList(4) }.add(photo)
-            }
-        }
-
-        val result = ArrayList<CleanupCardItem>(candidates.size)
-        val consumedGroupIds = HashSet<String>(burstGroups.size * 2)
-
-        for (photo in candidates) {
-            val gid = photo.burstGroupId
-            if (gid != null && !photo.isVideo) {
-                if (consumedGroupIds.add(gid)) {
-                    val stackPhotos = burstGroups[gid].orEmpty()
-                    if (stackPhotos.size >= 2) {
-                        var best = stackPhotos.first()
-                        var foundExplicitBest = false
-                        for (m in stackPhotos) {
-                            if (m.isBestInStack) {
-                                best = m
-                                foundExplicitBest = true
-                                break
-                            }
-                            if (m.qualityScore > best.qualityScore) {
-                                best = m
-                            }
-                        }
-                        if (!foundExplicitBest) {
-                            // already holds max qualityScore
-                        }
-                        result.add(
-                            CleanupCardItem.BurstStack(
-                                groupId = gid,
-                                photos = stackPhotos,
-                                bestPhoto = best
-                            )
-                        )
-                    } else {
-                        result.add(CleanupCardItem.SinglePhoto(photo))
-                    }
-                }
-            } else {
-                result.add(CleanupCardItem.SinglePhoto(photo))
-            }
-        }
-        return result
+        return LibraryDerivationEngine.buildArcQueue(
+            allPhotos = state.allPhotos,
+            year = year,
+            month = month,
+            locationName = locationName,
+            includeReviewed = includeReviewed,
+            customPhotoIds = customPhotoIds
+        )
     }
 
     fun swipeTrashPhoto(
@@ -747,66 +646,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    /**
-     * Strictly O(N) linear gallery builder for 10,000+ items.
-     * Pre-groups burst clusters in a single HashMap pass instead of scanning all items per burst group.
-     */
     fun buildGalleryEntries(photos: List<PhotoItemEntity>): List<GalleryEntry> {
-        return buildGalleryEntriesLinear(photos.sortedByDescending { it.takenAtMillis })
-    }
-
-    private fun buildGalleryEntriesLinear(alreadySortedDesc: List<PhotoItemEntity>): List<GalleryEntry> {
-        if (alreadySortedDesc.isEmpty()) return emptyList()
-
-        val burstMembers = HashMap<String, ArrayList<PhotoItemEntity>>()
-        for (photo in alreadySortedDesc) {
-            val gid = photo.burstGroupId
-            if (gid != null && !photo.isVideo) {
-                burstMembers.getOrPut(gid) { ArrayList(4) }.add(photo)
-            }
-        }
-
-        val entries = ArrayList<GalleryEntry>(alreadySortedDesc.size)
-        val consumedGroups = HashSet<String>(burstMembers.size * 2)
-
-        for (photo in alreadySortedDesc) {
-            val gid = photo.burstGroupId
-            if (gid != null && !photo.isVideo) {
-                if (consumedGroups.add(gid)) {
-                    val rawMembers = burstMembers[gid]
-                    if (rawMembers != null && rawMembers.size >= 2) {
-                        // Already in DESC order; reverse to ASC chronological order in O(k) without sorting
-                        val members = if (rawMembers.size <= 2) {
-                            if (rawMembers[0].takenAtMillis <= rawMembers[1].takenAtMillis) rawMembers else rawMembers.asReversed()
-                        } else {
-                            rawMembers.sortedBy { it.takenAtMillis }
-                        }
-                        var best = members.first()
-                        for (m in members) {
-                            if (m.isBestInStack) {
-                                best = m
-                                break
-                            }
-                            if (m.qualityScore > best.qualityScore) {
-                                best = m
-                            }
-                        }
-                        entries.add(
-                            GalleryEntry.Burst(
-                                groupId = gid,
-                                photos = members,
-                                bestPhoto = best
-                            )
-                        )
-                    } else {
-                        entries.add(GalleryEntry.Single(photo))
-                    }
-                }
-            } else {
-                entries.add(GalleryEntry.Single(photo))
-            }
-        }
-        return entries
+        return LibraryDerivationEngine.buildGalleryEntries(photos)
     }
 
     fun keepBestInGalleryBurst(burst: GalleryEntry.Burst, chosenBest: PhotoItemEntity = burst.bestPhoto) {
@@ -1465,159 +1306,5 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 snackbarMessage.value = null
             }
         }
-    }
-
-    /**
-     * Single-pass O(N) Yearbook aggregator using fixed IntArray(13) month accumulators per year
-     * (replaces nested month filters across 10,000+ photos).
-     */
-    private class YearAcc(val year: Int) {
-        var total = 0
-        var videoCount = 0
-        var unreviewedCount = 0
-        var keptCount = 0
-        var trashedCount = 0
-        var reclaimableBytes = 0L
-        val yearPhotos = ArrayList<PhotoItemEntity>(32)
-        val monthPresent = BooleanArray(13)
-        val monthUnreviewed = IntArray(13)
-    }
-
-    private fun buildYearbooksLinear(
-        photos: List<PhotoItemEntity>,
-        stamps: Map<String, MonthStampEntity>,
-        coverConfigs: Map<Int, YearbookCoverConfigEntity>
-    ): List<YearbookSummary> {
-        if (photos.isEmpty()) return emptyList()
-        val byYear = HashMap<Int, YearAcc>(16)
-
-        for (p in photos) {
-            val acc = byYear.getOrPut(p.year) { YearAcc(p.year) }
-            acc.total++
-            acc.yearPhotos.add(p)
-            if (p.isVideo) acc.videoCount++
-
-            val m = p.month
-            if (m in 1..12) acc.monthPresent[m] = true
-
-            val st = p.photoStatus
-            when (st) {
-                PhotoStatus.UNREVIEWED -> {
-                    acc.unreviewedCount++
-                    acc.reclaimableBytes += p.fileSizeBytes
-                    if (m in 1..12) acc.monthUnreviewed[m]++
-                }
-                PhotoStatus.KEPT -> acc.keptCount++
-                PhotoStatus.TRASHED -> acc.trashedCount++
-                PhotoStatus.PURGED -> Unit
-            }
-        }
-
-        val sortedYears = byYear.keys.sortedDescending()
-        return sortedYears.mapIndexed { idx, year ->
-            val acc = byYear[year]!!
-            var totalMonths = 0
-            var cleanedMonths = 0
-            for (m in 1..12) {
-                if (acc.monthPresent[m]) {
-                    totalMonths++
-                    val key = PhotoRepository.yearMonthKey(year, m)
-                    if (acc.monthUnreviewed[m] == 0 || stamps.containsKey(key)) {
-                        cleanedMonths++
-                    }
-                }
-            }
-            val resolvedCover = YearbookCoverCurator.resolveCoverPresentation(
-                yearPhotos = acc.yearPhotos,
-                config = coverConfigs[year]
-            )
-
-            YearbookSummary(
-                year = year,
-                coverPhoto = resolvedCover.coverPhoto,
-                coverSlides = resolvedCover.slides,
-                coverMode = resolvedCover.mode,
-                coverIntervalSeconds = resolvedCover.intervalSeconds,
-                customCoverPhotoIds = resolvedCover.customPhotoIds,
-                totalPhotos = acc.total,
-                videoCount = acc.videoCount,
-                unreviewedCount = acc.unreviewedCount,
-                keptCount = acc.keptCount,
-                trashedCount = acc.trashedCount,
-                cleanedMonthsCount = cleanedMonths,
-                totalMonthsCount = totalMonths,
-                reclaimableBytes = acc.reclaimableBytes,
-                editionIndex = idx % 4
-            )
-        }
-    }
-
-    private fun hasValidLocation(photo: PhotoItemEntity): Boolean {
-        val lat = photo.latitude
-        val lon = photo.longitude
-        return lat != null && lon != null &&
-            lat.isFinite() && lon.isFinite() &&
-            lat in -85.05..85.05 && lon in -180.0..180.0 &&
-            !photo.locationName.isNullOrBlank()
-    }
-
-    private class ClusterAcc(val name: String, firstPhoto: PhotoItemEntity) {
-        val photos = ArrayList<PhotoItemEntity>(16)
-        var latSum = 0.0
-        var lonSum = 0.0
-        var coordCount = 0
-        var unreviewedCount = 0
-        var totalBytes = 0L
-        var favoriteCover: PhotoItemEntity? = null
-        var bestQualityCover: PhotoItemEntity = firstPhoto
-    }
-
-    /**
-     * Single-pass O(N) cluster + unlocated split with primitive accumulators (zero intermediate list allocations).
-     */
-    private fun buildLocationClustersAndUnlocatedLinear(
-        photos: List<PhotoItemEntity>
-    ): Pair<List<LocationCluster>, List<PhotoItemEntity>> {
-        if (photos.isEmpty()) return emptyList<LocationCluster>() to emptyList()
-
-        val clusterMap = HashMap<String, ClusterAcc>(64)
-        val unlocated = ArrayList<PhotoItemEntity>()
-
-        for (p in photos) {
-            if (!hasValidLocation(p)) {
-                unlocated.add(p)
-                continue
-            }
-            val name = p.locationName!!
-            val acc = clusterMap.getOrPut(name) { ClusterAcc(name, p) }
-            acc.photos.add(p)
-            acc.latSum += p.latitude!!
-            acc.lonSum += p.longitude!!
-            acc.coordCount++
-            if (p.photoStatus == PhotoStatus.UNREVIEWED) acc.unreviewedCount++
-            acc.totalBytes += p.fileSizeBytes
-            if (p.isFavorite && acc.favoriteCover == null) acc.favoriteCover = p
-            if (p.qualityScore > acc.bestQualityCover.qualityScore) acc.bestQualityCover = p
-        }
-
-        val clusters = ArrayList<LocationCluster>(clusterMap.size)
-        for (acc in clusterMap.values) {
-            if (acc.coordCount <= 0) continue
-            val avgLat = (acc.latSum / acc.coordCount).coerceIn(-85.0, 85.0)
-            val avgLon = (acc.lonSum / acc.coordCount).coerceIn(-180.0, 180.0)
-            clusters.add(
-                LocationCluster(
-                    locationName = acc.name,
-                    latitude = avgLat,
-                    longitude = avgLon,
-                    photos = acc.photos,
-                    coverPhoto = acc.favoriteCover ?: acc.bestQualityCover,
-                    unreviewedCount = acc.unreviewedCount,
-                    totalBytes = acc.totalBytes
-                )
-            )
-        }
-        clusters.sortWith(compareByDescending<LocationCluster> { it.unreviewedCount }.thenByDescending { it.photos.size })
-        return clusters to unlocated
     }
 }
