@@ -370,15 +370,15 @@ fun GalleryTactileOrbButton(
         if (isDark) {
             Brush.verticalGradient(
                 colors = listOf(
-                    Color(0xEB262D40),
-                    tintSurface.copy(alpha = 0.94f)
+                    Color(0xFF262D40),
+                    tintSurface.copy(alpha = 1f)
                 )
             )
         } else {
             Brush.verticalGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = 0.92f),
-                    tintSurface.copy(alpha = 0.92f)
+                    Color.White,
+                    tintSurface.copy(alpha = 1f)
                 )
             )
         }
@@ -454,23 +454,44 @@ fun GalleryHeaderOrbButton(
     val surfacePure = com.example.ui.theme.SurfacePure
     val hairline = com.example.ui.theme.HairlineBorder
     val rimStart = GlassSpecularRimStart
+    val shadowTint = if (isDark) Color.Black else InkPrimary
+
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .size(48.dp)
+            .drawBehind {
+                if (enabled) {
+                    // Pure circular radial soft shadow (avoids Android HWUI tessellated polygon
+                    // bleed-through that occurs when shadowElevation is placed on translucent circles)
+                    val radiusPx = 22.dp.toPx()
+                    val shadowCenter = Offset(center.x, center.y + 1.5.dp.toPx())
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            0.0f to shadowTint.copy(alpha = if (isDark) 0.34f else 0.14f),
+                            0.68f to shadowTint.copy(alpha = if (isDark) 0.16f else 0.06f),
+                            1.0f to Color.Transparent,
+                            center = shadowCenter,
+                            radius = radiusPx
+                        ),
+                        radius = radiusPx,
+                        center = shadowCenter
+                    )
+                }
+            }
             .clip(CircleShape)
             .clickable(enabled = enabled, onClick = onClick)
     ) {
         androidx.compose.material3.Surface(
             shape = CircleShape,
-            color = if (isDark) surfacePure.copy(alpha = if (enabled) 0.72f else 0.40f)
-            else surfacePure.copy(alpha = if (enabled) 0.90f else 0.55f),
+            color = if (isDark) surfacePure.copy(alpha = if (enabled) 0.78f else 0.42f)
+            else surfacePure.copy(alpha = if (enabled) 0.94f else 0.58f),
             border = androidx.compose.foundation.BorderStroke(
-                0.85.dp,
+                0.9.dp,
                 if (isDark) hairline.copy(alpha = if (enabled) 1f else 0.45f)
                 else rimStart.copy(alpha = if (enabled) 1f else 0.55f)
             ),
-            shadowElevation = if (!enabled) 0.dp else if (isDark) 2.dp else 3.dp,
+            shadowElevation = 0.dp,
             modifier = Modifier.size(38.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {

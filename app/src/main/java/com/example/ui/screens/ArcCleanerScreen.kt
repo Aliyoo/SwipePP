@@ -380,13 +380,13 @@ fun ArcCleanerScreen(
                 val hasTrashedInSession = sessionTrashedBytes > 0L
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = if (isDarkHeader) SurfacePure.copy(alpha = 0.72f) else SurfacePure.copy(alpha = 0.90f),
+                    color = if (isDarkHeader) SurfacePure.copy(alpha = 0.78f) else SurfacePure.copy(alpha = 0.92f),
                     border = BorderStroke(
                         0.85.dp,
                         if (hasTrashedInSession) CoralDanger.copy(alpha = 0.42f)
                         else if (isDarkHeader) HairlineBorder else GlassSpecularRimStart
                     ),
-                    shadowElevation = if (isDarkHeader) 2.dp else 3.dp,
+                    shadowElevation = 0.dp,
                     modifier = Modifier.testTag("dynamic_storage_counter")
                 ) {
                     Row(

@@ -90,6 +90,7 @@ import com.example.ui.MediaFilter
 import com.example.ui.components.Adaptive3DBookshelfCarousel
 import com.example.ui.components.AppSettingsSheet
 import com.example.ui.components.ArtisticGalleryBackdrop
+import com.example.ui.components.GalleryHeaderOrbButton
 import com.example.ui.components.ThemeAppearanceSheet
 import com.example.ui.components.YearbookCoverStudioSheet
 import com.example.ui.components.activeChromeSatinBrush
@@ -224,12 +225,12 @@ fun BookshelfScreen(
                     ) {
                         Surface(
                             shape = CircleShape,
-                            color = if (isDark) SurfacePure.copy(alpha = 0.72f) else SurfacePure.copy(alpha = 0.84f),
+                            color = if (isDark) SurfacePure.copy(alpha = 0.78f) else SurfacePure.copy(alpha = 0.92f),
                             border = BorderStroke(
-                                0.8.dp,
+                                0.85.dp,
                                 if (isDark) HairlineBorder else GlassSpecularRimStart
                             ),
-                            shadowElevation = 1.dp
+                            shadowElevation = 0.dp
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
@@ -276,7 +277,7 @@ fun BookshelfScreen(
                         )
                     }
 
-                    HeaderGlassOrbButton(
+                    GalleryHeaderOrbButton(
                         onClick = { showThemeSheet = true },
                         modifier = Modifier.testTag("bookshelf_theme_button")
                     ) {
@@ -292,7 +293,7 @@ fun BookshelfScreen(
                         )
                     }
 
-                    HeaderGlassOrbButton(
+                    GalleryHeaderOrbButton(
                         onClick = { showSettingsSheet = true },
                         modifier = Modifier.testTag("bookshelf_settings_button")
                     ) {
@@ -635,40 +636,6 @@ fun BookshelfScreen(
             onRemoveDemoArchive = onRemoveDemoArchive,
             onDismiss = { showSettingsSheet = false }
         )
-    }
-}
-
-/**
- * Tactile 38dp frosted circular glass orb wrapped in a 48dp accessible hit area for top header controls.
- */
-@Composable
-private fun HeaderGlassOrbButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
-) {
-    val isDark = LocalIsDarkTheme.current
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-            .clip(CircleShape)
-            .clickable(onClick = onClick)
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = if (isDark) SurfacePure.copy(alpha = 0.72f) else SurfacePure.copy(alpha = 0.88f),
-            border = BorderStroke(
-                0.85.dp,
-                if (isDark) HairlineBorder else GlassSpecularRimStart
-            ),
-            shadowElevation = if (isDark) 2.dp else 3.dp,
-            modifier = Modifier.size(38.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                content()
-            }
-        }
     }
 }
 

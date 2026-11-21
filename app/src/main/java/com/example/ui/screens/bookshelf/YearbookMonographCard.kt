@@ -49,7 +49,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -314,6 +316,22 @@ internal fun ModernYearbook3DCard(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                .drawBehind {
+                                    // Smooth circular ambient shadow halo (no HWUI elevation polygon bleed-through)
+                                    val radiusPx = 21.dp.toPx()
+                                    val shadowCenter = Offset(center.x, center.y + 1.5.dp.toPx())
+                                    drawCircle(
+                                        brush = Brush.radialGradient(
+                                            0.0f to Color.Black.copy(alpha = 0.34f),
+                                            0.68f to Color.Black.copy(alpha = 0.14f),
+                                            1.0f to Color.Transparent,
+                                            center = shadowCenter,
+                                            radius = radiusPx
+                                        ),
+                                        radius = radiusPx,
+                                        center = shadowCenter
+                                    )
+                                }
                                 .clip(CircleShape)
                                 .clickable(
                                     onClickLabel = stringResource(R.string.cd_customize_cover),
@@ -323,9 +341,9 @@ internal fun ModernYearbook3DCard(
                         ) {
                             Surface(
                                 shape = CircleShape,
-                                color = Color(0x660C1018),
-                                border = BorderStroke(0.9.dp, Color.White.copy(alpha = 0.34f)),
-                                shadowElevation = 4.dp,
+                                color = Color(0x7A0C1018),
+                                border = BorderStroke(0.9.dp, Color.White.copy(alpha = 0.36f)),
+                                shadowElevation = 0.dp,
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {

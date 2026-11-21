@@ -422,7 +422,7 @@ internal fun ModernArcSwipeCard(
                     ) {
                         Surface(
                             shape = CircleShape,
-                            color = SolarAmber.copy(alpha = 0.94f),
+                            color = SolarAmber,
                             shadowElevation = 12.dp,
                             modifier = Modifier.size(72.dp)
                         ) {
