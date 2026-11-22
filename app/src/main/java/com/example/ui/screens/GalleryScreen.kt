@@ -58,6 +58,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -101,10 +102,13 @@ import com.example.ui.components.DecoSealButton
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.GallerySmartFilter
+import com.example.ui.components.GalleryZoomTier
+import com.example.ui.components.GalleryZoomTierIconButton
 import com.example.ui.components.PhotoDetailLightbox
 import com.example.ui.components.TimelineDateRangePickerDialog
 import com.example.ui.components.TimelineGlobalSearchBar
 import com.example.ui.components.TimelineSearchFilterSheet
+import com.example.ui.components.defaultGalleryZoomTier
 import com.example.ui.extractDescriptiveKeywordTags
 import com.example.ui.filterGalleryEntriesBySearch
 import com.example.ui.screens.gallery.BulkMoveDestinationSheet
@@ -292,6 +296,12 @@ fun GalleryScreen(
     var smartFilter by remember { mutableStateOf(GallerySmartFilter.ALL) }
     var selectedAlbumFilter by remember { mutableStateOf<String?>(null) }
     var lightboxPhoto by remember { mutableStateOf<PhotoItemEntity?>(null) }
+    var galleryZoomTier by rememberSaveable { mutableStateOf(defaultGalleryZoomTier(galleryColumns)) }
+    LaunchedEffect(galleryColumns) {
+        if (!galleryZoomTier.isWaterfall) {
+            galleryZoomTier = defaultGalleryZoomTier(galleryColumns)
+        }
+    }
 
     var explicitSelectionMode by remember { mutableStateOf(false) }
     var selectedPhotoIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
@@ -357,7 +367,9 @@ fun GalleryScreen(
     }
 
     val allEntries = uiState.galleryEntries
-    val existingAlbums = remember(allEntries) {
+    val precomputed = uiState.galleryIndex.takeIf { it.matches(allEntries) }
+
+    val existingAlbums = precomputed?.existingAlbums ?: remember(allEntries) {
         val counts = HashMap<String, Int>(16)
         for (entry in allEntries) {
             when (entry) {
@@ -382,8 +394,10 @@ fun GalleryScreen(
         }
     }
 
-    val burstEntries = remember(allEntries) { allEntries.filterIsInstance<GalleryEntry.Burst>() }
-    val largePhotoEntries = remember(allEntries) {
+    val burstEntries = precomputed?.burstEntries ?: remember(allEntries) {
+        allEntries.filterIsInstance<GalleryEntry.Burst>()
+    }
+    val largePhotoEntries = precomputed?.largePhotoEntries ?: remember(allEntries) {
         allEntries.filter { entry ->
             when (entry) {
                 is GalleryEntry.Single -> !entry.photo.isVideo && entry.photo.fileSizeBytes >= LARGE_PHOTO_THRESHOLD_BYTES
@@ -391,7 +405,7 @@ fun GalleryScreen(
             }
         }
     }
-    val missingLocationEntries = remember(allEntries) {
+    val missingLocationEntries = precomputed?.missingLocationEntries ?: remember(allEntries) {
         allEntries.filter { entry ->
             when (entry) {
                 is GalleryEntry.Single ->
@@ -402,7 +416,7 @@ fun GalleryScreen(
         }
     }
 
-    val extractedKeywordTags = remember(allEntries) {
+    val extractedKeywordTags = precomputed?.extractedKeywordTags ?: remember(allEntries) {
         extractDescriptiveKeywordTags(allEntries)
     }
 
@@ -572,9 +586,9 @@ fun GalleryScreen(
                                     )
                                     Text(
                                         text = if (burstEntries.isNotEmpty()) {
-                                            "共 ${displayedEntries.size} 项 · 含 ${burstEntries.size} 组连拍"
+                                            "共 ${displayedEntries.size} 项 · 含 ${burstEntries.size} 组连拍 · 双指缩放"
                                         } else {
-                                            "共 ${displayedEntries.size} 项 · 长按可多选"
+                                            "共 ${displayedEntries.size} 项 · 双指缩放切大图 · 长按多选"
                                         },
                                         style = MaterialTheme.typography.bodySmall,
                                         fontSize = 12.sp,
@@ -762,37 +776,63 @@ fun GalleryScreen(
                                         if (missingLocationEntries.isNotEmpty()) add(GallerySmartFilter.MISSING_LOCATION to "缺定位 (${missingLocationEntries.size})")
                                     }
                                 }
-                                if (quickSmartChoices.size > 1) {
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    LazyRow(
-                                        contentPadding = PaddingValues(horizontal = 20.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(7.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .testTag("gallery_quick_smart_strip")
-                                    ) {
-                                        items(quickSmartChoices, key = { it.first.name }) { (filterOption, label) ->
-                                            val isSel = smartFilter == filterOption
-                                            GalleryDecoJumpTag(
-                                                selected = isSel,
-                                                onClick = {
-                                                    hapticEngine.pageFlipLift()
-                                                    smartFilter = filterOption
-                                                },
-                                                modifier = Modifier.testTag("gallery_quick_${filterOption.name.lowercase()}")
-                                            ) {
-                                                Text(
-                                                    text = label,
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    fontSize = 12.sp,
-                                                    letterSpacing = 0.5.sp,
-                                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
-                                                    color = if (isSel) DecoMat else DecoInkOnGround.copy(alpha = 0.78f)
-                                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(end = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (quickSmartChoices.size > 1) {
+                                        LazyRow(
+                                            contentPadding = PaddingValues(start = 20.dp, end = 8.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .testTag("gallery_quick_smart_strip")
+                                        ) {
+                                            items(quickSmartChoices, key = { it.first.name }) { (filterOption, label) ->
+                                                val isSel = smartFilter == filterOption
+                                                GalleryDecoJumpTag(
+                                                    selected = isSel,
+                                                    onClick = {
+                                                        hapticEngine.pageFlipLift()
+                                                        smartFilter = filterOption
+                                                    },
+                                                    modifier = Modifier.testTag("gallery_quick_${filterOption.name.lowercase()}")
+                                                ) {
+                                                    Text(
+                                                        text = label,
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        fontSize = 12.sp,
+                                                        letterSpacing = 0.5.sp,
+                                                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                                        color = if (isSel) DecoMat else DecoInkOnGround.copy(alpha = 0.78f)
+                                                    )
+                                                }
                                             }
                                         }
+                                        Box(
+                                            modifier = Modifier
+                                                .padding(horizontal = 4.dp)
+                                                .width(1.dp)
+                                                .height(18.dp)
+                                                .background(DecoGold.copy(alpha = 0.45f))
+                                        )
+                                    } else {
+                                        Spacer(modifier = Modifier.weight(1f))
                                     }
+
+                                    // Pinned right-edge icon-only view density button reflecting current layout state
+                                    GalleryZoomTierIconButton(
+                                        currentTier = galleryZoomTier,
+                                        onClick = {
+                                            hapticEngine.pageFlipLift()
+                                            galleryZoomTier = galleryZoomTier.nextByTap(galleryColumns)
+                                        },
+                                        modifier = Modifier.testTag("gallery_zoom_tier_toggle")
+                                    )
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
                                 // 画报栏目线：通栏金渐变细线（deco-app.html 画廊屏 chips 与月头之间）
@@ -923,6 +963,13 @@ fun GalleryScreen(
                         },
                         monthStamps = uiState.monthStamps,
                         showMonthStampOverlay = true,
+                        precomputedClusterLayout = if (precomputed != null && displayedEntries === allEntries) {
+                            precomputed.defaultClusterLayout
+                        } else {
+                            null
+                        },
+                        zoomTier = galleryZoomTier,
+                        onZoomTierChanged = { galleryZoomTier = it },
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)

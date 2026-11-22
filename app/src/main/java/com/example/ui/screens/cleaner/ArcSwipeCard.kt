@@ -38,6 +38,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -90,8 +92,7 @@ private val DecoPhotoChipBase = Color(0xFF132920)    // 原型压照片徽章: r
 @Composable
 internal fun ModernArcSwipeCard(
     item: CleanupCardItem,
-    pageOffset: Float,
-    absOffset: Float,
+    pageOffsetProvider: () -> Float,
     isFocused: Boolean,
     isVideoPlaybackActive: Boolean,
     haptics: HapticPatternEngine,
@@ -109,6 +110,7 @@ internal fun ModernArcSwipeCard(
     var isCommitting by remember(item.stableKey) { mutableStateOf(false) }
     var showFavoriteHeartBurst by remember(item.stableKey) { mutableStateOf(false) }
 
+    val arcDropBasePx = with(density) { 42.dp.toPx() }
     val trashThresholdPx = with(density) { 104.dp.toPx() }
     val keepThresholdPx = with(density) { 98.dp.toPx() }
     val flingMinDistancePx = with(density) { 54.dp.toPx() }
@@ -127,12 +129,12 @@ internal fun ModernArcSwipeCard(
         }
     }
 
-    val arcDropPx = (pageOffset * pageOffset) * with(density) { 42.dp.toPx() }
-    val arcTiltDeg = (-pageOffset * 10f).coerceIn(-15f, 15f)
-    val arcScale = lerp(1f, 0.85f, absOffset.coerceIn(0f, 1f))
-    val arcAlpha = lerp(1f, 0.65f, absOffset.coerceIn(0f, 1f))
-    val trashProgress = (-dragOffsetY.value / trashThresholdPx).coerceIn(0f, 1f)
-    val keepProgress = (dragOffsetY.value / keepThresholdPx).coerceIn(0f, 1f)
+    val showTrashOverlay by remember(item.stableKey, trashThresholdPx) {
+        derivedStateOf { (-dragOffsetY.value / trashThresholdPx) > 0.08f }
+    }
+    val showKeepOverlay by remember(item.stableKey, keepThresholdPx) {
+        derivedStateOf { (dragOffsetY.value / keepThresholdPx) > 0.08f }
+    }
 
     val palette = LocalFlipYearPalette.current
     val decoGold = palette.decoGold
@@ -161,8 +163,19 @@ internal fun ModernArcSwipeCard(
                 }
             }
             .graphicsLayer {
-                translationY = arcDropPx + dragOffsetY.value
-                rotationZ = arcTiltDeg + (dragOffsetY.value * -0.014f)
+                val pageOffset = pageOffsetProvider()
+                val absOffset = pageOffset.absoluteValue.coerceIn(0f, 1.5f)
+                val clampedAbs = absOffset.coerceIn(0f, 1f)
+                val dragY = dragOffsetY.value
+                val trashProgress = (-dragY / trashThresholdPx).coerceIn(0f, 1f)
+
+                val arcDropPx = (pageOffset * pageOffset) * arcDropBasePx
+                val arcTiltDeg = (-pageOffset * 10f).coerceIn(-15f, 15f)
+                val arcScale = lerp(1f, 0.85f, clampedAbs)
+                val arcAlpha = lerp(1f, 0.65f, clampedAbs)
+
+                translationY = arcDropPx + dragY
+                rotationZ = arcTiltDeg + (dragY * -0.014f)
                 scaleX = arcScale * (1f - trashProgress * 0.08f)
                 scaleY = arcScale * (1f - trashProgress * 0.08f)
                 alpha = arcAlpha * (1f - trashProgress * 0.35f)
@@ -458,12 +471,15 @@ internal fun ModernArcSwipeCard(
                     }
                 }
 
-                // Swipe-up Vermilion Trash Feedback Overlay
-                if (trashProgress > 0.08f) {
+                // Swipe-up 朱红回收站反馈（theirs draw 相期 alpha，拖拽帧零重组）× 画报纸章造型
+                if (showTrashOverlay) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(decoVerm.copy(alpha = trashProgress * 0.55f)),
+                            .drawBehind {
+                                val p = (-dragOffsetY.value / trashThresholdPx).coerceIn(0f, 1f)
+                                drawRect(color = decoVerm.copy(alpha = p * 0.55f))
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Surface(
@@ -492,12 +508,15 @@ internal fun ModernArcSwipeCard(
                     }
                 }
 
-                // Swipe-down Gold Keep Feedback Overlay
-                if (keepProgress > 0.08f) {
+                // Swipe-down 金色保留反馈（theirs draw 相期 alpha，拖拽帧零重组）× 画报纸章造型
+                if (showKeepOverlay) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(decoGold.copy(alpha = keepProgress * 0.42f)),
+                            .drawBehind {
+                                val p = (dragOffsetY.value / keepThresholdPx).coerceIn(0f, 1f)
+                                drawRect(color = decoGold.copy(alpha = p * 0.42f))
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Surface(

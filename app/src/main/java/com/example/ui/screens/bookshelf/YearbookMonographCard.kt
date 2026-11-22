@@ -3,6 +3,7 @@ package com.example.ui.screens.bookshelf
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -10,6 +11,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +46,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -142,14 +146,35 @@ internal fun ModernYearbook3DCard(
         }
     }
 
+    // 摩登画报外框：主仓库按压缩放反馈（interaction + spring）× 18dp 投影 + 金双框衬纸（画报造型）
+    val bookInteraction = remember { MutableInteractionSource() }
+    val isBookPressed by bookInteraction.collectIsPressedAsState()
+    val bookPressScaleState = animateFloatAsState(
+        targetValue = if (isBookPressed) 0.982f else 1f,
+        animationSpec = spring(
+            dampingRatio = 0.76f,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "book_press_scale"
+    )
+
     Box(
         modifier = modifier
+            .graphicsLayer {
+                val s = bookPressScaleState.value
+                scaleX = s
+                scaleY = s
+            }
             .shadow(elevation = 18.dp, shape = decoShape, spotColor = Color.Black.copy(alpha = 0.52f))
             .clip(decoShape)
             // 内衬底色：金双框之间的画框衬纸
             .background(mat)
             .border(width = 1.5.dp, color = gold, shape = decoShape)
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = bookInteraction,
+                indication = androidx.compose.material3.ripple(color = gold),
+                onClick = onClick
+            )
     ) {
         // 画框内画片视窗：外 1.5dp 金 → 3dp 内衬 → 1dp 弱金 → 全幅封面照
         Box(
@@ -160,13 +185,7 @@ internal fun ModernYearbook3DCard(
                 .border(width = 1.dp, color = gold.copy(alpha = 0.40f), shape = photoShape)
         ) {
             if (displayedPhoto != null) {
-                val kenBurnsScale = if (isCarouselActive) lerp(1.00f, 1.07f, slideProgress.value) else 1f
-                val kenBurnsPanX = if (isCarouselActive) {
-                    val direction = if (safeSlideIndex % 2 == 0) 1f else -1f
-                    lerp(-6f, 6f, slideProgress.value) * direction
-                } else {
-                    0f
-                }
+                val panDirection = if (safeSlideIndex % 2 == 0) 1f else -1f
 
                 Crossfade(
                     targetState = displayedPhoto,
@@ -183,9 +202,17 @@ internal fun ModernYearbook3DCard(
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
-                                scaleX = kenBurnsScale
-                                scaleY = kenBurnsScale
-                                translationX = kenBurnsPanX
+                                if (isCarouselActive) {
+                                    val p = slideProgress.value
+                                    val kenBurnsScale = lerp(1.00f, 1.07f, p)
+                                    scaleX = kenBurnsScale
+                                    scaleY = kenBurnsScale
+                                    translationX = lerp(-6f, 6f, p) * panDirection
+                                } else {
+                                    scaleX = 1f
+                                    scaleY = 1f
+                                    translationX = 0f
+                                }
                             }
                     )
                 }
@@ -274,7 +301,7 @@ internal fun ModernYearbook3DCard(
                     )
             )
 
-            // 画片内容层
+            // 画片内容层（theirs 的 drawBehind 零重组进度条与方章按压反馈已按画报语法接入）
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -296,21 +323,21 @@ internal fun ModernYearbook3DCard(
                                         .weight(1f)
                                         .height(2.dp)
                                         .background(DecoPaperCream.copy(alpha = 0.26f))
-                                ) {
-                                    val segmentFill = when {
-                                        idx < safeSlideIndex -> 1f
-                                        idx == safeSlideIndex -> if (isCarouselActive) slideProgress.value.coerceIn(0.08f, 1f) else 1f
-                                        else -> 0f
-                                    }
-                                    if (segmentFill > 0f) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxHeight()
-                                                .fillMaxWidth(segmentFill)
-                                                .background(DecoPaperCream.copy(alpha = if (idx == safeSlideIndex) 0.95f else 0.62f))
-                                        )
-                                    }
-                                }
+                                        .drawBehind {
+                                            // theirs 零重组逻辑：segmentFill 只在 draw 相期读取 slideProgress
+                                            val segmentFill = when {
+                                                idx < safeSlideIndex -> 1f
+                                                idx == safeSlideIndex -> if (isCarouselActive) slideProgress.value.coerceIn(0.08f, 1f) else 1f
+                                                else -> 0f
+                                            }
+                                            if (segmentFill > 0f) {
+                                                drawRect(
+                                                    color = DecoPaperCream.copy(alpha = if (idx == safeSlideIndex) 0.95f else 0.62f),
+                                                    size = Size(width = size.width * segmentFill, height = size.height)
+                                                )
+                                            }
+                                        }
+                                )
                             }
                         }
                     }
@@ -341,15 +368,33 @@ internal fun ModernYearbook3DCard(
                         }
 
                         // 方章换封面按钮：40dp 正方、1.5dp 描边、竖排两字（仅中央聚焦卡展示，基线门槛不变）
+                        // theirs 按压反馈（cover_orb_scale spring）接入方章
                         if (isFocused) {
+                            val coverOrbInteraction = remember { MutableInteractionSource() }
+                            val coverOrbPressed by coverOrbInteraction.collectIsPressedAsState()
+                            val coverOrbScaleState = animateFloatAsState(
+                                targetValue = if (coverOrbPressed) 0.90f else 1f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                ),
+                                label = "cover_orb_scale"
+                            )
                             Box(
                                 contentAlignment = Alignment.Center,
                                 modifier = Modifier
                                     .size(40.dp)
+                                    .graphicsLayer {
+                                        val s = coverOrbScaleState.value
+                                        scaleX = s
+                                        scaleY = s
+                                    }
                                     .clip(RoundedCornerShape(4.dp))
                                     .background(ground.copy(alpha = 0.62f))
                                     .border(1.5.dp, gold, RoundedCornerShape(4.dp))
                                     .clickable(
+                                        interactionSource = coverOrbInteraction,
+                                        indication = androidx.compose.material3.ripple(color = gold),
                                         onClickLabel = stringResource(R.string.cd_customize_cover),
                                         onClick = onCustomizeCover
                                     )

@@ -19,9 +19,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -60,10 +62,15 @@ private val DecoSheetGoldBrush = { gold: Color ->
     )
 }
 
+// 摩登画报 · 压图深墨签底与纸黄细边（同 BurstGalleryGrid 序号签语法）
+private val DecoInspectOrbBg = Color(0x8C000000)
+private val DecoInspectOrbBorder = Color(0x40EFE3C8)
+
 @Composable
 internal fun BurstComparisonSheet(
     stack: CleanupCardItem.BurstStack,
-    onConfirmKeepBest: (PhotoItemEntity) -> Unit
+    onConfirmKeepBest: (PhotoItemEntity) -> Unit,
+    onInspectPhoto: (PhotoItemEntity) -> Unit = {}
 ) {
     val palette = LocalFlipYearPalette.current
     val decoGold = palette.decoGold
@@ -80,32 +87,66 @@ internal fun BurstComparisonSheet(
             .padding(bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = "连拍精选对比 · 共 ${stack.photos.size} 张",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = inkOnGround
-            )
-            // 金色分隔细线（画报小节标尺）
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(DecoSheetGoldBrush(decoGold))
-            )
-            Text(
-                text = "点击任意帧预览选择，确认后才仅保留选中项并将其他连拍移入回收站。",
-                fontSize = 14.sp,
-                color = inkOnGround.copy(alpha = 0.66f)
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "连拍精选对比 · 共 ${stack.photos.size} 张",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = inkOnGround
+                )
+                // 金色分隔细线（画报小节标尺）
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(DecoSheetGoldBrush(decoGold))
+                )
+                Text(
+                    text = "轻触切换保留帧，再次点击或点放大钮查看原图细节，确认后仅保留选中项。",
+                    fontSize = 14.sp,
+                    color = inkOnGround.copy(alpha = 0.66f)
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            // 金边跳签放大钮（未选中金描边透明底，同画廊跳签语法）
+            Surface(
+                onClick = { onInspectPhoto(selectedPhoto) },
+                shape = RoundedCornerShape(50),
+                color = Color.Transparent,
+                border = BorderStroke(1.dp, decoGold.copy(alpha = 0.55f)),
+                modifier = Modifier.testTag("burst_inspect_selected_button")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.OpenInFull,
+                        contentDescription = "查看原图详情",
+                        tint = decoGold,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Text(
+                        text = "看大图",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = decoGold
+                    )
+                }
+            }
         }
 
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            itemsIndexed(stack.photos) { idx, photo ->
+            itemsIndexed(stack.photos, key = { _, p -> p.id }) { idx, photo ->
                 val isSelected = photo.id == selectedPhoto.id
                 // 金框画片：选中 2.5dp 金描边 + 金晕；未选 1dp 弱金
                 Surface(
@@ -118,7 +159,11 @@ internal fun BurstComparisonSheet(
                     modifier = Modifier
                         .width(166.dp)
                         .clickable {
-                            selectedPhoto = photo
+                            if (isSelected) {
+                                onInspectPhoto(photo)
+                            } else {
+                                selectedPhoto = photo
+                            }
                         }
                         .testTag("burst_choice_${idx}")
                 ) {
@@ -147,6 +192,37 @@ internal fun BurstComparisonSheet(
                                 targetSizePx = 384,
                                 modifier = Modifier.fillMaxSize()
                             )
+
+                            // One-tap full-screen detail inspect orb on every burst frame
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .size(36.dp)
+                                    .clickable {
+                                        selectedPhoto = photo
+                                        onInspectPhoto(photo)
+                                    }
+                                    .padding(6.dp)
+                                    .testTag("burst_inspect_detail_${idx}")
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape)
+                                        .background(DecoInspectOrbBg)
+                                        .border(0.8.dp, DecoInspectOrbBorder, CircleShape)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.OpenInFull,
+                                        contentDescription = "查看第 ${idx + 1} 张详情",
+                                        tint = DecoPaperCream,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                }
+                            }
+
                             if (isSelected) {
                                 // 朱红实印：选中帧徽记
                                 Surface(

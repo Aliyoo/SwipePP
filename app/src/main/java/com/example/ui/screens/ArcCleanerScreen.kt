@@ -125,7 +125,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
-import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
 private fun CleanupCardItem.matchesDay(day: Int): Boolean = when (this) {
@@ -199,6 +198,7 @@ fun ArcCleanerScreen(
     entrySource: CleanerEntrySource = CleanerEntrySource.BOOKSHELF,
     initialFocusDay: Int? = null,
     timelineSortOrder: TimelineSortOrder = TimelineSortOrder.NEWEST_FIRST,
+    onToggleFavorite: (PhotoItemEntity, Boolean) -> Unit = { p, f -> onKeepPhoto(p, f) },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -239,6 +239,8 @@ fun ArcCleanerScreen(
 
     var inspectingStack by remember { mutableStateOf<CleanupCardItem.BurstStack?>(null) }
     var lightboxPhoto by remember { mutableStateOf<PhotoItemEntity?>(null) }
+    var lightboxContextPhotos by remember { mutableStateOf<List<PhotoItemEntity>>(emptyList()) }
+    var resumeBurstGroupIdAfterLightbox by remember { mutableStateOf<String?>(null) }
     var shakeVisualPulse by remember { mutableStateOf(false) }
     var previousQueueKeys by remember { mutableStateOf<List<String>>(emptyList()) }
     var pendingRestoreFocusKey by remember { mutableStateOf<String?>(null) }
@@ -682,15 +684,16 @@ fun ArcCleanerScreen(
                             .testTag("arc_timeline_pager")
                     ) { index ->
                         val item = displayedQueue.getOrNull(index) ?: return@HorizontalPager
-                        val pageOffset = (pagerState.currentPage - index) + pagerState.currentPageOffsetFraction
-                        val absOffset = pageOffset.absoluteValue.coerceIn(0f, 1.5f)
                         val isFocused = index == safePage
 
                         key(item.stableKey) {
                             ModernArcSwipeCard(
                                 item = item,
-                                pageOffset = pageOffset,
-                                absOffset = absOffset,
+                                pageOffsetProvider = {
+                                    val raw = pagerState.currentPageOffsetFraction
+                                    val safeFrac = if (raw.isFinite()) raw else 0f
+                                    (pagerState.currentPage - index) + safeFrac
+                                },
                                 isFocused = isFocused,
                                 isVideoPlaybackActive = isFocused && lightboxPhoto == null,
                                 haptics = haptics,
@@ -723,10 +726,22 @@ fun ArcCleanerScreen(
                                             }
                                         }
                                         item is CleanupCardItem.BurstStack -> inspectingStack = item
-                                        item is CleanupCardItem.SinglePhoto -> lightboxPhoto = item.photo
+                                        item is CleanupCardItem.SinglePhoto -> {
+                                            resumeBurstGroupIdAfterLightbox = null
+                                            lightboxContextPhotos = displayedQueue.map { it.primaryPhoto }
+                                            lightboxPhoto = item.photo
+                                        }
                                     }
                                 },
-                                onOpenFullscreen = { photo -> lightboxPhoto = photo },
+                                onOpenFullscreen = { photo ->
+                                    resumeBurstGroupIdAfterLightbox = null
+                                    lightboxContextPhotos = if (item is CleanupCardItem.BurstStack) {
+                                        item.photos
+                                    } else {
+                                        displayedQueue.map { it.primaryPhoto }
+                                    }
+                                    lightboxPhoto = photo
+                                },
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
@@ -849,10 +864,16 @@ fun ArcCleanerScreen(
                                                     .size(36.dp)
                                                     .clip(RoundedCornerShape(2.dp))
                                                     .border(1.2.dp, DecoGold, RoundedCornerShape(2.dp))
+                                                    .clickable {
+                                                        resumeBurstGroupIdAfterLightbox = null
+                                                        lightboxContextPhotos = current.photos
+                                                        lightboxPhoto = current.bestPhoto
+                                                    }
+                                                    .testTag("burst_best_thumb_preview")
                                             ) {
                                                 PhotoArtwork(
                                                     photo = current.bestPhoto,
-                                                    contentDescription = "预览将保留的最佳帧",
+                                                    contentDescription = "点击查看大图预览最佳帧",
                                                     showVideoBadge = false,
                                                     downsampleTier = ImageDownsampleTier.GRID_THUMB,
                                                     targetSizePx = 128,
@@ -1032,17 +1053,42 @@ fun ArcCleanerScreen(
     }
 
     lightboxPhoto?.let { photo ->
-        val flatPhotos = remember(displayedQueue) { displayedQueue.map { it.primaryPhoto } }
+        val flatPhotos = remember(lightboxContextPhotos, displayedQueue) {
+            lightboxContextPhotos.ifEmpty { displayedQueue.map { it.primaryPhoto } }
+        }
         val startIdx = remember(photo, flatPhotos) {
             flatPhotos.indexOfFirst { it.id == photo.id }.coerceAtLeast(0)
         }
+        val isFromBurstStack = resumeBurstGroupIdAfterLightbox != null ||
+            displayedQueue.any { it is CleanupCardItem.BurstStack && it.photos.any { p -> p.id == photo.id } }
         PhotoDetailLightbox(
             photo = photo,
             photos = flatPhotos,
             initialIndex = startIdx,
-            onDismiss = { lightboxPhoto = null },
-            onKeep = { target, fav -> handleKeepSingle(target, fav) },
-            onTrash = { target -> handleTrashSingle(target) }
+            onDismiss = {
+                lightboxPhoto = null
+                val resumeId = resumeBurstGroupIdAfterLightbox
+                resumeBurstGroupIdAfterLightbox = null
+                if (resumeId != null) {
+                    inspectingStack = displayedQueue.filterIsInstance<CleanupCardItem.BurstStack>()
+                        .firstOrNull { it.groupId == resumeId }
+                }
+            },
+            onKeep = { target, fav ->
+                if (isFromBurstStack) {
+                    onKeepPhoto(target, fav)
+                } else {
+                    handleKeepSingle(target, fav)
+                }
+            },
+            onTrash = { target ->
+                if (isFromBurstStack) {
+                    onTrashPhoto(target)
+                } else {
+                    handleTrashSingle(target)
+                }
+            },
+            onToggleFavorite = onToggleFavorite
         )
     }
 
@@ -1057,6 +1103,14 @@ fun ArcCleanerScreen(
                 onConfirmKeepBest = { chosen ->
                     inspectingStack = null
                     handleKeepBestInStack(stack, chosen)
+                },
+                onInspectPhoto = { targetPhoto ->
+                    // Dismiss sheet window temporarily so FullScreenOverlayHost Lightbox renders cleanly on top,
+                    // then restore BurstComparisonSheet upon Lightbox dismissal
+                    resumeBurstGroupIdAfterLightbox = stack.groupId
+                    inspectingStack = null
+                    lightboxContextPhotos = stack.photos
+                    lightboxPhoto = targetPhoto
                 }
             )
         }

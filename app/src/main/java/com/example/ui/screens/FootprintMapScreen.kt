@@ -1,21 +1,27 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,10 +34,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CenterFocusStrong
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.EditLocationAlt
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -40,18 +48,15 @@ import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,16 +69,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -88,6 +92,7 @@ import com.example.data.PhotoStatus
 import com.example.data.ResolvedGeoLocation
 import com.example.data.SameDayLocationMatch
 import com.example.data.inferSameDayLocations
+import com.example.sensor.rememberHapticEngine
 import com.example.ui.FlipYearUiState
 import com.example.ui.LocalFloatingDockInset
 import com.example.ui.MediaFilter
@@ -96,7 +101,9 @@ import com.example.ui.components.BatchLocationEditorSheet
 import com.example.ui.components.DecoPosterPanel
 import com.example.ui.components.DecoSunburst
 import com.example.ui.components.DecoVermStrip
+import com.example.ui.components.FootprintLocationScrubRail
 import com.example.ui.components.FootprintMapStyle
+import com.example.ui.components.FootprintScrubStop
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.InteractiveSlippyMap
@@ -145,7 +152,7 @@ fun FootprintMapScreen(
     val mat = palette.decoMat
     // 纸黄 #EFE3C8 只压照片暗部与朱红底（可读性红线）
     val cream = DecoPaperCream
-
+    val haptics = rememberHapticEngine()
     val floatingDockInset = LocalFloatingDockInset.current
     val clusters = uiState.locationClusters
     val unlocatedPhotos = uiState.unlocatedPhotos
@@ -154,10 +161,10 @@ fun FootprintMapScreen(
 
     var selectedLocationName by rememberSaveable { mutableStateOf<String?>(null) }
     var isCardExpanded by rememberSaveable { mutableStateOf(false) }
+    var showMapZoomControls by rememberSaveable { mutableStateOf(false) }
     var lightboxPhoto by remember { mutableStateOf<PhotoItemEntity?>(null) }
     var lightboxPhotos by remember { mutableStateOf<List<PhotoItemEntity>>(emptyList()) }
     var showBatchLocationSheet by remember { mutableStateOf(false) }
-    val locationChipsState = rememberLazyListState()
 
     var mapStyleName by rememberSaveable { mutableStateOf(FootprintMapStyle.AMAP_ZH.name) }
     val mapStyle = remember(mapStyleName) {
@@ -181,15 +188,46 @@ fun FootprintMapScreen(
         }
     }
 
-    LaunchedEffect(selectedLocationName, clusters.size, showingUnlocated) {
-        val targetIndex = when {
-            showingUnlocated -> clusters.size
-            selectedCluster != null -> clusters.indexOfFirst { it.locationName == selectedCluster.locationName }
-            else -> -1
+    val scrubStops = remember(clusters, unlocatedPhotos) {
+        buildList(clusters.size + 1) {
+            clusters.forEach { cluster ->
+                add(
+                    FootprintScrubStop(
+                        id = cluster.locationName,
+                        displayName = cluster.locationName,
+                        mediaCount = cluster.photos.size,
+                        unreviewedCount = cluster.unreviewedCount,
+                        totalBytes = cluster.totalBytes,
+                        latitude = cluster.latitude,
+                        longitude = cluster.longitude,
+                        isUnlocated = false
+                    )
+                )
+            }
+            if (unlocatedPhotos.isNotEmpty()) {
+                add(
+                    FootprintScrubStop(
+                        id = UNLOCATED_LOCATION_KEY,
+                        displayName = "无定位信息",
+                        mediaCount = unlocatedPhotos.size,
+                        unreviewedCount = unlocatedPhotos.count { it.photoStatus == PhotoStatus.UNREVIEWED },
+                        totalBytes = unlocatedPhotos.sumOf { it.fileSizeBytes },
+                        latitude = 0.0,
+                        longitude = 0.0,
+                        isUnlocated = true
+                    )
+                )
+            }
         }
-        if (targetIndex >= 0) {
-            locationChipsState.animateScrollToItem(index = (targetIndex - 1).coerceAtLeast(0))
+    }
+
+    val activeStopIndex = remember(scrubStops, showingUnlocated, selectedCluster) {
+        val idx = when {
+            showingUnlocated -> scrubStops.indexOfFirst { it.isUnlocated }
+            selectedCluster != null -> scrubStops.indexOfFirst { !it.isUnlocated && it.id == selectedCluster.locationName }
+            else -> 0
         }
+        idx.coerceAtLeast(0)
     }
 
     // Only indexes rows with gpsScanned = false (instant no-op once initial scan completes)
@@ -226,6 +264,31 @@ fun FootprintMapScreen(
             } else {
                 cameraState.fitClusters(scope, clusters, durationMs = 450)
             }
+        }
+    }
+
+    val commitFootprintStop: (FootprintScrubStop, Boolean) -> Unit = { stop, shouldExpand ->
+        selectedLocationName = stop.id
+        if (stop.isUnlocated) {
+            isCardExpanded = true
+        } else {
+            if (shouldExpand) {
+                isCardExpanded = true
+            }
+            cameraState.animateToLatLng(
+                scope = scope,
+                lat = stop.latitude,
+                lon = stop.longitude,
+                targetZoom = 6.8f
+            )
+        }
+    }
+
+    val stepFootprintStop: (Int) -> Unit = { delta ->
+        if (scrubStops.size >= 2) {
+            val nextIdx = (activeStopIndex + delta).mod(scrubStops.size)
+            haptics.bookshelfDetent()
+            commitFootprintStop(scrubStops[nextIdx], false)
         }
     }
 
@@ -303,7 +366,7 @@ fun FootprintMapScreen(
                 .padding(start = 24.dp, bottom = 24.dp)
         )
 
-        // Top Floating Header, Permission Prompt & Location Quick-Jump Chips
+        // Top Compact Telemetry Pill + Map Layer Switcher
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -320,10 +383,25 @@ fun FootprintMapScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 顶部磨砂信息卡 → 画报纸面信息卡
+                // 顶部单行足迹遥测纸面药丸（点击回正/全览足迹，theirs 新交互）
                 DecoPosterPanel(
+                    onClick = {
+                        haptics.pageFlipLift()
+                        if (mapStyle == FootprintMapStyle.AMAP_ZH) {
+                            val hasOverseas = clusters.any { !isInsideChinaMainland(it.latitude, it.longitude) }
+                            if (hasOverseas && cameraState.isFramingChinaOverview()) {
+                                cameraState.fitClusters(scope, clusters)
+                            } else {
+                                cameraState.focusChinaRegion(scope, clusters)
+                            }
+                        } else if (clusters.isNotEmpty()) {
+                            cameraState.fitClusters(scope, clusters)
+                        }
+                    },
                     shadowElevation = 4.dp,
-                    modifier = Modifier.weight(1f, fill = false)
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .testTag("map_stats_pill")
                 ) {
                     Column(
                         modifier = Modifier.padding(start = 12.dp, end = if (uiState.hasDeviceMedia) 4.dp else 12.dp, top = 7.dp, bottom = 7.dp),
@@ -331,49 +409,47 @@ fun FootprintMapScreen(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(7.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Explore,
-                                contentDescription = null,
+                                contentDescription = stringResource(R.string.cd_map_fit_all),
                                 tint = gold,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
-                            Column(modifier = Modifier.weight(1f, fill = false)) {
-                                Text(
-                                    text = "足迹地图",
-                                    fontFamily = EditorialSerifFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp,
-                                    color = ink
-                                )
-                                val subtitle = when {
-                                    uiState.isIndexingGps && uiState.gpsTotalCount > 0 ->
-                                        "正在解析定位 (${uiState.gpsIndexedCount}/${uiState.gpsTotalCount})"
-                                    totalVisibleCount > 0 ->
-                                        "${clusters.size} 个足迹 · 已定位 $locatedCount / $totalVisibleCount 项"
-                                    else -> "暂无带 GPS 信息的照片"
-                                }
-                                Text(
-                                    text = subtitle,
-                                    fontSize = 12.sp,
-                                    color = ink.copy(alpha = 0.72f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                            val statsLabel = when {
+                                uiState.isIndexingGps && uiState.gpsTotalCount > 0 ->
+                                    "解析定位 ${uiState.gpsIndexedCount}/${uiState.gpsTotalCount}"
+                                totalVisibleCount > 0 ->
+                                    "${clusters.size} 个足迹 · 已定位 $locatedCount/$totalVisibleCount"
+                                else -> "暂无带 GPS 信息的照片"
                             }
+                            Text(
+                                text = statsLabel,
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = ink,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .weight(1f, fill = false)
+                                    .padding(vertical = 5.dp)
+                            )
                             if (uiState.hasDeviceMedia) {
-                                IconButton(
-                                    onClick = { onTriggerGpsBackfill(true) },
+                                Box(
+                                    contentAlignment = Alignment.Center,
                                     modifier = Modifier
-                                        .size(48.dp)
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .clickable { onTriggerGpsBackfill(true) }
                                         .testTag("map_rescan_gps_button")
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Refresh,
                                         contentDescription = "重新解析全量照片定位",
                                         tint = ink.copy(alpha = 0.72f),
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
                             }
@@ -480,52 +556,9 @@ fun FootprintMapScreen(
                 }
             }
 
-            if (clusters.isNotEmpty() || unlocatedPhotos.isNotEmpty()) {
-                LazyRow(
-                    state = locationChipsState,
-                    contentPadding = PaddingValues(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(clusters, key = { it.locationName }) { cluster ->
-                        val selected = !showingUnlocated && cluster.locationName == selectedCluster?.locationName
-                        DecoFootprintChip(
-                            label = cluster.locationName,
-                            selected = selected,
-                            count = cluster.unreviewedCount,
-                            countTone = DecoChipBadgeTone.VERM,
-                            onClick = {
-                                selectedLocationName = cluster.locationName
-                                isCardExpanded = true
-                                cameraState.animateToLatLng(
-                                    scope = scope,
-                                    lat = cluster.latitude,
-                                    lon = cluster.longitude,
-                                    targetZoom = 6.8f
-                                )
-                            },
-                            modifier = Modifier.testTag("location_chip_${cluster.locationName}")
-                        )
-                    }
-
-                    // Transparent chip for media files without embedded GPS coordinates (screenshots, saved images, etc.)
-                    if (unlocatedPhotos.isNotEmpty()) {
-                        item(key = UNLOCATED_LOCATION_KEY) {
-                            DecoFootprintChip(
-                                label = "无定位信息",
-                                selected = showingUnlocated,
-                                dashed = true,
-                                count = unlocatedPhotos.size,
-                                countTone = DecoChipBadgeTone.NEUTRAL,
-                                onClick = {
-                                    selectedLocationName = UNLOCATED_LOCATION_KEY
-                                    isCardExpanded = true
-                                },
-                                modifier = Modifier.testTag("location_chip_unlocated")
-                            )
-                        }
-                    }
-                }
-            }
+            // Top city chip row intentionally removed to liberate the map canvas;
+            // one-handed location switching now lives on the right-edge FootprintLocationScrubRail
+            // and bottom detail card quick-stepper.
 
             // Global MediaFilter active notice when user filtered to Photos/Videos on Bookshelf
             if (uiState.mediaFilter != MediaFilter.ALL) {
@@ -605,66 +638,64 @@ fun FootprintMapScreen(
             }
         }
 
-        // Right-side Floating Zoom, Fit-All & GPS Re-Index Controls (dynamically clears expanded bottom card)
+        // Right-edge One-Handed Footprint Location Scrub Rail + Bottom-Left Map Zoom/Fit Controls
         val hasBottomCard = selectedCluster != null || showingUnlocated
-        val controlsBottomPadding by animateDpAsState(
-            targetValue = when {
-                hasBottomCard && isCardExpanded -> 268.dp + floatingDockInset * 0.45f
-                hasBottomCard -> 132.dp + floatingDockInset * 0.4f
-                else -> 0.dp
-            },
-            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        val density = LocalDensity.current
+        val targetControlsShiftPx = with(density) {
+            when {
+                hasBottomCard && isCardExpanded -> -244.dp.toPx()
+                hasBottomCard -> -102.dp.toPx()
+                else -> 0f
+            }
+        }
+        val controlsShiftYState = animateFloatAsState(
+            targetValue = targetControlsShiftPx,
+            animationSpec = spring(
+                dampingRatio = 0.84f,
+                stiffness = Spring.StiffnessMediumLow
+            ),
             label = "map_controls_clearance"
         )
-        // Unified single right-side paper map control rail (Zoom + Fit-All)
-        Box(
+
+        val railBottomClearance = when {
+            hasBottomCard && isCardExpanded -> 268.dp + floatingDockInset
+            hasBottomCard -> 124.dp + floatingDockInset
+            else -> 36.dp + floatingDockInset
+        }
+
+        // Signature Right-Edge 「足迹小旗快滑轨」: drag to live-preview locations, release to fly
+        if (scrubStops.size >= 2) {
+            FootprintLocationScrubRail(
+                stops = scrubStops,
+                activeIndex = activeStopIndex,
+                onCommitStop = { stop -> commitFootprintStop(stop, false) },
+                topPadding = if (uiState.hasDeviceMedia && !uiState.hasMediaLocationPermission) 144.dp else 68.dp,
+                bottomPadding = railBottomClearance,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+            )
+        }
+
+        // Bottom-Left Horizontal Map Zoom Capsule — hidden by default to preserve an uncluttered map canvas
+        AnimatedVisibility(
+            visible = showMapZoomControls,
+            enter = fadeIn(tween(180)),
+            exit = fadeOut(tween(140)),
             modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(
-                    end = 16.dp,
-                    bottom = controlsBottomPadding
-                )
+                .align(Alignment.BottomStart)
+                .navigationBarsPadding()
+                .padding(start = 16.dp, bottom = 14.dp + floatingDockInset)
+                .graphicsLayer {
+                    translationY = controlsShiftYState.value
+                }
                 .pointerInput(Unit) {}
         ) {
+            // 缩放胶囊画报纸面化：DecoPosterPanel 替换磨砂玻璃（theirs 交互骨架原样保留）
             DecoPosterPanel(shadowElevation = 5.dp) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    IconButton(
-                        onClick = { cameraState.animateZoomBy(scope, +1.2f) },
-                        modifier = Modifier
-                            .size(48.dp)
-                            .testTag("map_zoom_in_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Add,
-                            contentDescription = stringResource(R.string.cd_map_zoom_in),
-                            tint = ink,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    HorizontalDivider(
-                        modifier = Modifier.width(24.dp),
-                        thickness = 1.dp,
-                        color = gold.copy(alpha = 0.45f)
-                    )
-                    IconButton(
-                        onClick = { cameraState.animateZoomBy(scope, -1.2f) },
-                        modifier = Modifier
-                            .size(48.dp)
-                            .testTag("map_zoom_out_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Remove,
-                            contentDescription = stringResource(R.string.cd_map_zoom_out),
-                            tint = ink,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     if (clusters.isNotEmpty() || mapStyle == FootprintMapStyle.AMAP_ZH) {
-                        HorizontalDivider(
-                            modifier = Modifier.width(24.dp),
-                            thickness = 1.dp,
-                            color = gold.copy(alpha = 0.45f)
-                        )
                         IconButton(
                             onClick = {
                                 if (mapStyle == FootprintMapStyle.AMAP_ZH) {
@@ -686,9 +717,47 @@ fun FootprintMapScreen(
                                 imageVector = Icons.Filled.CenterFocusStrong,
                                 contentDescription = stringResource(R.string.cd_map_fit_all),
                                 tint = gold,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(19.dp)
                             )
                         }
+                        Box(
+                            modifier = Modifier
+                                .width(0.8.dp)
+                                .height(22.dp)
+                                .background(gold.copy(alpha = 0.45f))
+                        )
+                    }
+                    IconButton(
+                        onClick = { cameraState.animateZoomBy(scope, -1.2f) },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("map_zoom_out_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Remove,
+                            contentDescription = stringResource(R.string.cd_map_zoom_out),
+                            tint = ink,
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .width(0.8.dp)
+                            .height(22.dp)
+                            .background(gold.copy(alpha = 0.45f))
+                    )
+                    IconButton(
+                        onClick = { cameraState.animateZoomBy(scope, +1.2f) },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("map_zoom_in_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Add,
+                            contentDescription = stringResource(R.string.cd_map_zoom_in),
+                            tint = ink,
+                            modifier = Modifier.size(19.dp)
+                        )
                     }
                 }
             }
@@ -739,7 +808,7 @@ fun FootprintMapScreen(
                         )
                         Text(
                             text = if (unlocatedPhotos.isNotEmpty()) {
-                                "截图、社交软件保存图或拍摄时未开启定位开关的照片/视频不会写入 GPS 坐标。你可以点击上方「无定位信息」直接浏览并整理。"
+                                "截图、社交软件保存图或拍摄时未开启定位开关的照片/视频不会写入 GPS 坐标。你可以点击下方直接查看或批量补全定位。"
                             } else {
                                 "当本地相册包含 GPS 拍摄位置时，这里会自动在地图上聚合足迹并支持按地点批量清理。"
                             },
@@ -778,7 +847,20 @@ fun FootprintMapScreen(
             }
         }
 
-        // Bottom Collapsible Paper Detail Card (Either Selected Geotagged Cluster OR Unlocated Media Sheet)
+        // 底部可折叠画报详情卡（点击卡头或纵向拖拽展开/收起；选中有定位地点 或 无定位媒体清单）
+        AnimatedVisibility(
+            visible = hasBottomCard,
+            enter = fadeIn(tween(185, easing = FastOutSlowInEasing)) +
+                slideInVertically(tween(220, easing = FastOutSlowInEasing)) { it / 3 },
+            exit = fadeOut(tween(135)) +
+                slideOutVertically(tween(160)) { it / 3 },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .fillMaxWidth()
+                .widthIn(max = 600.dp)
+                .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 10.dp + floatingDockInset)
+        ) {
         if (showingUnlocated) {
             val unreviewedUnlocated = remember(unlocatedPhotos) {
                 unlocatedPhotos.count { it.photoStatus == PhotoStatus.UNREVIEWED }
@@ -788,11 +870,7 @@ fun FootprintMapScreen(
             DecoPosterPanel(
                 shadowElevation = 14.dp,
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
                     .fillMaxWidth()
-                    .widthIn(max = 600.dp)
-                    .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 12.dp + floatingDockInset)
                     .animateContentSize(
                         animationSpec = spring(
                             dampingRatio = Spring.DampingRatioLowBouncy,
@@ -828,11 +906,26 @@ fun FootprintMapScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .pointerInput(scrubStops.size, activeStopIndex) {
+                                if (scrubStops.size < 2) return@pointerInput
+                                var totalDx = 0f
+                                detectHorizontalDragGestures(
+                                    onDragStart = { totalDx = 0f },
+                                    onHorizontalDrag = { _, dragAmount -> totalDx += dragAmount },
+                                    onDragEnd = {
+                                        if (totalDx < -48f) stepFootprintStop(+1)
+                                        else if (totalDx > 48f) stepFootprintStop(-1)
+                                    }
+                                )
+                            }
                             .clickable { isCardExpanded = !isCardExpanded },
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
                             Text(
                                 text = "无定位信息的照片与视频",
                                 fontFamily = EditorialSerifFontFamily,
@@ -852,6 +945,14 @@ fun FootprintMapScreen(
                             )
                         }
 
+                        if (scrubStops.size >= 2) {
+                            CompactLocationStepper(
+                                onPrevious = { stepFootprintStop(-1) },
+                                onNext = { stepFootprintStop(+1) }
+                            )
+                        }
+
+                        // 画报展开/收起方钮（HEAD 保留的显式开合暗示）
                         IconButton(
                             onClick = { isCardExpanded = !isCardExpanded },
                             modifier = Modifier.size(48.dp)
@@ -899,18 +1000,11 @@ fun FootprintMapScreen(
                     }
                 }
             }
-        } else selectedCluster?.let { cluster ->
-            val latLabel = if (cluster.latitude >= 0) "N" else "S"
-            val lonLabel = if (cluster.longitude >= 0) "E" else "W"
-
+        } else selectedCluster?.let { activeCluster ->
             DecoPosterPanel(
                 shadowElevation = 14.dp,
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
                     .fillMaxWidth()
-                    .widthIn(max = 600.dp)
-                    .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 12.dp + floatingDockInset)
                     .animateContentSize(
                         animationSpec = spring(
                             dampingRatio = Spring.DampingRatioLowBouncy,
@@ -930,6 +1024,18 @@ fun FootprintMapScreen(
                     }
                     .testTag("location_detail_card")
             ) {
+                AnimatedContent(
+                    targetState = activeCluster,
+                    contentKey = { it.locationName },
+                    transitionSpec = {
+                        (fadeIn(tween(165, easing = FastOutSlowInEasing)) +
+                            slideInVertically(tween(175, easing = FastOutSlowInEasing)) { it / 12 }) togetherWith
+                            (fadeOut(tween(105)) + slideOutVertically(tween(110)) { -it / 14 })
+                    },
+                    label = "map_cluster_card_switch"
+                ) { cluster ->
+                val latLabel = if (cluster.latitude >= 0) "N" else "S"
+                val lonLabel = if (cluster.longitude >= 0) "E" else "W"
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -945,8 +1051,20 @@ fun FootprintMapScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .pointerInput(scrubStops.size, activeStopIndex) {
+                                if (scrubStops.size < 2) return@pointerInput
+                                var totalDx = 0f
+                                detectHorizontalDragGestures(
+                                    onDragStart = { totalDx = 0f },
+                                    onHorizontalDrag = { _, dragAmount -> totalDx += dragAmount },
+                                    onDragEnd = {
+                                        if (totalDx < -48f) stepFootprintStop(+1)
+                                        else if (totalDx > 48f) stepFootprintStop(-1)
+                                    }
+                                )
+                            }
                             .clickable { isCardExpanded = !isCardExpanded },
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // 地点卡：52dp 金框封面印记 + 美术字地名 + 坐标元数据
@@ -1027,6 +1145,14 @@ fun FootprintMapScreen(
                                     tint = ink.copy(alpha = 0.75f)
                                 )
                             }
+
+                            // theirs 新增：单手地点快切步进器（逻辑原样保留）
+                            if (scrubStops.size >= 2) {
+                                CompactLocationStepper(
+                                    onPrevious = { stepFootprintStop(-1) },
+                                    onNext = { stepFootprintStop(+1) }
+                                )
+                            }
                         }
                     }
 
@@ -1070,7 +1196,9 @@ fun FootprintMapScreen(
                         }
                     }
                 }
+                }
             }
+        }
         }
     }
 
@@ -1113,110 +1241,6 @@ fun FootprintMapScreen(
 // =====================================================================================
 // 屏内画报一次性组件（色彩全部从主题 Deco 令牌派生，不引入硬编码色值）
 // =====================================================================================
-
-private enum class DecoChipBadgeTone { VERM, NEUTRAL }
-
-/** 地点快速跳转 chips：金描边纸面方章；[dashed] 用于「无定位信息」（虚线金框），[count] 为朱红/中性计数徽 */
-@Composable
-private fun DecoFootprintChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    count: Int? = null,
-    countTone: DecoChipBadgeTone = DecoChipBadgeTone.VERM,
-    dashed: Boolean = false
-) {
-    val palette = LocalFlipYearPalette.current
-    val ink = palette.decoInkOnGround
-    val gold = palette.decoGold
-    val verm = palette.decoVerm
-    val shape = RoundedCornerShape(3.dp)
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-
-    Box(
-        modifier = modifier
-            .graphicsLayer {
-                scaleX = if (pressed) 0.96f else 1f
-                scaleY = if (pressed) 0.96f else 1f
-            }
-            .clip(shape)
-            .background(if (selected) gold.copy(alpha = 0.16f) else ink.copy(alpha = 0.05f))
-            .then(
-                if (dashed) {
-                    Modifier.drawBehind {
-                        // 虚线金框（deco-app.html 无定位印记：borderStyle dashed）
-                        val half = 1.dp.toPx() / 2f
-                        drawRoundRect(
-                            color = gold.copy(alpha = 0.75f),
-                            topLeft = Offset(half, half),
-                            size = Size(size.width - half * 2, size.height - half * 2),
-                            cornerRadius = CornerRadius(2.dp.toPx()),
-                            style = Stroke(
-                                width = 1.dp.toPx(),
-                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 4f))
-                            )
-                        )
-                    }
-                } else {
-                    Modifier.border(
-                        width = if (selected) 1.5.dp else 1.dp,
-                        color = if (selected) gold else gold.copy(alpha = 0.55f),
-                        shape = shape
-                    )
-                }
-            )
-            .clickable(
-                interactionSource = interactionSource,
-                indication = ripple(color = ink),
-                onClick = onClick
-            )
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-    ) {
-        androidx.compose.foundation.layout.Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                text = label,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = if (selected) ink else ink.copy(alpha = 0.85f),
-                maxLines = 1
-            )
-            if (count != null && count > 0) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(
-                            when (countTone) {
-                                DecoChipBadgeTone.VERM -> verm
-                                DecoChipBadgeTone.NEUTRAL -> gold.copy(alpha = 0.20f)
-                            }
-                        )
-                        .then(
-                            if (countTone == DecoChipBadgeTone.VERM) {
-                                Modifier.border(1.dp, DecoPaperCream.copy(alpha = 0.45f), RoundedCornerShape(2.dp))
-                            } else {
-                                Modifier
-                            }
-                        )
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "$count",
-                        fontFamily = JetBrainsMonoFontFamily,
-                        // 标签字号红线 ≥12sp：计数徽从原型 11px 升 12sp（原型例外已记录）
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (countTone == DecoChipBadgeTone.VERM) DecoPaperCream else ink
-                    )
-                }
-            }
-        }
-    }
-}
 
 /** 待理/已整理 方章小签：待理朱红底纸黄字（纸黄压朱红底红线），已整理弱金底墨字 */
 @Composable
@@ -1333,6 +1357,62 @@ private fun DecoGhostButton(
             color = gold,
             maxLines = 1
         )
+    }
+}
+
+/** theirs 新增：底部卡头单手地点步进器（逻辑与 testTag 原样保留，样式画报化：纸面 + 金发丝描边） */
+@Composable
+private fun CompactLocationStepper(
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val palette = LocalFlipYearPalette.current
+    val gold = palette.decoGold
+    val ink = palette.decoInkOnGround
+    val pillShape = RoundedCornerShape(3.dp)
+    Row(
+        modifier = modifier
+            .height(34.dp)
+            .clip(pillShape)
+            .background(ink.copy(alpha = 0.05f))
+            .border(0.8.dp, gold.copy(alpha = 0.55f), pillShape),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(width = 34.dp, height = 34.dp)
+                .clickable(onClick = onPrevious)
+                .testTag("map_prev_location_button")
+        ) {
+            Icon(
+                imageVector = Icons.Filled.ChevronLeft,
+                contentDescription = stringResource(R.string.cd_footprint_prev_location),
+                tint = ink,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .width(0.8.dp)
+                .height(16.dp)
+                .background(gold.copy(alpha = 0.45f))
+        )
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(width = 34.dp, height = 34.dp)
+                .clickable(onClick = onNext)
+                .testTag("map_next_location_button")
+        ) {
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = stringResource(R.string.cd_footprint_next_location),
+                tint = ink,
+                modifier = Modifier.size(18.dp)
+            )
+        }
     }
 }
 

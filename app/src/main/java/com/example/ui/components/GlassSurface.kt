@@ -213,6 +213,28 @@ fun FrostedGlassCard(
         )
     }
 
+    val ambientDiffusionBrush = remember(enableAmbientBlur, isDark, sapphireGlow, champagneGlow) {
+        if (!enableAmbientBlur) {
+            null
+        } else {
+            Brush.linearGradient(
+                colors = if (isDark) {
+                    listOf(
+                        Color.White.copy(alpha = 0.05f),
+                        sapphireGlow.copy(alpha = 0.16f),
+                        champagneGlow.copy(alpha = 0.11f)
+                    )
+                } else {
+                    listOf(
+                        Color.White.copy(alpha = 0.22f),
+                        sapphireGlow.copy(alpha = 0.09f),
+                        champagneGlow.copy(alpha = 0.11f)
+                    )
+                }
+            )
+        }
+    }
+
     val topHighlightColor = if (isDark) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.68f)
 
     val containerModifier = modifier
@@ -231,6 +253,9 @@ fun FrostedGlassCard(
         .clip(shape)
         .drawBehind {
             drawRect(brush = fillBrush)
+            if (ambientDiffusionBrush != null) {
+                drawRect(brush = ambientDiffusionBrush)
+            }
             if (accentTint != Color.Transparent) {
                 drawRect(color = accentTint)
             }
@@ -258,34 +283,7 @@ fun FrostedGlassCard(
             }
         )
 
-    Box(modifier = containerModifier) {
-        // Strictly static GPU-cached internal frosted light diffusion ribbon (never blurs child text!)
-        if (enableAmbientBlur && supportsHardwareBlur) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .blur(radius = 18.dp, edgeTreatment = BlurredEdgeTreatment.Rectangle)
-                    .background(
-                        Brush.linearGradient(
-                            colors = if (isDark) {
-                                listOf(
-                                    Color.White.copy(alpha = 0.06f),
-                                    sapphireGlow.copy(alpha = 0.20f),
-                                    champagneGlow.copy(alpha = 0.14f)
-                                )
-                            } else {
-                                listOf(
-                                    Color.White.copy(alpha = 0.26f),
-                                    sapphireGlow.copy(alpha = 0.12f),
-                                    champagneGlow.copy(alpha = 0.14f)
-                                )
-                            }
-                        )
-                    )
-            )
-        }
-        content()
-    }
+    Box(modifier = containerModifier, content = content)
 }
 
 /**

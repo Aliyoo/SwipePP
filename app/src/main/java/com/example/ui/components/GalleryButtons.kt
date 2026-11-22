@@ -117,7 +117,7 @@ fun GalleryActionButton(
 
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(
+    val pressScaleState = animateFloatAsState(
         targetValue = if (pressed) 0.972f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -220,8 +220,9 @@ fun GalleryActionButton(
         modifier = modifier
             .heightIn(min = height)
             .graphicsLayer {
-                scaleX = pressScale
-                scaleY = pressScale
+                val s = pressScaleState.value
+                scaleX = s
+                scaleY = s
                 alpha = if (enabled) 1f else 0.50f
             }
             .shadow(
@@ -305,7 +306,7 @@ fun GallerySelectableChip(
 
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(
+    val pressScaleState = animateFloatAsState(
         targetValue = if (pressed) 0.96f else 1f,
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
         label = "chip_scale"
@@ -341,8 +342,9 @@ fun GallerySelectableChip(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .graphicsLayer {
-                scaleX = pressScale
-                scaleY = pressScale
+                val s = pressScaleState.value
+                scaleX = s
+                scaleY = s
             }
             .shadow(
                 elevation = if (selected) 6.dp else 3.dp,
@@ -387,7 +389,7 @@ fun GalleryTactileOrbButton(
     val isDark = LocalIsDarkTheme.current
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(
+    val pressScaleState = animateFloatAsState(
         targetValue = if (pressed) 0.91f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -432,8 +434,9 @@ fun GalleryTactileOrbButton(
             modifier = modifier
                 .size(orbSize)
                 .graphicsLayer {
-                    scaleX = pressScale
-                    scaleY = pressScale
+                    val s = pressScaleState.value
+                    scaleX = s
+                    scaleY = s
                 }
                 .shadow(
                     elevation = if (pressed) 4.dp else 10.dp,
@@ -485,11 +488,26 @@ fun GalleryHeaderOrbButton(
     val hairline = com.example.ui.theme.HairlineBorder
     val rimStart = GlassSpecularRimStart
     val shadowTint = if (isDark) Color.Black else InkPrimary
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val pressScaleState = animateFloatAsState(
+        targetValue = if (pressed && enabled) 0.91f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "header_orb_scale"
+    )
 
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .size(48.dp)
+            .graphicsLayer {
+                val s = pressScaleState.value
+                scaleX = s
+                scaleY = s
+            }
             .drawBehind {
                 if (enabled) {
                     // Pure circular radial soft shadow (avoids Android HWUI tessellated polygon
@@ -510,7 +528,12 @@ fun GalleryHeaderOrbButton(
                 }
             }
             .clip(CircleShape)
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = ripple(color = if (isDark) Color.White else InkPrimary),
+                onClick = onClick
+            )
     ) {
         androidx.compose.material3.Surface(
             shape = CircleShape,
@@ -562,7 +585,7 @@ fun GallerySculptedHeroButton(
 
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(
+    val pressScaleState = animateFloatAsState(
         targetValue = if (pressed) 0.975f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -621,8 +644,9 @@ fun GallerySculptedHeroButton(
         modifier = modifier
             .heightIn(min = height)
             .graphicsLayer {
-                scaleX = pressScale
-                scaleY = pressScale
+                val s = pressScaleState.value
+                scaleX = s
+                scaleY = s
                 alpha = if (enabled) 1f else 0.50f
             }
             .shadow(
