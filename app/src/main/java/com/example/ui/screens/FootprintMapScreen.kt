@@ -23,15 +23,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -320,8 +323,14 @@ fun FootprintMapScreen(
         )
 
         // 金双线画框：外 1.5dp 金 + mat 内衬带 + 1dp 弱金（deco-app.html GoldFrame 语法）
-        // 纯描边 Canvas，不注册 pointerInput，手势完全穿透到地图
-        Canvas(modifier = Modifier.fillMaxSize()) {
+        // 纯描边 Canvas，不注册 pointerInput，手势完全穿透到地图；
+        // 画框收进安全区：顶部避开状态栏、底部避开全局停靠栏（floatingDockInset 含导航栏）
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(top = 6.dp, bottom = floatingDockInset + 10.dp)
+        ) {
             val frameInset = 7.dp.toPx()
             val frameRadius = 2.dp.toPx()
             // mat 内衬带（6dp 描边带，覆盖瓦片边缘形成画框内衬）
