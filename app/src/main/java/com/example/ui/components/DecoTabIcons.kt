@@ -12,6 +12,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.unit.dp
 
 /** 底部导航四签的画报图标语汇（与 TopLevelTab 路由一一对应）。 */
@@ -31,20 +33,23 @@ fun DecoTabIcon(
     iconSize: androidx.compose.ui.unit.Dp = 20.dp
 ) {
     Canvas(modifier = modifier.size(iconSize)) {
-        val stroke = 1.4.dp.toPx()
-        val strokeStyle = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        // 20 单位设计稿等比映射到实际像素（此前坐标被当作 px，图标只有 1/3 大）
+        val unit = size.width / 20f
+        withTransform({ scale(unit, unit, pivot = Offset.Zero) }) {
+        val strokeStyle = Stroke(width = 1.4f, cap = StrokeCap.Round, join = StrokeJoin.Round)
         when (kind) {
             DecoTabIconKind.ALBUM -> drawAlbum(color, selected, strokeStyle)
             DecoTabIconKind.GALLERY -> drawGallery(color, selected, strokeStyle)
             DecoTabIconKind.FOOTPRINT -> drawFootprint(color, selected, strokeStyle)
             DecoTabIconKind.VAULT -> drawVault(color, selected, strokeStyle)
         }
+        }
     }
 }
 
 /** 影集：错位叠放的双画片 + 内框印点（画报画片语法） */
 private fun DrawScope.drawAlbum(color: Color, selected: Boolean, strokeStyle: Stroke) {
-    val r = CornerRadius(1.5.dp.toPx())
+    val r = CornerRadius(1.5f)
     // 底层画片（错位）
     drawRoundRect(
         color = color.copy(alpha = if (selected) 0.55f else 0.4f),
@@ -69,7 +74,7 @@ private fun DrawScope.drawAlbum(color: Color, selected: Boolean, strokeStyle: St
 
 /** 画廊：金双框画片 + 山折线 + 画报日轮（选中日轮填实） */
 private fun DrawScope.drawGallery(color: Color, selected: Boolean, strokeStyle: Stroke) {
-    val r = CornerRadius(1.5.dp.toPx())
+    val r = CornerRadius(1.5f)
     drawRoundRect(color = color, topLeft = Offset(2f, 3f), size = Size(16f, 14f), cornerRadius = r, style = strokeStyle)
     // 山折线
     drawPath(
@@ -120,7 +125,7 @@ private fun DrawScope.drawFootprint(color: Color, selected: Boolean, strokeStyle
 
 /** 回收站：方篓 + 篓盖双线 + 竖篾纹（方章化语汇） */
 private fun DrawScope.drawVault(color: Color, selected: Boolean, strokeStyle: Stroke) {
-    val r = CornerRadius(1.5.dp.toPx())
+    val r = CornerRadius(1.5f)
     // 篓盖横线
     drawLine(color = color, start = Offset(3.5f, 5.5f), end = Offset(16.5f, 5.5f), strokeWidth = 1.5f, cap = StrokeCap.Round)
     // 提手

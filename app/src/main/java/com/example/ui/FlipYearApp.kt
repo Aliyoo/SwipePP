@@ -1094,10 +1094,17 @@ private fun FloatingGalleryDock(
             )
             // 仅顶部金细线：圆角实机上左右边框会被屏幕圆角截断产生割裂
             .drawBehind {
+                // 上下金细线：左右开放（圆角屏割裂规避），底边线闭合底座
                 drawLine(
                     color = gold.copy(alpha = 0.5f),
                     start = Offset(0f, 0.5.dp.toPx()),
                     end = Offset(size.width, 0.5.dp.toPx()),
+                    strokeWidth = 1.dp.toPx()
+                )
+                drawLine(
+                    color = gold.copy(alpha = 0.5f),
+                    start = Offset(0f, size.height - 0.5.dp.toPx()),
+                    end = Offset(size.width, size.height - 0.5.dp.toPx()),
                     strokeWidth = 1.dp.toPx()
                 )
             }
@@ -1203,7 +1210,7 @@ private fun FloatingGalleryDock(
                                 },
                                 color = if (isSelected) gold else ink.copy(alpha = 0.72f),
                                 selected = isSelected,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(22.dp)
                             )
                             Spacer(modifier = Modifier.width(7.dp))
                             Text(
