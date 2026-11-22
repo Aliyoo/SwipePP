@@ -1,12 +1,20 @@
 package com.example.ui.components
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -28,10 +36,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.BurstMode
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -112,6 +124,12 @@ enum class GalleryZoomTier(
     fun gridColumns(): Int = when (this) {
         COMPACT_4 -> 4
         else -> 3
+    }
+
+    fun nextByTap(preferredColumns: Int): GalleryZoomTier = when (this) {
+        COMPACT_4, STANDARD_3 -> WATERFALL_2
+        WATERFALL_2 -> WATERFALL_1
+        WATERFALL_1 -> defaultGalleryZoomTier(preferredColumns)
     }
 }
 
@@ -860,3 +878,70 @@ private fun JustifiedWaterfallRow(
         }
     }
 }
+
+/**
+ * Compact, icon-only view density switch displaying the silhouette of the active [GalleryZoomTier].
+ * Keeps layout switching visually distinct from content filters while preserving a 48dp accessible hit target.
+ */
+@Composable
+fun GalleryZoomTierIconButton(
+    currentTier: GalleryZoomTier,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    visualSize: Dp = 36.dp
+) {
+    val isDark = LocalIsDarkTheme.current
+    val isWaterfall = currentTier.isWaterfall
+    val containerColor = when {
+        isWaterfall && isDark -> CobaltPrimary.copy(alpha = 0.24f)
+        isWaterfall -> CobaltPrimary.copy(alpha = 0.12f)
+        isDark -> SurfacePure.copy(alpha = 0.80f)
+        else -> SurfacePure.copy(alpha = 0.94f)
+    }
+    val borderColor = when {
+        isWaterfall -> CobaltPrimary.copy(alpha = if (isDark) 0.56f else 0.42f)
+        isDark -> HairlineBorder
+        else -> HairlineBorder.copy(alpha = 0.90f)
+    }
+    val iconTint = if (isWaterfall) CobaltPrimary else InkPrimary
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(visualSize)
+                .clip(CircleShape)
+                .background(containerColor)
+                .border(width = 0.95.dp, color = borderColor, shape = CircleShape)
+        ) {
+            AnimatedContent(
+                targetState = currentTier,
+                transitionSpec = {
+                    (fadeIn(tween(140)) + scaleIn(initialScale = 0.82f, animationSpec = tween(140))) togetherWith
+                        (fadeOut(tween(100)) + scaleOut(targetScale = 0.82f, animationSpec = tween(100)))
+                },
+                label = "gallery_zoom_tier_icon"
+            ) { tier ->
+                val icon = when (tier) {
+                    GalleryZoomTier.COMPACT_4 -> Icons.Filled.Apps
+                    GalleryZoomTier.STANDARD_3 -> Icons.Filled.GridView
+                    GalleryZoomTier.WATERFALL_2 -> Icons.Filled.Dashboard
+                    GalleryZoomTier.WATERFALL_1 -> Icons.Filled.ViewAgenda
+                }
+                Icon(
+                    imageVector = icon,
+                    contentDescription = "当前视图：${tier.label}，点按切换布局",
+                    tint = iconTint,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+

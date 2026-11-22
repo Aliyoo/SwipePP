@@ -12,6 +12,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,9 +41,7 @@ import androidx.compose.material.icons.filled.BurstMode
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Compress
-import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
@@ -93,6 +92,7 @@ import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.GallerySelectableChip
 import com.example.ui.components.GallerySmartFilter
 import com.example.ui.components.GalleryZoomTier
+import com.example.ui.components.GalleryZoomTierIconButton
 import com.example.ui.components.PhotoDetailLightbox
 import com.example.ui.components.TimelineDateRangePickerDialog
 import com.example.ui.components.TimelineGlobalSearchBar
@@ -107,6 +107,7 @@ import com.example.ui.screens.gallery.GallerySelectionTopBar
 import com.example.ui.theme.CobaltDark
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CobaltSoft
+import com.example.ui.theme.HairlineBorder
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.SolarAmber
@@ -663,70 +664,64 @@ fun GalleryScreen(
                                         if (missingLocationEntries.isNotEmpty()) add(GallerySmartFilter.MISSING_LOCATION to "缺定位 (${missingLocationEntries.size})")
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 20.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(7.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .testTag("gallery_quick_smart_strip")
+                                        .padding(end = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // 1-tap Grid <-> Justified Waterfall toggle synchronized with 2-finger pinch-to-zoom
-                                    item(key = "zoom_tier_toggle") {
-                                        val isWaterfall = galleryZoomTier.isWaterfall
-                                        GallerySelectableChip(
-                                            selected = isWaterfall,
-                                            onClick = {
-                                                hapticEngine.pageFlipLift()
-                                                galleryZoomTier = when (galleryZoomTier) {
-                                                    GalleryZoomTier.COMPACT_4,
-                                                    GalleryZoomTier.STANDARD_3 -> GalleryZoomTier.WATERFALL_2
-                                                    GalleryZoomTier.WATERFALL_2 -> GalleryZoomTier.WATERFALL_1
-                                                    GalleryZoomTier.WATERFALL_1 -> defaultGalleryZoomTier(galleryColumns)
-                                                }
-                                            },
-                                            modifier = Modifier.testTag("gallery_zoom_tier_toggle")
-                                        ) {
-                                            Icon(
-                                                imageVector = if (isWaterfall) Icons.Filled.Dashboard else Icons.Filled.GridView,
-                                                contentDescription = if (isWaterfall) "切换大图密度或返回网格" else "展开大图瀑布流",
-                                                tint = if (isWaterfall) SolarAmber else CobaltPrimary,
-                                                modifier = Modifier.size(13.5.dp)
-                                            )
-                                            Text(
-                                                text = if (isWaterfall) galleryZoomTier.shortChipLabel else "大图瀑布流",
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontSize = 11.5.sp,
-                                                fontWeight = if (isWaterfall) FontWeight.Bold else FontWeight.SemiBold,
-                                                color = if (isWaterfall) Color.White else InkPrimary
-                                            )
-                                        }
-                                    }
-
                                     if (quickSmartChoices.size > 1) {
-                                        items(quickSmartChoices, key = { it.first.name }) { (filterOption, label) ->
-                                            val isSel = smartFilter == filterOption
-                                            GallerySelectableChip(
-                                                selected = isSel,
-                                                onClick = {
-                                                    hapticEngine.pageFlipLift()
-                                                    smartFilter = filterOption
-                                                },
-                                                modifier = Modifier.testTag("gallery_quick_${filterOption.name.lowercase()}")
-                                            ) {
-                                                Text(
-                                                    text = label,
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    fontSize = 11.5.sp,
-                                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
-                                                    color = if (isSel) Color.White else InkPrimary
-                                                )
+                                        LazyRow(
+                                            contentPadding = PaddingValues(start = 20.dp, end = 8.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .testTag("gallery_quick_smart_strip")
+                                        ) {
+                                            items(quickSmartChoices, key = { it.first.name }) { (filterOption, label) ->
+                                                val isSel = smartFilter == filterOption
+                                                GallerySelectableChip(
+                                                    selected = isSel,
+                                                    onClick = {
+                                                        hapticEngine.pageFlipLift()
+                                                        smartFilter = filterOption
+                                                    },
+                                                    modifier = Modifier.testTag("gallery_quick_${filterOption.name.lowercase()}")
+                                                ) {
+                                                    Text(
+                                                        text = label,
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        fontSize = 11.5.sp,
+                                                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                                        color = if (isSel) Color.White else InkPrimary
+                                                    )
+                                                }
                                             }
                                         }
+                                        Box(
+                                            modifier = Modifier
+                                                .padding(horizontal = 4.dp)
+                                                .width(1.dp)
+                                                .height(18.dp)
+                                                .background(HairlineBorder)
+                                        )
+                                    } else {
+                                        Spacer(modifier = Modifier.weight(1f))
                                     }
+
+                                    // Pinned right-edge icon-only view density button reflecting current layout state
+                                    GalleryZoomTierIconButton(
+                                        currentTier = galleryZoomTier,
+                                        onClick = {
+                                            hapticEngine.pageFlipLift()
+                                            galleryZoomTier = galleryZoomTier.nextByTap(galleryColumns)
+                                        },
+                                        modifier = Modifier.testTag("gallery_zoom_tier_toggle")
+                                    )
                                 }
-                                Spacer(modifier = Modifier.height(4.dp))
+                                Spacer(modifier = Modifier.height(2.dp))
                             }
                         }
                     }

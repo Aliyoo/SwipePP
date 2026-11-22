@@ -90,4 +90,7 @@
     <string name="cd_open_settings">打开偏好设置</string>
     <string name="settings_sheet_title">偏好设置</string>
     <string name="settings_sheet_subtitle">统一全局时间顺序、默认视图与相册体验</string>
+    <string name="cd_footprint_scrub_rail">足迹地点快滑轨，上下拖动预览地点，松手飞往该地</string>
+    <string name="cd_footprint_prev_location">切换至上一个足迹地点</string>
+    <string name="cd_footprint_next_location">切换至下一个足迹地点</string>
 </resources>

@@ -53,7 +53,6 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CleaningServices
-import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.FilterNone
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PlayArrow
@@ -124,8 +123,8 @@ import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.GalleryHeaderOrbButton
 import com.example.ui.components.GallerySculptedHeroButton
-import com.example.ui.components.GallerySelectableChip
 import com.example.ui.components.GalleryZoomTier
+import com.example.ui.components.GalleryZoomTierIconButton
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.PhotoDetailLightbox
 import com.example.ui.components.activeChromeSatinBrush
@@ -1171,33 +1170,15 @@ private fun ModernCalendarBookPage(
                             modifier = Modifier.weight(1f)
                         )
                         if (showGalleryMode && page.totalPhotos > 0) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            GallerySelectableChip(
-                                selected = galleryZoomTier.isWaterfall,
+                            Spacer(modifier = Modifier.width(4.dp))
+                            GalleryZoomTierIconButton(
+                                currentTier = galleryZoomTier,
                                 onClick = {
-                                    val next = if (galleryZoomTier.isWaterfall) {
-                                        defaultGalleryZoomTier(galleryColumns)
-                                    } else {
-                                        GalleryZoomTier.WATERFALL_2
-                                    }
-                                    onGalleryZoomTierChanged(next)
+                                    onGalleryZoomTierChanged(galleryZoomTier.nextByTap(galleryColumns))
                                 },
+                                visualSize = 34.dp,
                                 modifier = Modifier.testTag("flipbook_waterfall_toggle_${page.month}")
-                            ) {
-                                Icon(
-                                    imageVector = if (galleryZoomTier.isWaterfall) Icons.Filled.Dashboard else Icons.Filled.GridView,
-                                    contentDescription = if (galleryZoomTier.isWaterfall) "切换为标准网格" else "展开大图瀑布流",
-                                    tint = if (galleryZoomTier.isWaterfall) SolarAmber else CobaltPrimary,
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Text(
-                                    text = if (galleryZoomTier.isWaterfall) galleryZoomTier.shortChipLabel else "瀑布流",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (galleryZoomTier.isWaterfall) Color.White else InkPrimary
-                                )
-                            }
+                            )
                         }
                     }
                 }
