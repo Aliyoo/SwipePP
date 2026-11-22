@@ -2,6 +2,8 @@ package com.example.ui.screens.cleaner
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,9 +20,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -42,7 +46,6 @@ import androidx.compose.ui.unit.sp
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
 import com.example.ui.CleanupCardItem
-import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.formatShortTime
@@ -54,12 +57,15 @@ import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.InkTertiary
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.ObsidianOverlayBorder
+import com.example.ui.theme.ObsidianOverlayGlass
 import com.example.ui.theme.SurfaceMuted
 
 @Composable
 internal fun BurstComparisonSheet(
     stack: CleanupCardItem.BurstStack,
-    onConfirmKeepBest: (PhotoItemEntity) -> Unit
+    onConfirmKeepBest: (PhotoItemEntity) -> Unit,
+    onInspectPhoto: (PhotoItemEntity) -> Unit = {}
 ) {
     var selectedPhoto by remember(stack) { mutableStateOf(stack.bestPhoto) }
 
@@ -71,24 +77,57 @@ internal fun BurstComparisonSheet(
             .padding(bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Column {
-            Text(
-                text = "连拍精选对比 · 共 ${stack.photos.size} 张",
-                style = MaterialTheme.typography.headlineMedium,
-                color = InkPrimary
-            )
-            Text(
-                text = "点击任意帧预览选择，确认后才仅保留选中项并将其他连拍移入回收站。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = InkSecondary
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "连拍精选对比 · 共 ${stack.photos.size} 张",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = InkPrimary
+                )
+                Text(
+                    text = "轻触切换保留帧，再次点击或点放大钮查看原图细节，确认后仅保留选中项。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = InkSecondary
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Surface(
+                onClick = { onInspectPhoto(selectedPhoto) },
+                shape = RoundedCornerShape(50),
+                color = CobaltSoft,
+                border = BorderStroke(1.dp, CobaltPrimary.copy(alpha = 0.25f)),
+                modifier = Modifier.testTag("burst_inspect_selected_button")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.OpenInFull,
+                        contentDescription = "查看原图详情",
+                        tint = CobaltPrimary,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Text(
+                        text = "看大图",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = CobaltPrimary
+                    )
+                }
+            }
         }
 
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            itemsIndexed(stack.photos) { idx, photo ->
+            itemsIndexed(stack.photos, key = { _, p -> p.id }) { idx, photo ->
                 val isSelected = photo.id == selectedPhoto.id
                 val borderWidth by animateFloatAsState(if (isSelected) 2.5f else 1f, label = "burst_sel")
                 Surface(
@@ -101,7 +140,11 @@ internal fun BurstComparisonSheet(
                     modifier = Modifier
                         .width(166.dp)
                         .clickable {
-                            selectedPhoto = photo
+                            if (isSelected) {
+                                onInspectPhoto(photo)
+                            } else {
+                                selectedPhoto = photo
+                            }
                         }
                         .testTag("burst_choice_${idx}")
                 ) {
@@ -119,6 +162,37 @@ internal fun BurstComparisonSheet(
                                 targetSizePx = 384,
                                 modifier = Modifier.fillMaxSize()
                             )
+
+                            // One-tap full-screen detail inspect orb on every burst frame
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .size(36.dp)
+                                    .clickable {
+                                        selectedPhoto = photo
+                                        onInspectPhoto(photo)
+                                    }
+                                    .padding(6.dp)
+                                    .testTag("burst_inspect_detail_${idx}")
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape)
+                                        .background(ObsidianOverlayGlass)
+                                        .border(0.8.dp, ObsidianOverlayBorder, CircleShape)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.OpenInFull,
+                                        contentDescription = "查看第 ${idx + 1} 张详情",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                }
+                            }
+
                             if (isSelected) {
                                 Surface(
                                     shape = RoundedCornerShape(50),

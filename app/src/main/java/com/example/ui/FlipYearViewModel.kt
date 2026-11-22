@@ -21,6 +21,7 @@ import com.example.data.ResolvedGeoLocation
 import com.example.data.SameDayLocationMatch
 import com.example.data.YearbookCoverConfigEntity
 import com.example.data.YearbookCoverMode
+import com.example.ui.components.buildTimelineClusterLayout
 import com.example.ui.domain.LibraryDerivationEngine
 import com.example.ui.theme.ThemePreferences
 import com.example.ui.theme.TimelineSortOrder
@@ -107,6 +108,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         val sortOrder: TimelineSortOrder,
         val allPhotos: List<PhotoItemEntity>,
         val galleryEntries: List<GalleryEntry>,
+        val galleryIndex: PrecomputedGalleryIndex,
         val yearbooks: List<YearbookSummary>,
         val monthStamps: Map<String, MonthStampEntity>,
         val trashedPhotos: List<PhotoItemEntity>,
@@ -215,6 +217,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             visibleGallery.asReversed()
         }
         val galleryEntries = LibraryDerivationEngine.buildGalleryEntriesLinear(orderedGallerySource)
+        val galleryIndex = buildPrecomputedGalleryIndex(galleryEntries, stampMap)
         val (clusters, unlocated) = LibraryDerivationEngine.buildLocationClustersAndUnlocatedLinear(visibleGallery)
 
         var pendingBytes = 0L
@@ -227,6 +230,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             sortOrder = sortOrder,
             allPhotos = filtered,
             galleryEntries = galleryEntries,
+            galleryIndex = galleryIndex,
             yearbooks = yearbooks,
             monthStamps = stampMap,
             trashedPhotos = trashed,
@@ -259,6 +263,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             timelineSortOrder = data.sortOrder,
             allPhotos = data.allPhotos,
             galleryEntries = data.galleryEntries,
+            galleryIndex = data.galleryIndex,
             yearbooks = data.yearbooks,
             monthStamps = data.monthStamps,
             trashedPhotos = data.trashedPhotos,
@@ -1343,3 +1348,77 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         }
     }
 }
+
+private const val PRECOMPUTED_LARGE_PHOTO_THRESHOLD_BYTES = 3_000_000L
+
+/**
+ * Single-pass background indexing of Gallery metadata & monthly timeline clusters.
+ * Runs off the main thread inside `derivedLibraryFlow` on `Dispatchers.Default` so
+ * tapping the Gallery tab mounts in O(1) even on 10,000+ item libraries.
+ */
+internal fun buildPrecomputedGalleryIndex(
+    entries: List<GalleryEntry>,
+    monthStamps: Map<String, MonthStampEntity>
+): PrecomputedGalleryIndex {
+    if (entries.isEmpty()) {
+        return PrecomputedGalleryIndex(sourceEntries = entries)
+    }
+    val albumCounts = HashMap<String, Int>(24)
+    val bursts = ArrayList<GalleryEntry.Burst>()
+    val largePhotos = ArrayList<GalleryEntry>()
+    val missingLocation = ArrayList<GalleryEntry>()
+
+    for (entry in entries) {
+        when (entry) {
+            is GalleryEntry.Single -> {
+                val photo = entry.photo
+                val album = photo.bucketName?.trim()
+                if (!album.isNullOrEmpty()) {
+                    albumCounts[album] = (albumCounts[album] ?: 0) + 1
+                }
+                if (!photo.isVideo && photo.fileSizeBytes >= PRECOMPUTED_LARGE_PHOTO_THRESHOLD_BYTES) {
+                    largePhotos.add(entry)
+                }
+                if (photo.locationName.isNullOrBlank() || photo.latitude == null || photo.longitude == null) {
+                    missingLocation.add(entry)
+                }
+            }
+            is GalleryEntry.Burst -> {
+                bursts.add(entry)
+                var hasLarge = false
+                var hasMissingLoc = false
+                for (photo in entry.photos) {
+                    val album = photo.bucketName?.trim()
+                    if (!album.isNullOrEmpty()) {
+                        albumCounts[album] = (albumCounts[album] ?: 0) + 1
+                    }
+                    if (!hasLarge && !photo.isVideo && photo.fileSizeBytes >= PRECOMPUTED_LARGE_PHOTO_THRESHOLD_BYTES) {
+                        hasLarge = true
+                    }
+                    if (!hasMissingLoc && (photo.locationName.isNullOrBlank() || photo.latitude == null || photo.longitude == null)) {
+                        hasMissingLoc = true
+                    }
+                }
+                if (hasLarge) largePhotos.add(entry)
+                if (hasMissingLoc) missingLocation.add(entry)
+            }
+        }
+    }
+
+    val existingAlbums = albumCounts.entries
+        .sortedByDescending { it.value }
+        .map { it.key }
+    val keywordTags = extractDescriptiveKeywordTags(entries)
+    val defaultClusterLayout = buildTimelineClusterLayout(entries, monthStamps)
+
+    return PrecomputedGalleryIndex(
+        sourceEntries = entries,
+        existingAlbums = existingAlbums,
+        burstEntries = bursts,
+        largePhotoEntries = largePhotos,
+        missingLocationEntries = missingLocation,
+        extractedKeywordTags = keywordTags,
+        defaultClusterLayout = defaultClusterLayout
+    )
+}
+

@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -14,6 +15,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,7 +54,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -144,23 +149,36 @@ internal fun ModernYearbook3DCard(
     }
 
     val bookSpotShadow = if (LocalIsDarkTheme.current) Color.Black.copy(alpha = 0.60f) else InkPrimary.copy(alpha = 0.30f)
+    val bookInteraction = remember { MutableInteractionSource() }
+    val isBookPressed by bookInteraction.collectIsPressedAsState()
+    val bookPressScaleState = animateFloatAsState(
+        targetValue = if (isBookPressed) 0.982f else 1f,
+        animationSpec = spring(
+            dampingRatio = 0.76f,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "book_press_scale"
+    )
 
     Box(
         modifier = modifier
+            .graphicsLayer {
+                val s = bookPressScaleState.value
+                scaleX = s
+                scaleY = s
+            }
             .shadow(elevation = 22.dp, shape = bookShape, spotColor = bookSpotShadow)
             .clip(bookShape)
             .background(coverColor)
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = bookInteraction,
+                indication = androidx.compose.material3.ripple(color = Color.White.copy(alpha = 0.25f)),
+                onClick = onClick
+            )
     ) {
-        // 100% Full-Bleed Edge-to-Edge Living Cover Showcase (Crossfade + whisper-subtle Ken Burns drift)
+        // 100% Full-Bleed Edge-to-Edge Living Cover Showcase (Crossfade + GPU-only Ken Burns drift, zero recomposition)
         if (displayedPhoto != null) {
-            val kenBurnsScale = if (isCarouselActive) lerp(1.00f, 1.07f, slideProgress.value) else 1f
-            val kenBurnsPanX = if (isCarouselActive) {
-                val direction = if (safeSlideIndex % 2 == 0) 1f else -1f
-                lerp(-6f, 6f, slideProgress.value) * direction
-            } else {
-                0f
-            }
+            val panDirection = if (safeSlideIndex % 2 == 0) 1f else -1f
 
             Crossfade(
                 targetState = displayedPhoto,
@@ -177,9 +195,17 @@ internal fun ModernYearbook3DCard(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            scaleX = kenBurnsScale
-                            scaleY = kenBurnsScale
-                            translationX = kenBurnsPanX
+                            if (isCarouselActive) {
+                                val p = slideProgress.value
+                                val kenBurnsScale = lerp(1.00f, 1.07f, p)
+                                scaleX = kenBurnsScale
+                                scaleY = kenBurnsScale
+                                translationX = lerp(-6f, 6f, p) * panDirection
+                            } else {
+                                scaleX = 1f
+                                scaleY = 1f
+                                translationX = 0f
+                            }
                         }
                 )
             }
@@ -261,28 +287,33 @@ internal fun ModernYearbook3DCard(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         slides.indices.forEach { idx ->
+                            val activeFillColor = Color.White.copy(alpha = if (idx == safeSlideIndex) 0.95f else 0.62f)
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(2.dp)
                                     .clip(CircleShape)
                                     .background(Color.White.copy(alpha = 0.24f))
-                            ) {
-                                val segmentFill = when {
-                                    idx < safeSlideIndex -> 1f
-                                    idx == safeSlideIndex -> if (isCarouselActive) slideProgress.value.coerceIn(0.08f, 1f) else 1f
-                                    else -> 0f
-                                }
-                                if (segmentFill > 0f) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxHeight()
-                                            .fillMaxWidth(segmentFill)
-                                            .clip(CircleShape)
-                                            .background(Color.White.copy(alpha = if (idx == safeSlideIndex) 0.95f else 0.62f))
-                                    )
-                                }
-                            }
+                                    .drawBehind {
+                                        val segmentFill = when {
+                                            idx < safeSlideIndex -> 1f
+                                            idx == safeSlideIndex -> if (isCarouselActive) {
+                                                slideProgress.value.coerceIn(0.08f, 1f)
+                                            } else {
+                                                1f
+                                            }
+                                            else -> 0f
+                                        }
+                                        if (segmentFill > 0f) {
+                                            val radius = size.height / 2f
+                                            drawRoundRect(
+                                                color = activeFillColor,
+                                                size = Size(width = size.width * segmentFill, height = size.height),
+                                                cornerRadius = CornerRadius(radius, radius)
+                                            )
+                                        }
+                                    }
+                            )
                         }
                     }
                 }
@@ -312,10 +343,25 @@ internal fun ModernYearbook3DCard(
                     }
 
                     if (isFocused) {
+                        val coverOrbInteraction = remember { MutableInteractionSource() }
+                        val coverOrbPressed by coverOrbInteraction.collectIsPressedAsState()
+                        val coverOrbScaleState = animateFloatAsState(
+                            targetValue = if (coverOrbPressed) 0.90f else 1f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            ),
+                            label = "cover_orb_scale"
+                        )
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                .graphicsLayer {
+                                    val s = coverOrbScaleState.value
+                                    scaleX = s
+                                    scaleY = s
+                                }
                                 .drawBehind {
                                     // Smooth circular ambient shadow halo (no HWUI elevation polygon bleed-through)
                                     val radiusPx = 21.dp.toPx()
@@ -334,6 +380,8 @@ internal fun ModernYearbook3DCard(
                                 }
                                 .clip(CircleShape)
                                 .clickable(
+                                    interactionSource = coverOrbInteraction,
+                                    indication = androidx.compose.material3.ripple(color = Color.White),
                                     onClickLabel = stringResource(R.string.cd_customize_cover),
                                     onClick = onCustomizeCover
                                 )

@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -408,20 +409,52 @@ fun TimelineMonthStampOverlay(
     clusterLayout: TimelineClusterLayout,
     modifier: Modifier = Modifier
 ) {
+    TimelineMonthStampOverlayCore(
+        firstVisibleIndexProvider = { gridState.firstVisibleItemIndex },
+        isScrollingProvider = { gridState.isScrollInProgress },
+        onScrollToIndex = { targetIndex -> gridState.scrollToItem(targetIndex) },
+        clusterLayout = clusterLayout,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun TimelineMonthStampOverlay(
+    listState: LazyListState,
+    clusterLayout: TimelineClusterLayout,
+    modifier: Modifier = Modifier
+) {
+    TimelineMonthStampOverlayCore(
+        firstVisibleIndexProvider = { listState.firstVisibleItemIndex },
+        isScrollingProvider = { listState.isScrollInProgress },
+        onScrollToIndex = { targetIndex -> listState.scrollToItem(targetIndex) },
+        clusterLayout = clusterLayout,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun TimelineMonthStampOverlayCore(
+    firstVisibleIndexProvider: () -> Int,
+    isScrollingProvider: () -> Boolean,
+    onScrollToIndex: suspend (Int) -> Unit,
+    clusterLayout: TimelineClusterLayout,
+    modifier: Modifier = Modifier
+) {
     if (clusterLayout.clusters.isEmpty()) return
 
-    val activeCluster by remember(gridState, clusterLayout) {
+    val activeCluster by remember(clusterLayout) {
         derivedStateOf {
-            clusterLayout.clusterForVisibleIndex(gridState.firstVisibleItemIndex)
+            clusterLayout.clusterForVisibleIndex(firstVisibleIndexProvider())
         }
     }
-    val isScrolling by remember(gridState) {
-        derivedStateOf { gridState.isScrollInProgress }
+    val isScrolling by remember {
+        derivedStateOf { isScrollingProvider() }
     }
-    val scrollProgressFraction by remember(gridState, clusterLayout) {
+    val scrollProgressFraction by remember(clusterLayout) {
         derivedStateOf {
             val maxIndex = (clusterLayout.gridItems.size - 1).coerceAtLeast(1)
-            (gridState.firstVisibleItemIndex.toFloat() / maxIndex.toFloat()).coerceIn(0f, 1f)
+            (firstVisibleIndexProvider().toFloat() / maxIndex.toFloat()).coerceIn(0f, 1f)
         }
     }
 
@@ -699,7 +732,7 @@ fun TimelineMonthStampOverlay(
                                     (dragFraction * (clusterLayout.gridItems.size - 1))
                                         .roundToInt()
                                         .coerceAtLeast(0)
-                                scope.launch { gridState.scrollToItem(targetIndex) }
+                                scope.launch { onScrollToIndex(targetIndex) }
                                 true
                             }
                         }
@@ -719,7 +752,7 @@ fun TimelineMonthStampOverlay(
                                     (dragFraction * (clusterLayout.gridItems.size - 1))
                                         .roundToInt()
                                         .coerceAtLeast(0)
-                                scope.launch { gridState.scrollToItem(targetIndex) }
+                                scope.launch { onScrollToIndex(targetIndex) }
                             }
                         }
                         .testTag("timeline_scroll_rail_flag")

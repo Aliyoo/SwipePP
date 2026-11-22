@@ -1,10 +1,18 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -65,7 +73,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -583,25 +593,32 @@ fun FootprintMapScreen(
             }
         }
 
-        // Right-side Floating Zoom, Fit-All & GPS Re-Index Controls (dynamically clears expanded bottom card)
+        // Right-side Floating Zoom, Fit-All & GPS Re-Index Controls (GPU translationY clearance — zero relayout)
         val hasBottomCard = selectedCluster != null || showingUnlocated
-        val controlsBottomPadding by animateDpAsState(
-            targetValue = when {
-                hasBottomCard && isCardExpanded -> 268.dp + floatingDockInset * 0.45f
-                hasBottomCard -> 132.dp + floatingDockInset * 0.4f
-                else -> 0.dp
-            },
-            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        val density = LocalDensity.current
+        val targetControlsShiftPx = with(density) {
+            when {
+                hasBottomCard && isCardExpanded -> -(134.dp + floatingDockInset * 0.22f).toPx()
+                hasBottomCard -> -(66.dp + floatingDockInset * 0.2f).toPx()
+                else -> 0f
+            }
+        }
+        val controlsShiftYState = animateFloatAsState(
+            targetValue = targetControlsShiftPx,
+            animationSpec = spring(
+                dampingRatio = 0.84f,
+                stiffness = Spring.StiffnessMediumLow
+            ),
             label = "map_controls_clearance"
         )
         // Unified single right-side frosted map control rail (Zoom + Fit-All)
         Box(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .padding(
-                    end = 14.dp,
-                    bottom = controlsBottomPadding
-                )
+                .padding(end = 14.dp)
+                .graphicsLayer {
+                    translationY = controlsShiftYState.value
+                }
                 .pointerInput(Unit) {}
         ) {
             FrostedGlassCard(
@@ -749,6 +766,27 @@ fun FootprintMapScreen(
         }
 
         // Bottom Collapsible Frosted-Glass Detail Card (Either Selected Geotagged Cluster OR Unlocated Media Sheet)
+        val chevronRotationState = animateFloatAsState(
+            targetValue = if (isCardExpanded) 180f else 0f,
+            animationSpec = spring(
+                dampingRatio = 0.78f,
+                stiffness = Spring.StiffnessMedium
+            ),
+            label = "map_card_chevron_rotation"
+        )
+        AnimatedVisibility(
+            visible = hasBottomCard,
+            enter = fadeIn(tween(185, easing = FastOutSlowInEasing)) +
+                slideInVertically(tween(220, easing = FastOutSlowInEasing)) { it / 3 },
+            exit = fadeOut(tween(135)) +
+                slideOutVertically(tween(160)) { it / 3 },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .fillMaxWidth()
+                .widthIn(max = 600.dp)
+                .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 10.dp + floatingDockInset)
+        ) {
         if (showingUnlocated) {
             val unreviewedUnlocated = remember(unlocatedPhotos) {
                 unlocatedPhotos.count { it.photoStatus == PhotoStatus.UNREVIEWED }
@@ -761,11 +799,7 @@ fun FootprintMapScreen(
                 shadowElevation = 14.dp,
                 enableAmbientBlur = true,
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
                     .fillMaxWidth()
-                    .widthIn(max = 600.dp)
-                    .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 10.dp + floatingDockInset)
                     .animateContentSize(
                         animationSpec = spring(
                             dampingRatio = Spring.DampingRatioLowBouncy,
@@ -826,9 +860,12 @@ fun FootprintMapScreen(
                             modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
-                                imageVector = if (isCardExpanded) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
+                                imageVector = Icons.Filled.ExpandLess,
                                 contentDescription = if (isCardExpanded) "收起卡片" else "展开卡片",
-                                tint = InkSecondary
+                                tint = InkSecondary,
+                                modifier = Modifier.graphicsLayer {
+                                    rotationZ = chevronRotationState.value
+                                }
                             )
                         }
                     }
@@ -927,20 +964,13 @@ fun FootprintMapScreen(
                     }
                 }
             }
-        } else selectedCluster?.let { cluster ->
-            val latLabel = if (cluster.latitude >= 0) "N" else "S"
-            val lonLabel = if (cluster.longitude >= 0) "E" else "W"
-
+        } else selectedCluster?.let { activeCluster ->
             FrostedGlassCard(
                 shape = RoundedCornerShape(26.dp),
                 shadowElevation = 14.dp,
                 enableAmbientBlur = true,
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
                     .fillMaxWidth()
-                    .widthIn(max = 600.dp)
-                    .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 10.dp + floatingDockInset)
                     .animateContentSize(
                         animationSpec = spring(
                             dampingRatio = Spring.DampingRatioLowBouncy,
@@ -960,6 +990,18 @@ fun FootprintMapScreen(
                     }
                     .testTag("location_detail_card")
             ) {
+                AnimatedContent(
+                    targetState = activeCluster,
+                    contentKey = { it.locationName },
+                    transitionSpec = {
+                        (fadeIn(tween(165, easing = FastOutSlowInEasing)) +
+                            slideInVertically(tween(175, easing = FastOutSlowInEasing)) { it / 12 }) togetherWith
+                            (fadeOut(tween(105)) + slideOutVertically(tween(110)) { -it / 14 })
+                    },
+                    label = "map_cluster_card_switch"
+                ) { cluster ->
+                val latLabel = if (cluster.latitude >= 0) "N" else "S"
+                val lonLabel = if (cluster.longitude >= 0) "E" else "W"
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -1028,9 +1070,12 @@ fun FootprintMapScreen(
                                     .testTag("toggle_location_card_button")
                             ) {
                                 Icon(
-                                    imageVector = if (isCardExpanded) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
+                                    imageVector = Icons.Filled.ExpandLess,
                                     contentDescription = if (isCardExpanded) "收起卡片" else "展开卡片",
-                                    tint = InkSecondary
+                                    tint = InkSecondary,
+                                    modifier = Modifier.graphicsLayer {
+                                        rotationZ = chevronRotationState.value
+                                    }
                                 )
                             }
                         }
@@ -1113,7 +1158,9 @@ fun FootprintMapScreen(
                         }
                     }
                 }
+                }
             }
+        }
         }
     }
 

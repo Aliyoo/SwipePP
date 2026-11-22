@@ -500,14 +500,12 @@ fun BookshelfScreen(
 
                     val safeSettledIndex = pagerState.settledPage.coerceIn(0, books.lastIndex)
                     val settledBook = books[safeSettledIndex]
-                    var activeAmbientCoverPhoto by remember(settledBook.year, settledBook.coverPhoto) {
-                        mutableStateOf(settledBook.coverPhoto)
-                    }
+                    val bookYears = remember(books) { books.map { it.year } }
 
                     Adaptive3DBookshelfCarousel(
                         items = books,
                         pagerState = pagerState,
-                        settledCoverPhoto = activeAmbientCoverPhoto ?: settledBook.coverPhoto,
+                        settledCoverPhoto = settledBook.coverPhoto,
                         itemKey = { it.year },
                         pagerTestTag = "bookshelf_3d_pager",
                         modifier = Modifier.weight(1f)
@@ -521,11 +519,7 @@ fun BookshelfScreen(
                                 haptics.pageFlipLift()
                                 customizingYear = book.year
                             },
-                            onActiveSlideChanged = { slidePhoto ->
-                                if (safeSettledIndex == page && slidePhoto != null) {
-                                    activeAmbientCoverPhoto = slidePhoto
-                                }
-                            },
+                            onActiveSlideChanged = {},
                             onClick = {
                                 if (pagerState.currentPage == page) {
                                     haptics.pageFlipLift()
@@ -549,7 +543,7 @@ fun BookshelfScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         ModernYearWheel(
-                            years = books.map { it.year },
+                            years = bookYears,
                             selectedIndex = safeCurrentIndex,
                             onSelectIndex = { idx ->
                                 if (idx in books.indices) {

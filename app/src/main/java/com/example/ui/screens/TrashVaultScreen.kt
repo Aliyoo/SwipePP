@@ -1,8 +1,18 @@
 package com.example.ui.screens
 
 import android.os.Build
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -200,37 +210,50 @@ fun TrashVaultScreen(
                 }
             }
 
-            if (displayedTrashed.isEmpty()) {
-                // Compact Storage Summary Card (empty state)
-                FrostedGlassCard(
-                    shape = RoundedCornerShape(22.dp),
-                    borderAccent = null,
-                    shadowElevation = 4.dp,
-                    enableAmbientBlur = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp)
-                ) {
-                    VaultCompactSummaryContent(
-                        isPartialSelection = false,
-                        hasItems = false,
-                        displayBytes = 0L,
-                        targetsCount = 0,
-                        totalPurgedBytes = uiState.stats.totalPurgedBytes,
-                        totalCompressedSavedBytes = uiState.stats.totalCompressedSavedBytes
-                    )
-                }
+            AnimatedContent(
+                targetState = displayedTrashed.isEmpty(),
+                transitionSpec = {
+                    (fadeIn(tween(210, easing = FastOutSlowInEasing)) +
+                        scaleIn(initialScale = 0.98f, animationSpec = tween(220, easing = FastOutSlowInEasing))) togetherWith
+                        fadeOut(tween(130))
+                },
+                label = "vault_empty_content_switch",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) { isVaultEmpty ->
+                if (isVaultEmpty) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Compact Storage Summary Card (empty state)
+                        FrostedGlassCard(
+                            shape = RoundedCornerShape(22.dp),
+                            borderAccent = null,
+                            shadowElevation = 4.dp,
+                            enableAmbientBlur = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp)
+                        ) {
+                            VaultCompactSummaryContent(
+                                isPartialSelection = false,
+                                hasItems = false,
+                                displayBytes = 0L,
+                                targetsCount = 0,
+                                totalPurgedBytes = uiState.stats.totalPurgedBytes,
+                                totalCompressedSavedBytes = uiState.stats.totalCompressedSavedBytes
+                            )
+                        }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(start = 32.dp, end = 32.dp, top = 32.dp, bottom = 32.dp + floatingDockInset + navBarBottom),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .padding(start = 32.dp, end = 32.dp, top = 32.dp, bottom = 32.dp + floatingDockInset + navBarBottom),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
                     Icon(
                         imageVector = Icons.Filled.VerifiedUser,
                         contentDescription = null,
@@ -256,25 +279,25 @@ fun TrashVaultScreen(
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = InkSecondary,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 148.dp),
-                    contentPadding = PaddingValues(
-                        start = 20.dp,
-                        end = 20.dp,
-                        top = 2.dp,
-                        bottom = 96.dp + floatingDockInset + navBarBottom
-                    ),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .testTag("vault_photo_grid")
-                ) {
+                            textAlign = TextAlign.Center
+                        )
+                        }
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 148.dp),
+                        contentPadding = PaddingValues(
+                            start = 20.dp,
+                            end = 20.dp,
+                            top = 2.dp,
+                            bottom = 96.dp + floatingDockInset + navBarBottom
+                        ),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("vault_photo_grid")
+                    ) {
                     // Slim Focused Pending-Storage Card: gives maximum vertical space to photo inspection
                     item(key = "vault_summary_header", span = { GridItemSpan(maxLineSpan) }) {
                         FrostedGlassCard(
@@ -363,23 +386,31 @@ fun TrashVaultScreen(
                             )
                         )
                     }
+                    }
                 }
             }
         }
 
-        // Thumb-friendly Floating Bottom Action Dock (sits cleanly above the main navigation dock)
-        if (displayedTrashed.isNotEmpty()) {
+            // Thumb-friendly Floating Bottom Action Dock (sits cleanly above the main navigation dock)
+        AnimatedVisibility(
+            visible = displayedTrashed.isNotEmpty(),
+            enter = fadeIn(tween(190, easing = FastOutSlowInEasing)) +
+                slideInVertically(tween(220, easing = FastOutSlowInEasing)) { it / 2 },
+            exit = fadeOut(tween(135)) +
+                slideOutVertically(tween(150)) { it / 2 },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .widthIn(max = 640.dp)
+                .padding(
+                    start = 16.dp,
+                    end = 16.dp,
+                    bottom = floatingDockInset + navBarBottom + 10.dp
+                )
+        ) {
             Box(
                 contentAlignment = Alignment.BottomCenter,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .widthIn(max = 640.dp)
-                    .padding(
-                        start = 16.dp,
-                        end = 16.dp,
-                        bottom = floatingDockInset + navBarBottom + 10.dp
-                    )
+                modifier = Modifier.fillMaxWidth()
             ) {
                 FrostedGlassCard(
                     shape = RoundedCornerShape(22.dp),

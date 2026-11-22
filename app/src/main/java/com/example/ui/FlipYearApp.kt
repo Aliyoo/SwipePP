@@ -9,6 +9,7 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -16,7 +17,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -85,7 +89,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.runtime.State
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -184,6 +190,17 @@ object FlipYearRoutes {
         source: CleanerEntrySource = CleanerEntrySource.GALLERY
     ) = "arc_cleaner?year=-1&month=-1&day=-1&location=&includeReviewed=$includeReviewed&source=${source.routeKey}&custom=true"
 }
+
+private val TOP_LEVEL_ROUTE_ORDER = listOf(
+    FlipYearRoutes.BOOKSHELF,
+    FlipYearRoutes.GALLERY,
+    FlipYearRoutes.MAP,
+    FlipYearRoutes.VAULT
+)
+
+private val TOP_LEVEL_ROUTES = TOP_LEVEL_ROUTE_ORDER.toSet()
+
+private fun topLevelRouteIndex(route: String?): Int = TOP_LEVEL_ROUTE_ORDER.indexOf(route)
 
 private data class TopLevelTab(
     val route: String,
@@ -346,12 +363,7 @@ fun FlipYearApp(
         )
     }
 
-    val showTopLevelNav = currentRoute in setOf(
-        FlipYearRoutes.BOOKSHELF,
-        FlipYearRoutes.GALLERY,
-        FlipYearRoutes.MAP,
-        FlipYearRoutes.VAULT
-    )
+    val showTopLevelNav = currentRoute in TOP_LEVEL_ROUTES
 
     var isGallerySelectionMode by remember { mutableStateOf(false) }
     LaunchedEffect(currentRoute) {
@@ -446,14 +458,107 @@ fun FlipYearApp(
                         navController = navController,
                         startDestination = initialStartDestination,
                         enterTransition = {
-                            fadeIn(animationSpec = tween(220)) + scaleIn(
-                                initialScale = 0.97f,
-                                animationSpec = tween(220)
-                            )
+                            val fromRoute = initialState.destination.route
+                            val toRoute = targetState.destination.route
+                            val isTabSwitch = fromRoute in TOP_LEVEL_ROUTES && toRoute in TOP_LEVEL_ROUTES
+                            when {
+                                isTabSwitch -> {
+                                    val dir = if (topLevelRouteIndex(toRoute) >= topLevelRouteIndex(fromRoute)) 1 else -1
+                                    fadeIn(animationSpec = tween(155, easing = FastOutSlowInEasing)) +
+                                        slideInHorizontally(animationSpec = tween(175, easing = FastOutSlowInEasing)) { width ->
+                                            dir * (width / 22)
+                                        }
+                                }
+                                toRoute?.startsWith("flipbook") == true -> {
+                                    fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
+                                        scaleIn(
+                                            initialScale = 0.93f,
+                                            animationSpec = tween(230, easing = FastOutSlowInEasing)
+                                        )
+                                }
+                                toRoute?.startsWith("arc_cleaner") == true -> {
+                                    fadeIn(animationSpec = tween(210, easing = FastOutSlowInEasing)) +
+                                        slideInVertically(animationSpec = tween(230, easing = FastOutSlowInEasing)) { height ->
+                                            height / 14
+                                        }
+                                }
+                                else -> {
+                                    fadeIn(animationSpec = tween(190, easing = FastOutSlowInEasing)) +
+                                        scaleIn(initialScale = 0.97f, animationSpec = tween(190))
+                                }
+                            }
                         },
-                        exitTransition = { fadeOut(animationSpec = tween(160)) },
-                        popEnterTransition = { fadeIn(animationSpec = tween(200)) },
-                        popExitTransition = { fadeOut(animationSpec = tween(160)) },
+                        exitTransition = {
+                            val fromRoute = initialState.destination.route
+                            val toRoute = targetState.destination.route
+                            val isTabSwitch = fromRoute in TOP_LEVEL_ROUTES && toRoute in TOP_LEVEL_ROUTES
+                            when {
+                                isTabSwitch -> {
+                                    val dir = if (topLevelRouteIndex(toRoute) >= topLevelRouteIndex(fromRoute)) 1 else -1
+                                    fadeOut(animationSpec = tween(105)) +
+                                        slideOutHorizontally(animationSpec = tween(135, easing = FastOutSlowInEasing)) { width ->
+                                            -dir * (width / 28)
+                                        }
+                                }
+                                toRoute?.startsWith("flipbook") == true -> {
+                                    fadeOut(animationSpec = tween(150)) +
+                                        scaleOut(targetScale = 1.03f, animationSpec = tween(165))
+                                }
+                                toRoute?.startsWith("arc_cleaner") == true -> {
+                                    fadeOut(animationSpec = tween(145)) +
+                                        scaleOut(targetScale = 0.97f, animationSpec = tween(160))
+                                }
+                                else -> fadeOut(animationSpec = tween(140))
+                            }
+                        },
+                        popEnterTransition = {
+                            val fromRoute = initialState.destination.route
+                            val toRoute = targetState.destination.route
+                            val isTabSwitch = fromRoute in TOP_LEVEL_ROUTES && toRoute in TOP_LEVEL_ROUTES
+                            when {
+                                isTabSwitch -> {
+                                    val dir = if (topLevelRouteIndex(toRoute) >= topLevelRouteIndex(fromRoute)) 1 else -1
+                                    fadeIn(animationSpec = tween(155, easing = FastOutSlowInEasing)) +
+                                        slideInHorizontally(animationSpec = tween(175, easing = FastOutSlowInEasing)) { width ->
+                                            dir * (width / 22)
+                                        }
+                                }
+                                fromRoute?.startsWith("flipbook") == true -> {
+                                    fadeIn(animationSpec = tween(195, easing = FastOutSlowInEasing)) +
+                                        scaleIn(initialScale = 1.02f, animationSpec = tween(200, easing = FastOutSlowInEasing))
+                                }
+                                fromRoute?.startsWith("arc_cleaner") == true -> {
+                                    fadeIn(animationSpec = tween(185, easing = FastOutSlowInEasing)) +
+                                        scaleIn(initialScale = 0.97f, animationSpec = tween(195, easing = FastOutSlowInEasing))
+                                }
+                                else -> fadeIn(animationSpec = tween(180))
+                            }
+                        },
+                        popExitTransition = {
+                            val fromRoute = initialState.destination.route
+                            val toRoute = targetState.destination.route
+                            val isTabSwitch = fromRoute in TOP_LEVEL_ROUTES && toRoute in TOP_LEVEL_ROUTES
+                            when {
+                                isTabSwitch -> {
+                                    val dir = if (topLevelRouteIndex(toRoute) >= topLevelRouteIndex(fromRoute)) 1 else -1
+                                    fadeOut(animationSpec = tween(105)) +
+                                        slideOutHorizontally(animationSpec = tween(135, easing = FastOutSlowInEasing)) { width ->
+                                            -dir * (width / 28)
+                                        }
+                                }
+                                fromRoute?.startsWith("flipbook") == true -> {
+                                    fadeOut(animationSpec = tween(160)) +
+                                        scaleOut(targetScale = 0.94f, animationSpec = tween(175, easing = FastOutSlowInEasing))
+                                }
+                                fromRoute?.startsWith("arc_cleaner") == true -> {
+                                    fadeOut(animationSpec = tween(155)) +
+                                        slideOutVertically(animationSpec = tween(180, easing = FastOutSlowInEasing)) { height ->
+                                            height / 12
+                                        }
+                                }
+                                else -> fadeOut(animationSpec = tween(140))
+                            }
+                        },
                         modifier = Modifier.fillMaxSize()
                     ) {
                         composable(FlipYearRoutes.BOOKSHELF) {
@@ -619,6 +724,12 @@ fun FlipYearApp(
                                     showEmptyMonths = userPreferences.showEmptyMonths
                                 )
                             }
+                            val flipbookAvailableYears = remember(uiState.yearbooks, year) {
+                                uiState.yearbooks.map { it.year }
+                                    .distinct()
+                                    .sortedDescending()
+                                    .ifEmpty { listOf(year) }
+                            }
                             FlipbookScreen(
                                 year = year,
                                 monthPages = pages,
@@ -626,6 +737,11 @@ fun FlipYearApp(
                                 timelineSortOrder = uiState.timelineSortOrder,
                                 showEmptyMonths = userPreferences.showEmptyMonths,
                                 defaultShowGalleryMode = userPreferences.flipbookDefaultView == FlipbookDefaultView.GALLERY,
+                                galleryColumns = userPreferences.galleryGridDensity.columns,
+                                existingAlbums = uiState.galleryIndex.existingAlbums,
+                                availableYears = flipbookAvailableYears,
+                                locationClusters = uiState.locationClusters,
+                                allPhotos = uiState.allPhotos,
                                 onBack = { navController.popBackStack() },
                                 onStartMonthCleanup = { y, m, includeReviewed, focusDay ->
                                     navController.navigate(
@@ -642,7 +758,24 @@ fun FlipYearApp(
                                 onKeepBestInBurst = viewModel::keepBestInGalleryBurst,
                                 onKeepPhoto = { photo, fav -> viewModel.keepPhoto(photo, fav, fromCleanerSession = false) },
                                 onToggleFavorite = viewModel::toggleFavoritePhoto,
-                                onTrashPhoto = { photo -> viewModel.swipeTrashPhoto(photo, fromCleanerSession = false) }
+                                onTrashPhoto = { photo -> viewModel.swipeTrashPhoto(photo, fromCleanerSession = false) },
+                                onBulkTrashPhotos = viewModel::bulkTrashPhotos,
+                                onBulkKeepPhotos = viewModel::bulkKeepPhotos,
+                                onBulkMovePhotos = viewModel::bulkMovePhotos,
+                                onBatchCompress = { photos, preset ->
+                                    launchWriteIfNeeded(viewModel.requestBatchCompress(photos, preset))
+                                },
+                                onBatchManualLocation = { photos, name, lat, lon, writeExif ->
+                                    launchWriteIfNeeded(
+                                        viewModel.requestBatchManualLocation(photos, name, lat, lon, writeExif)
+                                    )
+                                },
+                                onBatchSameDayLocation = { matches, writeExif ->
+                                    launchWriteIfNeeded(
+                                        viewModel.requestBatchSameDayLocation(matches, writeExif)
+                                    )
+                                },
+                                onGeocodeLocation = viewModel::geocodeLocationQuery
                             )
                         }
 
@@ -722,6 +855,7 @@ fun FlipYearApp(
                                 onKeepPhoto = { photo, fav ->
                                     viewModel.keepPhoto(photo, fav, fromCleanerSession = true)
                                 },
+                                onToggleFavorite = viewModel::toggleFavoritePhoto,
                                 onTrashPhoto = { photo ->
                                     viewModel.swipeTrashPhoto(photo, fromCleanerSession = true)
                                 },
@@ -906,8 +1040,12 @@ private const val ACTIVE_DOCK_TAB_WEIGHT = 1.95f
  * Truly floating translucent frosted-glass capsule navigation dock overlaid directly on top of
  * full-bleed maps, photo grids, and backdrops:
  * - Inactive tabs stay calm, centered pure icons.
- * - The active tab expands horizontally via a synchronized spring while a sub-pixel satin pill
- *   glides seamlessly across the dock to reveal the label with zero layout jitter or text clipping.
+ * - Active tab expands horizontally while a sculpted satin pill glides across the dock to reveal
+ *   the label.
+ * - Performance Architecture: ZERO recompositions across every animation frame! Slot widths are
+ *   computed inside a custom `Layout` measure pass, the gliding pill is drawn in `drawBehind`,
+ *   icon morph/tint transitions run in GPU `graphicsLayer`, and label reveal runs in `Modifier.layout`
+ *   + `placeWithLayer`.
  */
 @Composable
 private fun FloatingGalleryDock(
@@ -920,6 +1058,7 @@ private fun FloatingGalleryDock(
     val isDark = LocalIsDarkTheme.current
     val palette = LocalFlipYearPalette.current
     val density = LocalDensity.current
+    val unselectedTint = InkSecondary
     val activeObsidianBrush = activeChromeSatinBrush()
     val activeRimBrush = remember(palette) {
         Brush.linearGradient(
@@ -931,25 +1070,39 @@ private fun FloatingGalleryDock(
         )
     }
 
-    // Unified critically-damped spring shared by gliding pill, slot weights, and label reveal
-    // so sum(slotWeights) stays constant across every frame with zero neighbor jitter.
+    // Optimistic route responds on frame 0 when tapped, staying synced with NavController backstack
+    var visualRoute by remember { mutableStateOf(currentRoute) }
+    LaunchedEffect(currentRoute) {
+        visualRoute = currentRoute
+    }
+
+    // Crisp, critically-damped spring shared by gliding pill, slot expansion, icon morph, and label reveal
     val dockSpringSpec = remember {
         spring<Float>(
-            dampingRatio = 0.86f,
-            stiffness = 430f
+            dampingRatio = 0.88f,
+            stiffness = 500f
         )
     }
 
-    val selectedIndex = remember(tabs, currentRoute) {
-        tabs.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
+    val selectedIndex = remember(tabs, visualRoute) {
+        tabs.indexOfFirst { it.route == visualRoute }.coerceAtLeast(0)
+    }
+
+    // Hold State<Float> handles without reading `.value` in composition scope -> 0 recompositions per frame!
+    val expandStates: List<State<Float>> = tabs.mapIndexed { index, tab ->
+        animateFloatAsState(
+            targetValue = if (index == selectedIndex) 1f else 0f,
+            animationSpec = dockSpringSpec,
+            label = "dock_tab_expand_${tab.route}"
+        )
     }
 
     FrostedGlassCard(
         shape = RoundedCornerShape(28.dp),
         topColor = if (isDark) Color(0xEB1C2230) else Color(0xE0FFFFFF),
         bottomColor = if (isDark) Color(0xDE131722) else Color(0xCEF7F5F0),
-        shadowElevation = 12.dp,
-        enableAmbientBlur = true,
+        shadowElevation = 10.dp,
+        enableAmbientBlur = false,
         modifier = Modifier
             .widthIn(max = 376.dp)
             .fillMaxWidth()
@@ -961,12 +1114,14 @@ private fun FloatingGalleryDock(
                 .padding(horizontal = 5.dp, vertical = 4.dp)
         ) {
             val gapDp = 4.dp
-            val gapPx = with(density) { gapDp.toPx() }
+            val gapPxFloat = with(density) { gapDp.toPx() }
+            val gapPxInt = gapPxFloat.roundToInt()
+            val heightPxInt = with(density) { 48.dp.roundToPx() }
             val containerWidthPx = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
             val totalWeight = (tabs.size - 1) + ACTIVE_DOCK_TAB_WEIGHT
-            val availableWidthPx = (containerWidthPx - gapPx * (tabs.size - 1)).coerceAtLeast(1f)
+            val availableWidthPx = (containerWidthPx - gapPxFloat * (tabs.size - 1)).coerceAtLeast(1f)
             val unitWidthPx = availableWidthPx / totalWeight
-            val targetPillOffsetX = selectedIndex * (unitWidthPx + gapPx)
+            val targetPillOffsetX = selectedIndex * (unitWidthPx + gapPxFloat)
             val targetPillWidth = unitWidthPx * ACTIVE_DOCK_TAB_WEIGHT
 
             val pillOffsetXState = animateFloatAsState(
@@ -980,7 +1135,7 @@ private fun FloatingGalleryDock(
                 label = "dock_gliding_pill_w"
             )
 
-            Row(
+            Layout(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
@@ -1020,109 +1175,192 @@ private fun FloatingGalleryDock(
                             style = Stroke(width = strokeWidthPx)
                         )
                     },
-                horizontalArrangement = Arrangement.spacedBy(gapDp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                tabs.forEach { tab ->
-                    val selected = currentRoute == tab.route
-                    val tabLabel = stringResource(tab.labelRes)
-                    val tabAccessibilityDesc = if (tab.route == FlipYearRoutes.VAULT && trashedCount > 0) {
-                        "$tabLabel，${trashedCount} 项待清理"
-                    } else {
-                        tabLabel
-                    }
+                content = {
+                    tabs.forEachIndexed { index, tab ->
+                        val isSelected = index == selectedIndex
+                        val expandState = expandStates[index]
+                        val tabLabel = stringResource(tab.labelRes)
+                        val tabAccessibilityDesc = if (tab.route == FlipYearRoutes.VAULT && trashedCount > 0) {
+                            "$tabLabel，${trashedCount} 项待清理"
+                        } else {
+                            tabLabel
+                        }
 
-                    val expandProgress by animateFloatAsState(
-                        targetValue = if (selected) 1f else 0f,
-                        animationSpec = dockSpringSpec,
-                        label = "dock_tab_expand_${tab.route}"
-                    )
-                    val slotWeight = (1f + (ACTIVE_DOCK_TAB_WEIGHT - 1f) * expandProgress).coerceAtLeast(0.5f)
-
-                    val contentColor by animateColorAsState(
-                        targetValue = if (selected) Color.White else InkSecondary,
-                        animationSpec = tween(durationMillis = 190),
-                        label = "dock_content_color_${tab.route}"
-                    )
-
-                    val interactionSource = remember { MutableInteractionSource() }
-                    val pressed by interactionSource.collectIsPressedAsState()
-                    val pressScale by animateFloatAsState(
-                        targetValue = if (pressed) 0.92f else 1f,
-                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        label = "dock_press_scale_${tab.route}"
-                    )
-
-                    Row(
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .weight(slotWeight)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(24.dp))
-                            .graphicsLayer {
-                                scaleX = pressScale
-                                scaleY = pressScale
-                            }
-                            .semantics(mergeDescendants = true) {
-                                contentDescription = tabAccessibilityDesc
-                                role = Role.Tab
-                                this.selected = selected
-                            }
-                            .clickable(
-                                interactionSource = interactionSource,
-                                indication = null,
-                                role = Role.Tab
-                            ) { onSelectTab(tab.route) }
-                            .padding(horizontal = 6.dp)
-                            .testTag(tab.testTag)
-                    ) {
-                        TabIconWithBadge(
-                            tab = tab,
-                            selected = selected,
-                            trashedCount = trashedCount,
-                            tint = contentColor,
-                            decorative = true
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val pressed by interactionSource.collectIsPressedAsState()
+                        val pressScaleState = animateFloatAsState(
+                            targetValue = if (pressed) 0.92f else 1f,
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                            label = "dock_press_scale_${tab.route}"
                         )
 
-                        // Natural-width label reveal: collapses cleanly to 0px when inactive so icon sits
-                        // mathematically centered, and slides/fades in smoothly without ever flickering "..."
                         Row(
+                            horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.layout { measurable, constraints ->
-                                val placeable = measurable.measure(
-                                    constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity)
-                                )
-                                val revealedWidth = (placeable.width * expandProgress).roundToInt()
-                                    .coerceIn(0, constraints.maxWidth)
-                                layout(revealedWidth, placeable.height) {
-                                    if (expandProgress > 0.02f) {
-                                        val labelAlpha = ((expandProgress - 0.20f) / 0.80f).coerceIn(0f, 1f)
-                                        val shiftX = -(1f - expandProgress) * 6.dp.toPx()
-                                        placeable.placeWithLayer(0, 0) {
-                                            alpha = labelAlpha
-                                            translationX = shiftX
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(24.dp))
+                                .graphicsLayer {
+                                    val s = pressScaleState.value
+                                    scaleX = s
+                                    scaleY = s
+                                }
+                                .semantics(mergeDescendants = true) {
+                                    contentDescription = tabAccessibilityDesc
+                                    role = Role.Tab
+                                    this.selected = isSelected
+                                }
+                                .clickable(
+                                    interactionSource = interactionSource,
+                                    indication = null,
+                                    role = Role.Tab
+                                ) {
+                                    if (visualRoute != tab.route) {
+                                        visualRoute = tab.route
+                                    }
+                                    onSelectTab(tab.route)
+                                }
+                                .padding(horizontal = 6.dp)
+                                .testTag(tab.testTag)
+                        ) {
+                            AnimatedDockTabIcon(
+                                tab = tab,
+                                expandState = expandState,
+                                trashedCount = trashedCount,
+                                unselectedTint = unselectedTint
+                            )
+
+                            // Natural-width label reveal: read expandState.value ONLY in layout & draw phase
+                            // -> 0 recompositions, centered pure icon when inactive, zero "..." clipping!
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.layout { measurable, constraints ->
+                                    val progress = expandState.value.coerceIn(0f, 1f)
+                                    val placeable = measurable.measure(
+                                        constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity)
+                                    )
+                                    val revealedWidth = (placeable.width * progress).roundToInt()
+                                        .coerceIn(0, constraints.maxWidth)
+                                    layout(revealedWidth, placeable.height) {
+                                        if (progress > 0.02f) {
+                                            val labelAlpha = ((progress - 0.18f) / 0.82f).coerceIn(0f, 1f)
+                                            val shiftX = -(1f - progress) * 5.dp.toPx()
+                                            placeable.placeWithLayer(0, 0) {
+                                                alpha = labelAlpha
+                                                translationX = shiftX
+                                            }
                                         }
                                     }
                                 }
+                            ) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = tabLabel,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Clip
+                                )
                             }
-                        ) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = tabLabel,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = contentColor,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Clip
-                            )
                         }
+                    }
+                }
+            ) { measurables, constraints ->
+                val count = measurables.size
+                if (count == 0) {
+                    return@Layout layout(constraints.minWidth, heightPxInt) {}
+                }
+                val totalWidth = constraints.maxWidth
+                val totalGaps = gapPxInt * (count - 1)
+                val availWidth = (totalWidth - totalGaps).coerceAtLeast(count)
+
+                val weights = FloatArray(count) { i ->
+                    1f + (ACTIVE_DOCK_TAB_WEIGHT - 1f) * expandStates[i].value.coerceIn(0f, 1f)
+                }
+                var sumWeights = 0f
+                for (w in weights) sumWeights += w
+                if (sumWeights <= 0f) sumWeights = count.toFloat()
+
+                var usedWidth = 0
+                val placeables = Array(count) { i ->
+                    val slotW = if (i == count - 1) {
+                        (availWidth - usedWidth).coerceAtLeast(1)
+                    } else {
+                        ((availWidth * (weights[i] / sumWeights)).roundToInt()).coerceAtLeast(1)
+                    }
+                    usedWidth += slotW
+                    measurables[i].measure(Constraints.fixed(slotW, heightPxInt))
+                }
+
+                layout(totalWidth, heightPxInt) {
+                    var x = 0
+                    for (i in 0 until count) {
+                        placeables[i].placeRelative(x, 0)
+                        x += placeables[i].width + gapPxInt
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * Zero-recomposition dual-layer icon crossfade (outlined InkSecondary <-> filled White)
+ * driven strictly in GPU `graphicsLayer` from `expandState`.
+ */
+@Composable
+private fun AnimatedDockTabIcon(
+    tab: TopLevelTab,
+    expandState: State<Float>,
+    trashedCount: Int,
+    unselectedTint: Color
+) {
+    val iconStack: @Composable () -> Unit = {
+        Box(
+            modifier = Modifier.size(22.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = tab.unselectedIcon,
+                contentDescription = null,
+                tint = unselectedTint,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        alpha = (1f - expandState.value * 1.45f).coerceIn(0f, 1f)
+                    }
+            )
+            Icon(
+                imageVector = tab.selectedIcon,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        alpha = ((expandState.value - 0.14f) / 0.86f).coerceIn(0f, 1f)
+                    }
+            )
+        }
+    }
+
+    if (tab.route == FlipYearRoutes.VAULT && trashedCount > 0) {
+        BadgedBox(
+            badge = {
+                Badge(
+                    containerColor = CoralDanger,
+                    contentColor = Color.White
+                ) {
+                    Text(trashedCount.toString())
+                }
+            }
+        ) {
+            iconStack()
+        }
+    } else {
+        iconStack()
     }
 }
 

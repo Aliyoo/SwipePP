@@ -9,10 +9,15 @@ import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -69,10 +74,13 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.util.lerp
+import kotlin.math.absoluteValue
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -216,7 +224,41 @@ private fun PhotoDetailLightboxContent(
     val density = LocalDensity.current
     val dismissThresholdPx = with(density) { 112.dp.toPx() }
 
-    BackHandler(onBack = onDismiss)
+    val revealAnim = remember { Animatable(0f) }
+    val dismissDragY = remember { Animatable(0f) }
+    var isDismissing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        revealAnim.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 210, easing = FastOutSlowInEasing)
+        )
+    }
+
+    fun requestAnimatedDismiss(fromSwipe: Boolean = false) {
+        if (isDismissing) return
+        isDismissing = true
+        scope.launch {
+            try {
+                if (fromSwipe) {
+                    launch {
+                        dismissDragY.animateTo(
+                            targetValue = dismissDragY.value + dismissThresholdPx * 0.85f,
+                            animationSpec = tween(durationMillis = 145, easing = FastOutLinearInEasing)
+                        )
+                    }
+                }
+                revealAnim.animateTo(
+                    targetValue = 0f,
+                    animationSpec = tween(durationMillis = 145, easing = FastOutLinearInEasing)
+                )
+            } finally {
+                onDismiss()
+            }
+        }
+    }
+
+    BackHandler(onBack = { requestAnimatedDismiss() })
 
     DisposableEffect(view) {
         val window = (view as? DialogWindowProvider)?.window
@@ -266,13 +308,12 @@ private fun PhotoDetailLightboxContent(
     var offset by remember(currentPhoto.id) { mutableStateOf(Offset.Zero) }
     var showChrome by remember { mutableStateOf(true) }
     val scaleAnim = remember(currentPhoto.id) { Animatable(1f) }
-    val dismissDragY = remember { Animatable(0f) }
 
     fun removeCurrentOrDismiss() {
         val idx = pagerState.currentPage.coerceIn(0, sessionPhotos.lastIndex)
         sessionPhotos.removeAt(idx)
         if (sessionPhotos.isEmpty()) {
-            onDismiss()
+            requestAnimatedDismiss()
         } else {
             val nextIdx = idx.coerceAtMost(sessionPhotos.lastIndex)
             scope.launch { pagerState.scrollToPage(nextIdx) }
@@ -284,7 +325,7 @@ private fun PhotoDetailLightboxContent(
         if (idx < sessionPhotos.lastIndex) {
             scope.launch { pagerState.animateScrollToPage(idx + 1) }
         } else {
-            onDismiss()
+            requestAnimatedDismiss()
         }
     }
 
@@ -338,30 +379,46 @@ private fun PhotoDetailLightboxContent(
             )
         }
 
-    val dismissProgress = (dismissDragY.value / (dismissThresholdPx * 2.4f)).coerceIn(0f, 1f)
+    val dismissScaleRangePx = dismissThresholdPx * 2.4f
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0C12).copy(alpha = (1f - dismissProgress * 0.65f).coerceIn(0.35f, 1f)))
+            .drawBehind {
+                val reveal = revealAnim.value.coerceIn(0f, 1f)
+                val dragProgress = (dismissDragY.value / dismissScaleRangePx).coerceIn(0f, 1f)
+                val scrimAlpha = (1f - dragProgress * 0.65f).coerceIn(0.35f, 1f) * reveal
+                drawRect(Color(0xFF0A0C12).copy(alpha = scrimAlpha))
+            }
             .semantics(mergeDescendants = false) { isTraversalGroup = true }
             .pointerInput(Unit) {}
             .testTag("photo_detail_lightbox")
     ) {
-        // Static GPU-blurred ambient photo radiance behind darkroom veil
+        // Static GPU-blurred ambient photo radiance behind darkroom veil (GPU-modulated alpha, zero recomposition)
         BlurredAmbientPhotoBackdrop(
             photo = currentPhoto,
-            alpha = 0.28f * (1f - dismissProgress * 0.5f),
+            alpha = 0.28f,
             blurRadius = 34.dp,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val reveal = revealAnim.value.coerceIn(0f, 1f)
+                    val dragProgress = (dismissDragY.value / dismissScaleRangePx).coerceIn(0f, 1f)
+                    alpha = (1f - dragProgress * 0.5f) * reveal
+                }
         )
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xC2090B10).copy(alpha = (0.76f * (1f - dismissProgress * 0.45f)).coerceIn(0.25f, 0.76f)))
+                .drawBehind {
+                    val reveal = revealAnim.value.coerceIn(0f, 1f)
+                    val dragProgress = (dismissDragY.value / dismissScaleRangePx).coerceIn(0f, 1f)
+                    val veilAlpha = (0.76f * (1f - dragProgress * 0.45f)).coerceIn(0.25f, 0.76f) * reveal
+                    drawRect(Color(0xFF090B10).copy(alpha = veilAlpha))
+                }
         )
 
-        // HorizontalPager for prev/next photo browsing + vertical swipe-down to close
+        // HorizontalPager for prev/next photo browsing + vertical swipe-down to close (100% GPU-driven)
         HorizontalPager(
             state = pagerState,
             userScrollEnabled = scale <= 1.05f,
@@ -369,10 +426,15 @@ private fun PhotoDetailLightboxContent(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
+                    val reveal = revealAnim.value.coerceIn(0f, 1f)
+                    val dragProgress = (dismissDragY.value / dismissScaleRangePx).coerceIn(0f, 1f)
+                    val apertureScale = lerp(0.93f, 1f, reveal)
+                    val dragScale = (1f - dragProgress * 0.11f).coerceIn(0.87f, 1f)
+                    val combinedScale = apertureScale * dragScale
                     translationY = dismissDragY.value
-                    val dragScale = (1f - dismissProgress * 0.10f).coerceIn(0.88f, 1f)
-                    scaleX = dragScale
-                    scaleY = dragScale
+                    scaleX = combinedScale
+                    scaleY = combinedScale
+                    alpha = reveal
                 }
                 .pointerInput(scale <= 1.05f, dismissThresholdPx) {
                     if (scale > 1.05f) return@pointerInput
@@ -386,7 +448,7 @@ private fun PhotoDetailLightboxContent(
                         },
                         onDragEnd = {
                             if (dismissDragY.value >= dismissThresholdPx) {
-                                onDismiss()
+                                requestAnimatedDismiss(fromSwipe = true)
                             } else {
                                 scope.launch {
                                     dismissDragY.animateTo(
@@ -406,7 +468,21 @@ private fun PhotoDetailLightboxContent(
             val pagePhoto = sessionPhotos.getOrNull(pageIndex) ?: return@HorizontalPager
             val isCurrentPage = pageIndex == pagerState.currentPage
 
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        val absOffset = ((pagerState.currentPage - pageIndex) + pagerState.currentPageOffsetFraction)
+                            .absoluteValue
+                            .coerceIn(0f, 1f)
+                        if (absOffset > 0.002f) {
+                            val pageScale = lerp(1f, 0.93f, absOffset)
+                            scaleX = pageScale
+                            scaleY = pageScale
+                            alpha = lerp(1f, 0.68f, absOffset)
+                        }
+                    }
+            ) {
                 if (pagePhoto.isVideo) {
                     InlineVideoPlayer(
                         photo = pagePhoto,
@@ -513,9 +589,15 @@ private fun PhotoDetailLightboxContent(
         // Top High-Contrast Darkroom Header Scrim + Controls
         AnimatedVisibility(
             visible = showChrome,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopCenter)
+            enter = fadeIn(tween(180, easing = FastOutSlowInEasing)) +
+                slideInVertically(tween(190, easing = FastOutSlowInEasing)) { -it / 3 },
+            exit = fadeOut(tween(130)) +
+                slideOutVertically(tween(140)) { -it / 3 },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .graphicsLayer {
+                    alpha = revealAnim.value.coerceIn(0f, 1f)
+                }
         ) {
             Row(
                 modifier = Modifier
@@ -540,7 +622,7 @@ private fun PhotoDetailLightboxContent(
                 ObsidianIconOrb(
                     icon = Icons.Filled.Close,
                     contentDescription = "关闭预览",
-                    onClick = onDismiss,
+                    onClick = { requestAnimatedDismiss() },
                     color = ObsidianOverlayGlass,
                     modifier = Modifier.testTag("lightbox_close_button")
                 )

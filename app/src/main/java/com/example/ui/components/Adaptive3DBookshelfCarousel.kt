@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -31,8 +32,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -44,17 +43,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.zIndex
 import com.example.data.PhotoItemEntity
-import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.SkylightChampagneGlow
 import com.example.ui.theme.SkylightSapphireGlow
-import com.example.ui.theme.SolarAmber
 import com.example.ui.theme.StudioCanvas
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
-import kotlin.math.roundToInt
 import kotlin.math.sign
 
 /**
@@ -73,9 +69,8 @@ data class CarouselItemKinematics(
  * Adaptive 3D Bookshelf Carousel that dynamically modulates:
  * 1. **Camera Perspective (`cameraDistance`, `rotationY`, `rotationX`)** based on real-time scroll speed
  *    and directional momentum (aero-banking + cinematic lens pull-in during fast flicks).
- * 2. **Dynamic Depth of Field (DoF)** combining hardware-accelerated quantized blur (API 31+) with
- *    atmospheric focal haze & opacity roll-off across all API levels (24-36), keeping the focused
- *    center monograph razor sharp (`0.dp` blur, zero offscreen blur overhead).
+ * 2. **Atmospheric Depth of Field (DoF)** executed strictly in GPU `graphicsLayer` with zero
+ *    per-frame recompositions and zero live RenderEffect blur stalls.
  * 3. **Responsive Stage Geometry** via [BoxWithConstraints] for phones, foldables, and tablets.
  */
 @Composable
@@ -89,7 +84,8 @@ fun <T> Adaptive3DBookshelfCarousel(
     modifier: Modifier = Modifier,
     itemContent: @Composable (item: T, index: Int, kinematics: CarouselItemKinematics, cardModifier: Modifier) -> Unit
 ) {
-    // Real-time smoothed scroll velocity kinematics (pages/sec normalized into 0f..1f & -1f..1f)
+    // Real-time smoothed scroll velocity kinematics (pages/sec normalized into 0f..1f & -1f..1f).
+    // IMPORTANT: Never read `.value` in composition scope — read ONLY inside Canvas & graphicsLayer!
     val animatedSpeedFactor = remember { Animatable(0f) }
     val animatedSignedVelocity = remember { Animatable(0f) }
     var lastVelocitySampleNanos by remember { mutableFloatStateOf(0f) }
@@ -162,9 +158,6 @@ fun <T> Adaptive3DBookshelfCarousel(
         }
     }
 
-    val speedFactor = animatedSpeedFactor.value.coerceIn(0f, 1f)
-    val signedVelocity = animatedSignedVelocity.value.coerceIn(-1f, 1f)
-
     BoxWithConstraints(
         modifier = modifier.fillMaxWidth(),
         contentAlignment = Alignment.Center
@@ -179,13 +172,24 @@ fun <T> Adaptive3DBookshelfCarousel(
         val horizontalPad = ((maxWidth - bookCardWidth) / 2f).coerceAtLeast(22.dp)
         val adaptiveSpacing = if (isWideScreen) 22.dp else 14.dp
 
-        // 1) Whisper-soft full-bleed radial ambient spotlight (no hard circular edge)
+        // 1) Whisper-soft full-bleed radial ambient spotlight (draw-phase only)
         val isDark = LocalIsDarkTheme.current
         val haloChampagne = SkylightChampagneGlow
         val haloSapphire = SkylightSapphireGlow
         val pedestalShadowInk = if (isDark) Color.Black else InkPrimary
+        val veilColor = StudioCanvas
+        val groundingBrush = remember(pedestalShadowInk, isDark) {
+            Brush.radialGradient(
+                colors = listOf(
+                    pedestalShadowInk.copy(alpha = if (isDark) 0.46f else 0.16f),
+                    Color.Transparent
+                )
+            )
+        }
 
         Canvas(modifier = Modifier.fillMaxSize()) {
+            val speedFactor = animatedSpeedFactor.value.coerceIn(0f, 1f)
+            val signedVelocity = animatedSignedVelocity.value.coerceIn(-1f, 1f)
             val haloRadius = (size.maxDimension * lerp(0.54f, 0.62f, speedFactor)).coerceAtLeast(1f)
             val centerPt = Offset(
                 x = size.width * 0.5f - signedVelocity * size.width * 0.05f,
@@ -206,34 +210,23 @@ fun <T> Adaptive3DBookshelfCarousel(
             )
         }
 
-        // 2) Subtle grounding contact shadow directly beneath the monograph spine
+        // 2) Subtle grounding contact shadow directly beneath the monograph spine (draw-phase animated)
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 8.dp)
-                .width(bookCardWidth * lerp(0.84f, 0.96f, speedFactor))
+                .width(bookCardWidth * 0.88f)
                 .height(14.dp)
+                .graphicsLayer {
+                    val speedFactor = animatedSpeedFactor.value.coerceIn(0f, 1f)
+                    scaleX = lerp(0.96f, 1.09f, speedFactor)
+                    alpha = lerp(1f, 0.48f, speedFactor)
+                }
                 .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            pedestalShadowInk.copy(
-                                alpha = lerp(
-                                    if (isDark) 0.46f else 0.16f,
-                                    if (isDark) 0.22f else 0.08f,
-                                    speedFactor
-                                )
-                            ),
-                            Color.Transparent
-                        )
-                    )
-                )
+                .background(groundingBrush)
         )
 
-        // 4) Adaptive 3D Horizontal Pager with Scroll-Velocity Perspective & Optical Depth of Field
-        // Avoid HorizontalPager(key = ...) which triggers a Compose Foundation 1.7 crash in
-        // NearestRangeKeyIndexMap when pageCount grows across filter transitions (e.g. Videos -> Photos)
-        // before latestKey updates; key the inner card composable instead with strict bounds checks.
+        // 3) Adaptive 3D Horizontal Pager with Zero-Recomposition GPU Perspective & Atmospheric DoF
         val safeBeyondViewport = (items.size - 1).coerceIn(0, 2)
         HorizontalPager(
             state = pagerState,
@@ -246,55 +239,52 @@ fun <T> Adaptive3DBookshelfCarousel(
                 .testTag(pagerTestTag)
         ) { page ->
             val item = items.getOrNull(page) ?: return@HorizontalPager
-            val rawOffsetFraction = pagerState.currentPageOffsetFraction
-            val safeOffsetFraction = if (rawOffsetFraction.isFinite()) rawOffsetFraction else 0f
-            val pageOffset = (pagerState.currentPage - page) + safeOffsetFraction
-            val absOffset = pageOffset.absoluteValue.coerceIn(0f, 1.5f)
-            val clampedOffset = absOffset.coerceIn(0f, 1f)
-
-            // Dynamic Perspective: tightens camera lens distance & deepens 3D rotation as scroll speed rises
-            val dynamicCameraDistance = lerp(16.5f, 10.2f, speedFactor)
-            val baseYawDeg = pageOffset * lerp(-22f, -31f, speedFactor)
-            val velocityBankDeg = (-signedVelocity * 9.5f) * (0.45f + 0.55f * clampedOffset)
-            val dynamicRotationY = (baseYawDeg + velocityBankDeg).coerceIn(-42f, 42f)
-            val dynamicRotationX = (-speedFactor * 5.2f) * (1f - 0.35f * clampedOffset)
-
-            // Parabolic Depth Arc & Dynamic Elevation
-            val flankingScaleTarget = lerp(0.86f, 0.77f, speedFactor)
-            val dynamicScale = lerp(1f, flankingScaleTarget, clampedOffset) * (1f - speedFactor * 0.025f * clampedOffset)
-            val dynamicTranslationY = lerp(-speedFactor * 10f, lerp(20f, 38f, speedFactor), clampedOffset)
-            val dynamicTranslationX = (-pageOffset.sign) * clampedOffset * speedFactor * 14f
-
-            // Dynamic Depth of Field (DoF):
-            // Center focused card stays razor sharp (0.dp blur) at rest; flanking cards defocus
-            // proportionally to both spatial depth (absOffset) and scroll speed (speedFactor).
-            val spatialDefocus = ((absOffset - 0.08f) / 0.92f).coerceIn(0f, 1f)
-            val dofFactor = (spatialDefocus * lerp(0.45f, 1.0f, speedFactor)).coerceIn(0f, 1f)
-            val dynamicAlpha = lerp(1f, lerp(0.76f, 0.58f, speedFactor), dofFactor)
-
-            // Quantize GPU blur radius to 0.5dp increments & bypass completely below 0.5dp for zero overhead on focused card
-            val rawBlurDp = if (supportsHardwareBlur && dofFactor > 0.06f) {
-                val maxBlur = lerp(3.5f, 8.5f, speedFactor)
-                (((dofFactor * maxBlur) * 2f).roundToInt() / 2f).coerceIn(0f, 8.5f)
-            } else {
-                0f
+            val isCurrentPage by remember(page, pagerState) {
+                derivedStateOf { pagerState.currentPage == page }
             }
-
-            val kinematics = CarouselItemKinematics(
-                pageOffset = pageOffset,
-                absOffset = absOffset,
-                depthOfFieldFactor = dofFactor,
-                scrollSpeedFactor = speedFactor,
-                isCentered = absOffset < 0.12f
-            )
+            val isSettledCenter by remember(page, pagerState) {
+                derivedStateOf { pagerState.settledPage == page }
+            }
+            val kinematics = remember(isSettledCenter) {
+                CarouselItemKinematics(
+                    pageOffset = 0f,
+                    absOffset = if (isSettledCenter) 0f else 1f,
+                    depthOfFieldFactor = if (isSettledCenter) 0f else 0.45f,
+                    scrollSpeedFactor = 0f,
+                    isCentered = isSettledCenter
+                )
+            }
 
             key(itemKey(item)) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(0.70f)
-                        .zIndex(1f - clampedOffset)
+                        .zIndex(if (isCurrentPage) 2f else 1f)
                         .graphicsLayer {
+                            val rawOffsetFraction = pagerState.currentPageOffsetFraction
+                            val safeOffsetFraction = if (rawOffsetFraction.isFinite()) rawOffsetFraction else 0f
+                            val pageOffset = (pagerState.currentPage - page) + safeOffsetFraction
+                            val absOffset = pageOffset.absoluteValue.coerceIn(0f, 1.5f)
+                            val clampedOffset = absOffset.coerceIn(0f, 1f)
+                            val speedFactor = animatedSpeedFactor.value.coerceIn(0f, 1f)
+                            val signedVelocity = animatedSignedVelocity.value.coerceIn(-1f, 1f)
+
+                            val dynamicCameraDistance = lerp(16.5f, 10.2f, speedFactor)
+                            val baseYawDeg = pageOffset * lerp(-22f, -31f, speedFactor)
+                            val velocityBankDeg = (-signedVelocity * 9.5f) * (0.45f + 0.55f * clampedOffset)
+                            val dynamicRotationY = (baseYawDeg + velocityBankDeg).coerceIn(-42f, 42f)
+                            val dynamicRotationX = (-speedFactor * 5.2f) * (1f - 0.35f * clampedOffset)
+
+                            val flankingScaleTarget = lerp(0.86f, 0.77f, speedFactor)
+                            val dynamicScale = lerp(1f, flankingScaleTarget, clampedOffset) * (1f - speedFactor * 0.025f * clampedOffset)
+                            val dynamicTranslationY = lerp(-speedFactor * 10f, lerp(20f, 38f, speedFactor), clampedOffset)
+                            val dynamicTranslationX = (-pageOffset.sign) * clampedOffset * speedFactor * 14f
+
+                            val spatialDefocus = ((absOffset - 0.08f) / 0.92f).coerceIn(0f, 1f)
+                            val dofFactor = (spatialDefocus * lerp(0.45f, 1.0f, speedFactor)).coerceIn(0f, 1f)
+                            val dynamicAlpha = lerp(1f, lerp(0.78f, 0.60f, speedFactor), dofFactor)
+
                             scaleX = dynamicScale
                             scaleY = dynamicScale
                             alpha = dynamicAlpha
@@ -305,28 +295,29 @@ fun <T> Adaptive3DBookshelfCarousel(
                             cameraDistance = dynamicCameraDistance * density
                         }
                 ) {
-                    // Apply hardware RenderEffect DoF blur ONLY to defocused flanking cards on API 31+
-                    val dofModifier = if (rawBlurDp >= 0.5f) {
-                        Modifier
+                    itemContent(item, page, kinematics, Modifier.fillMaxSize())
+
+                    // Atmospheric Depth-of-Field focal veil (GPU draw-phase alpha, zero recomposition, zero blur FBO)
+                    Box(
+                        modifier = Modifier
                             .fillMaxSize()
-                            .blur(radius = rawBlurDp.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                    } else {
-                        Modifier.fillMaxSize()
-                    }
-
-                    itemContent(item, page, kinematics, dofModifier)
-
-                    // Atmospheric Depth-of-Field veil (provides focal-plane separation across ALL Android API 24-36!)
-                    if (dofFactor > 0.05f) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(itemShape)
-                                .background(
-                                    StudioCanvas.copy(alpha = (dofFactor * lerp(0.16f, 0.28f, speedFactor)).coerceIn(0f, 0.30f))
-                                )
-                        )
-                    }
+                            .graphicsLayer {
+                                val rawOffsetFraction = pagerState.currentPageOffsetFraction
+                                val safeOffsetFraction = if (rawOffsetFraction.isFinite()) rawOffsetFraction else 0f
+                                val absOffset = ((pagerState.currentPage - page) + safeOffsetFraction)
+                                    .absoluteValue.coerceIn(0f, 1.5f)
+                                val speedFactor = animatedSpeedFactor.value.coerceIn(0f, 1f)
+                                val spatialDefocus = ((absOffset - 0.08f) / 0.92f).coerceIn(0f, 1f)
+                                val dofFactor = (spatialDefocus * lerp(0.45f, 1.0f, speedFactor)).coerceIn(0f, 1f)
+                                alpha = if (dofFactor > 0.05f) {
+                                    (dofFactor * lerp(0.16f, 0.28f, speedFactor)).coerceIn(0f, 0.30f)
+                                } else {
+                                    0f
+                                }
+                            }
+                            .clip(itemShape)
+                            .background(veilColor)
+                    )
                 }
             }
         }

@@ -1,5 +1,16 @@
 package com.example.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -26,6 +37,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -42,8 +54,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -139,158 +158,368 @@ fun BurstGalleryGrid(
     onCleanMonth: ((year: Int, month: Int, isCleaned: Boolean) -> Unit)? = null,
     monthStamps: Map<String, MonthStampEntity> = emptyMap(),
     showMonthStampOverlay: Boolean = false,
+    precomputedClusterLayout: TimelineClusterLayout? = null,
+    zoomTier: GalleryZoomTier? = null,
+    onZoomTierChanged: ((GalleryZoomTier) -> Unit)? = null,
+    enablePinchZoom: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
     val gridState = rememberLazyGridState()
+    val waterfallListState = rememberLazyListState()
+
+    var internalZoomTier by rememberSaveable(columns) {
+        mutableStateOf(defaultGalleryZoomTier(columns))
+    }
+    val activeZoomTier = zoomTier ?: internalZoomTier
+    val effectiveGridColumns = if (activeZoomTier.isWaterfall) columns else activeZoomTier.gridColumns()
+
+    var zoomHudPulseToken by remember { mutableIntStateOf(0) }
+    var showZoomHud by remember { mutableStateOf(false) }
+    var pendingAnchorEntryKey by remember { mutableStateOf<String?>(null) }
+    val pinchScaleAnim = remember { Animatable(1f) }
+
+    LaunchedEffect(zoomHudPulseToken) {
+        if (zoomHudPulseToken > 0) {
+            showZoomHud = true
+            delay(1300L)
+            showZoomHud = false
+        }
+    }
+
+    val clusterLayout = if (showMonthStampOverlay) {
+        precomputedClusterLayout ?: remember(entries, monthStamps) {
+            buildTimelineClusterLayout(entries, monthStamps)
+        }
+    } else {
+        null
+    }
+
+    val waterfallLayout = remember(
+        entries,
+        expandedBurstIds,
+        monthStamps,
+        showMonthStampOverlay,
+        activeZoomTier
+    ) {
+        if (activeZoomTier.isWaterfall) {
+            buildWaterfallLayout(
+                entries = entries,
+                expandedBurstIds = expandedBurstIds,
+                monthStamps = monthStamps,
+                showMonthHeaders = showMonthStampOverlay,
+                singleColumnImmersive = activeZoomTier == GalleryZoomTier.WATERFALL_1
+            )
+        } else {
+            null
+        }
+    }
+
+    fun captureCurrentAnchorKey(): String? {
+        return if (activeZoomTier.isWaterfall) {
+            val rows = waterfallLayout?.rows.orEmpty()
+            val startIdx = waterfallListState.firstVisibleItemIndex.coerceIn(0, (rows.lastIndex).coerceAtLeast(0))
+            for (i in startIdx until rows.size) {
+                when (val r = rows[i]) {
+                    is WaterfallRowItem.JustifiedPhotos -> return r.cells.firstOrNull()?.entry?.stableKey
+                    is WaterfallRowItem.ExpandedBurst -> return r.burst.stableKey
+                    else -> Unit
+                }
+            }
+            null
+        } else if (clusterLayout != null) {
+            val items = clusterLayout.gridItems
+            val startIdx = gridState.firstVisibleItemIndex.coerceIn(0, (items.lastIndex).coerceAtLeast(0))
+            for (i in startIdx until items.size) {
+                val it = items[i]
+                if (it is TimelineGridItem.MediaEntry) return it.entry.stableKey
+            }
+            null
+        } else {
+            entries.getOrNull(gridState.firstVisibleItemIndex)?.stableKey
+        }
+    }
+
+    fun updateZoomTier(next: GalleryZoomTier) {
+        if (next == activeZoomTier) return
+        pendingAnchorEntryKey = captureCurrentAnchorKey()
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        if (onZoomTierChanged != null) {
+            onZoomTierChanged(next)
+        } else {
+            internalZoomTier = next
+        }
+        zoomHudPulseToken++
+    }
+
+    // Preserve visual scroll anchor cleanly across Grid <-> Waterfall transitions
+    LaunchedEffect(activeZoomTier.isWaterfall, pendingAnchorEntryKey) {
+        val anchorKey = pendingAnchorEntryKey ?: return@LaunchedEffect
+        if (activeZoomTier.isWaterfall) {
+            val rows = waterfallLayout?.rows.orEmpty()
+            val targetRowIdx = rows.indexOfFirst { row ->
+                when (row) {
+                    is WaterfallRowItem.JustifiedPhotos -> row.cells.any { it.entry.stableKey == anchorKey }
+                    is WaterfallRowItem.ExpandedBurst -> row.burst.stableKey == anchorKey
+                    else -> false
+                }
+            }
+            if (targetRowIdx >= 0) {
+                runCatching { waterfallListState.scrollToItem(targetRowIdx) }
+            }
+        } else {
+            val targetGridIdx = if (clusterLayout != null) {
+                clusterLayout.gridItems.indexOfFirst { it is TimelineGridItem.MediaEntry && it.entry.stableKey == anchorKey }
+            } else {
+                entries.indexOfFirst { it.stableKey == anchorKey }
+            }
+            if (targetGridIdx >= 0) {
+                runCatching { gridState.scrollToItem(targetGridIdx) }
+            }
+        }
+        pendingAnchorEntryKey = null
+    }
+
+    val monthPhotosMap = remember(entries, isSelectionMode, showMonthStampOverlay) {
+        if (!isSelectionMode || !showMonthStampOverlay) {
+            emptyMap()
+        } else {
+            val map = HashMap<String, ArrayList<PhotoItemEntity>>()
+            for (entry in entries) {
+                val key = "${entry.primaryPhoto.year}-${entry.primaryPhoto.month.toString().padStart(2, '0')}"
+                val list = map.getOrPut(key) { ArrayList() }
+                when (entry) {
+                    is GalleryEntry.Single -> list.add(entry.photo)
+                    is GalleryEntry.Burst -> list.addAll(entry.photos)
+                }
+            }
+            map
+        }
+    }
+
     // Density-calibrated thumbnail decode size capped tightly to keep memory & texture upload fast
-    val gridThumbPx = remember(density, columns) {
-        val approxTileDp = (360f / columns.coerceAtLeast(1))
+    val gridThumbPx = remember(density, effectiveGridColumns) {
+        val approxTileDp = (360f / effectiveGridColumns.coerceAtLeast(1))
         with(density) { (approxTileDp * 0.88f).dp.toPx().toInt() }
             .coerceIn(180, ImageDownsampleTier.GRID_THUMB.maxSizePx)
     }
 
-    if (showMonthStampOverlay) {
-        val clusterLayout = remember(entries, monthStamps) {
-            buildTimelineClusterLayout(entries, monthStamps)
-        }
-        val monthPhotosMap = remember(entries, isSelectionMode) {
-            if (!isSelectionMode) {
-                emptyMap()
-            } else {
-                val map = HashMap<String, ArrayList<PhotoItemEntity>>()
-                for (entry in entries) {
-                    val key = "${entry.primaryPhoto.year}-${entry.primaryPhoto.month.toString().padStart(2, '0')}"
-                    val list = map.getOrPut(key) { ArrayList() }
-                    when (entry) {
-                        is GalleryEntry.Single -> list.add(entry.photo)
-                        is GalleryEntry.Burst -> list.addAll(entry.photos)
+    val pinchModifier = if (enablePinchZoom) {
+        Modifier.galleryPinchZoomGesture(
+            scope = coroutineScope,
+            pinchScaleAnim = pinchScaleAnim,
+            onZoomIn = { updateZoomTier(activeZoomTier.zoomIn()) },
+            onZoomOut = { updateZoomTier(activeZoomTier.zoomOut()) }
+        )
+    } else {
+        Modifier
+    }
+
+    Box(
+        modifier = modifier
+            .then(pinchModifier)
+            .graphicsLayer {
+                val s = pinchScaleAnim.value
+                scaleX = s
+                scaleY = s
+            }
+    ) {
+        AnimatedContent(
+            targetState = activeZoomTier.isWaterfall,
+            transitionSpec = {
+                (fadeIn(tween(180, easing = FastOutSlowInEasing)) +
+                    scaleIn(initialScale = 0.97f, animationSpec = tween(190, easing = FastOutSlowInEasing))) togetherWith
+                    fadeOut(tween(120))
+            },
+            label = "gallery_grid_waterfall_mode",
+            modifier = Modifier.fillMaxSize()
+        ) { isWaterfall ->
+            if (isWaterfall && waterfallLayout != null) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    GalleryJustifiedWaterfallList(
+                        layoutResult = waterfallLayout,
+                        listState = waterfallListState,
+                        singleColumnImmersive = activeZoomTier == GalleryZoomTier.WATERFALL_1,
+                        showMonthHeaders = showMonthStampOverlay,
+                        contentPadding = contentPadding,
+                        isSelectionMode = isSelectionMode,
+                        selectedPhotoIds = selectedPhotoIds,
+                        monthPhotosMap = monthPhotosMap,
+                        haptic = haptic,
+                        onToggleBurst = onToggleBurst,
+                        onSelectBestInBurst = onSelectBestInBurst,
+                        onKeepBestInBurst = onKeepBestInBurst,
+                        onTrashSinglePhoto = onTrashSinglePhoto,
+                        onPhotoClick = onPhotoClick,
+                        onToggleSelectPhotos = onToggleSelectPhotos,
+                        onLongPressSelectPhotos = onLongPressSelectPhotos,
+                        onCleanMonth = onCleanMonth
+                    )
+
+                    if (showMonthStampOverlay) {
+                        TimelineMonthStampOverlay(
+                            listState = waterfallListState,
+                            clusterLayout = waterfallLayout.clusterLayout,
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
                 }
-                map
-            }
-        }
+            } else if (showMonthStampOverlay && clusterLayout != null) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    LazyVerticalGrid(
+                        state = gridState,
+                        columns = GridCells.Fixed(effectiveGridColumns),
+                        contentPadding = contentPadding,
+                        horizontalArrangement = Arrangement.spacedBy(if (effectiveGridColumns >= 4) 7.dp else 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (effectiveGridColumns >= 4) 8.dp else 12.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(
+                            items = clusterLayout.gridItems,
+                            key = { it.stableKey },
+                            contentType = { item ->
+                                when (item) {
+                                    is TimelineGridItem.MonthDivider -> "month_divider"
+                                    is TimelineGridItem.MediaEntry -> when (val entry = item.entry) {
+                                        is GalleryEntry.Single -> "single"
+                                        is GalleryEntry.Burst -> if (entry.groupId in expandedBurstIds) "burst_expanded" else "burst_collapsed"
+                                    }
+                                }
+                            },
+                            span = { item ->
+                                val fullSpan = when (item) {
+                                    is TimelineGridItem.MonthDivider -> true
+                                    is TimelineGridItem.MediaEntry ->
+                                        item.entry is GalleryEntry.Burst && item.entry.groupId in expandedBurstIds
+                                }
+                                GridItemSpan(if (fullSpan) maxLineSpan else 1)
+                            }
+                        ) { item ->
+                            when (item) {
+                                is TimelineGridItem.MonthDivider -> {
+                                    val monthPhotos = monthPhotosMap[item.cluster.yearMonthKey].orEmpty()
+                                    val isMonthAllSelected = isSelectionMode && monthPhotos.isNotEmpty() &&
+                                        monthPhotos.all { it.id in selectedPhotoIds }
+                                    MonthlyClusterHeaderStamp(
+                                        cluster = item.cluster,
+                                        isSelectionMode = isSelectionMode,
+                                        isMonthAllSelected = isMonthAllSelected,
+                                        onToggleSelectMonth = if (isSelectionMode && monthPhotos.isNotEmpty()) {
+                                            {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                onToggleSelectPhotos(monthPhotos)
+                                            }
+                                        } else null,
+                                        onCleanMonth = onCleanMonth?.let { cb ->
+                                            { cb(item.cluster.year, item.cluster.month, item.cluster.isCleaned) }
+                                        }
+                                    )
+                                }
 
-        Box(modifier = modifier) {
-            LazyVerticalGrid(
-                state = gridState,
-                columns = GridCells.Fixed(columns),
-                contentPadding = contentPadding,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(
-                    items = clusterLayout.gridItems,
-                    key = { it.stableKey },
-                    contentType = { item ->
-                        when (item) {
-                            is TimelineGridItem.MonthDivider -> "month_divider"
-                            is TimelineGridItem.MediaEntry -> when (val entry = item.entry) {
+                                is TimelineGridItem.MediaEntry -> {
+                                    GalleryEntryGridCell(
+                                        entry = item.entry,
+                                        thumbSizePx = gridThumbPx,
+                                        expandedBurstIds = expandedBurstIds,
+                                        isSelectionMode = isSelectionMode,
+                                        selectedPhotoIds = selectedPhotoIds,
+                                        haptic = haptic,
+                                        onToggleBurst = onToggleBurst,
+                                        onSelectBestInBurst = onSelectBestInBurst,
+                                        onKeepBestInBurst = onKeepBestInBurst,
+                                        onTrashSinglePhoto = onTrashSinglePhoto,
+                                        onPhotoClick = onPhotoClick,
+                                        onToggleSelectPhotos = onToggleSelectPhotos,
+                                        onLongPressSelectPhotos = onLongPressSelectPhotos
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    TimelineMonthStampOverlay(
+                        gridState = gridState,
+                        clusterLayout = clusterLayout,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            } else {
+                LazyVerticalGrid(
+                    state = gridState,
+                    columns = GridCells.Fixed(effectiveGridColumns),
+                    contentPadding = contentPadding,
+                    horizontalArrangement = Arrangement.spacedBy(if (effectiveGridColumns >= 4) 7.dp else 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (effectiveGridColumns >= 4) 8.dp else 12.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(
+                        items = entries,
+                        key = { it.stableKey },
+                        contentType = { entry ->
+                            when (entry) {
                                 is GalleryEntry.Single -> "single"
                                 is GalleryEntry.Burst -> if (entry.groupId in expandedBurstIds) "burst_expanded" else "burst_collapsed"
                             }
+                        },
+                        span = { entry ->
+                            val isExpandedBurst = entry is GalleryEntry.Burst && entry.groupId in expandedBurstIds
+                            GridItemSpan(if (isExpandedBurst) maxLineSpan else 1)
                         }
-                    },
-                    span = { item ->
-                        val fullSpan = when (item) {
-                            is TimelineGridItem.MonthDivider -> true
-                            is TimelineGridItem.MediaEntry ->
-                                item.entry is GalleryEntry.Burst && item.entry.groupId in expandedBurstIds
-                        }
-                        GridItemSpan(if (fullSpan) maxLineSpan else 1)
-                    }
-                ) { item ->
-                    when (item) {
-                        is TimelineGridItem.MonthDivider -> {
-                            val monthPhotos = monthPhotosMap[item.cluster.yearMonthKey].orEmpty()
-                            val isMonthAllSelected = isSelectionMode && monthPhotos.isNotEmpty() &&
-                                monthPhotos.all { it.id in selectedPhotoIds }
-                            MonthlyClusterHeaderStamp(
-                                cluster = item.cluster,
-                                isSelectionMode = isSelectionMode,
-                                isMonthAllSelected = isMonthAllSelected,
-                                onToggleSelectMonth = if (isSelectionMode && monthPhotos.isNotEmpty()) {
-                                    {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        onToggleSelectPhotos(monthPhotos)
-                                    }
-                                } else null,
-                                onCleanMonth = onCleanMonth?.let { cb ->
-                                    { cb(item.cluster.year, item.cluster.month, item.cluster.isCleaned) }
-                                }
-                            )
-                        }
-
-                        is TimelineGridItem.MediaEntry -> {
-                            GalleryEntryGridCell(
-                                entry = item.entry,
-                                thumbSizePx = gridThumbPx,
-                                expandedBurstIds = expandedBurstIds,
-                                isSelectionMode = isSelectionMode,
-                                selectedPhotoIds = selectedPhotoIds,
-                                haptic = haptic,
-                                onToggleBurst = onToggleBurst,
-                                onSelectBestInBurst = onSelectBestInBurst,
-                                onKeepBestInBurst = onKeepBestInBurst,
-                                onTrashSinglePhoto = onTrashSinglePhoto,
-                                onPhotoClick = onPhotoClick,
-                                onToggleSelectPhotos = onToggleSelectPhotos,
-                                onLongPressSelectPhotos = onLongPressSelectPhotos
-                            )
-                        }
+                    ) { entry ->
+                        GalleryEntryGridCell(
+                            entry = entry,
+                            thumbSizePx = gridThumbPx,
+                            expandedBurstIds = expandedBurstIds,
+                            isSelectionMode = isSelectionMode,
+                            selectedPhotoIds = selectedPhotoIds,
+                            haptic = haptic,
+                            onToggleBurst = onToggleBurst,
+                            onSelectBestInBurst = onSelectBestInBurst,
+                            onKeepBestInBurst = onKeepBestInBurst,
+                            onTrashSinglePhoto = onTrashSinglePhoto,
+                            onPhotoClick = onPhotoClick,
+                            onToggleSelectPhotos = onToggleSelectPhotos,
+                            onLongPressSelectPhotos = onLongPressSelectPhotos
+                        )
                     }
                 }
             }
-
-            TimelineMonthStampOverlay(
-                gridState = gridState,
-                clusterLayout = clusterLayout,
-                modifier = Modifier.fillMaxSize()
-            )
         }
-        return
-    }
 
-    LazyVerticalGrid(
-        state = gridState,
-        columns = GridCells.Fixed(columns),
-        contentPadding = contentPadding,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = modifier
-    ) {
-        items(
-            items = entries,
-            key = { it.stableKey },
-            contentType = { entry ->
-                when (entry) {
-                    is GalleryEntry.Single -> "single"
-                    is GalleryEntry.Burst -> if (entry.groupId in expandedBurstIds) "burst_expanded" else "burst_collapsed"
-                }
-            },
-            span = { entry ->
-                val isExpandedBurst = entry is GalleryEntry.Burst && entry.groupId in expandedBurstIds
-                GridItemSpan(if (isExpandedBurst) maxLineSpan else 1)
+        // Ephemeral floating zoom-tier HUD pill when pinch-zooming
+        AnimatedVisibility(
+            visible = showZoomHud,
+            enter = fadeIn(tween(150)) + slideInVertically(tween(170)) { -it / 2 },
+            exit = fadeOut(tween(220)) + slideOutVertically(tween(180)) { -it / 3 },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .clip(PillShape)
+                    .background(ObsidianPillBg)
+                    .border(0.9.dp, ObsidianPillBorder, PillShape)
+                    .padding(horizontal = 13.dp, vertical = 6.dp)
+                    .testTag("gallery_zoom_tier_hud")
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(SolarAmber)
+                )
+                Text(
+                    text = activeZoomTier.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
             }
-        ) { entry ->
-            GalleryEntryGridCell(
-                entry = entry,
-                thumbSizePx = gridThumbPx,
-                expandedBurstIds = expandedBurstIds,
-                isSelectionMode = isSelectionMode,
-                selectedPhotoIds = selectedPhotoIds,
-                haptic = haptic,
-                onToggleBurst = onToggleBurst,
-                onSelectBestInBurst = onSelectBestInBurst,
-                onKeepBestInBurst = onKeepBestInBurst,
-                onTrashSinglePhoto = onTrashSinglePhoto,
-                onPhotoClick = onPhotoClick,
-                onToggleSelectPhotos = onToggleSelectPhotos,
-                onLongPressSelectPhotos = onLongPressSelectPhotos
-            )
         }
     }
 }
@@ -476,7 +705,7 @@ private fun SingleGalleryTile(
 }
 
 @Composable
-private fun SelectionCheckIndicator(
+internal fun SelectionCheckIndicator(
     isSelected: Boolean,
     partialCountText: String? = null,
     modifier: Modifier = Modifier
@@ -848,7 +1077,7 @@ private fun CollapsedBurstStackTile(
  * Full-width inline Expanded Burst Tray optimized for zero-jank vertical & horizontal scrolling.
  */
 @Composable
-private fun ExpandedBurstStackTray(
+internal fun ExpandedBurstStackTray(
     burst: GalleryEntry.Burst,
     isSelectionMode: Boolean,
     selectedPhotoIds: Set<Long>,

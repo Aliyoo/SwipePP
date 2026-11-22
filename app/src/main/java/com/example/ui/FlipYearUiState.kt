@@ -6,6 +6,7 @@ import com.example.data.MediaAccessLevel
 import com.example.data.MonthStampEntity
 import com.example.data.PhotoItemEntity
 import com.example.data.YearbookCoverMode
+import com.example.ui.components.TimelineClusterLayout
 import com.example.ui.theme.TimelineSortOrder
 
 enum class MediaFilter(val label: String) {
@@ -36,6 +37,7 @@ data class YearbookSummary(
         get() = if (totalPhotos == 0) 1f else ((totalPhotos - unreviewedCount).toFloat() / totalPhotos.toFloat()).coerceIn(0f, 1f)
 }
 
+@Immutable
 data class MonthPageModel(
     val year: Int,
     val month: Int,
@@ -179,6 +181,23 @@ data class CustomCleanerSession(
 )
 
 @Immutable
+data class PrecomputedGalleryIndex(
+    val sourceEntries: List<GalleryEntry> = emptyList(),
+    val existingAlbums: List<String> = emptyList(),
+    val burstEntries: List<GalleryEntry.Burst> = emptyList(),
+    val largePhotoEntries: List<GalleryEntry> = emptyList(),
+    val missingLocationEntries: List<GalleryEntry> = emptyList(),
+    val extractedKeywordTags: List<String> = emptyList(),
+    val defaultClusterLayout: TimelineClusterLayout = TimelineClusterLayout(emptyList(), emptyList())
+) {
+    fun matches(entries: List<GalleryEntry>): Boolean = sourceEntries === entries
+
+    companion object {
+        val EMPTY = PrecomputedGalleryIndex()
+    }
+}
+
+@Immutable
 data class FlipYearUiState(
     val isLoading: Boolean = true,
     val isScanningDevice: Boolean = false,
@@ -191,6 +210,7 @@ data class FlipYearUiState(
     val timelineSortOrder: TimelineSortOrder = TimelineSortOrder.NEWEST_FIRST,
     val allPhotos: List<PhotoItemEntity> = emptyList(),
     val galleryEntries: List<GalleryEntry> = emptyList(),
+    val galleryIndex: PrecomputedGalleryIndex = PrecomputedGalleryIndex.EMPTY,
     val yearbooks: List<YearbookSummary> = emptyList(),
     val monthStamps: Map<String, MonthStampEntity> = emptyMap(),
     val trashedPhotos: List<PhotoItemEntity> = emptyList(),

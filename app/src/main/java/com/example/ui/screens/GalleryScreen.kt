@@ -40,7 +40,9 @@ import androidx.compose.material.icons.filled.BurstMode
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Compress
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
@@ -55,6 +57,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -89,10 +92,12 @@ import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.GallerySelectableChip
 import com.example.ui.components.GallerySmartFilter
+import com.example.ui.components.GalleryZoomTier
 import com.example.ui.components.PhotoDetailLightbox
 import com.example.ui.components.TimelineDateRangePickerDialog
 import com.example.ui.components.TimelineGlobalSearchBar
 import com.example.ui.components.TimelineSearchFilterSheet
+import com.example.ui.components.defaultGalleryZoomTier
 import com.example.ui.extractDescriptiveKeywordTags
 import com.example.ui.filterGalleryEntriesBySearch
 import com.example.ui.screens.gallery.BulkMoveDestinationSheet
@@ -177,6 +182,12 @@ fun GalleryScreen(
     var smartFilter by remember { mutableStateOf(GallerySmartFilter.ALL) }
     var selectedAlbumFilter by remember { mutableStateOf<String?>(null) }
     var lightboxPhoto by remember { mutableStateOf<PhotoItemEntity?>(null) }
+    var galleryZoomTier by rememberSaveable { mutableStateOf(defaultGalleryZoomTier(galleryColumns)) }
+    LaunchedEffect(galleryColumns) {
+        if (!galleryZoomTier.isWaterfall) {
+            galleryZoomTier = defaultGalleryZoomTier(galleryColumns)
+        }
+    }
 
     var explicitSelectionMode by remember { mutableStateOf(false) }
     var selectedPhotoIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
@@ -242,7 +253,9 @@ fun GalleryScreen(
     }
 
     val allEntries = uiState.galleryEntries
-    val existingAlbums = remember(allEntries) {
+    val precomputed = uiState.galleryIndex.takeIf { it.matches(allEntries) }
+
+    val existingAlbums = precomputed?.existingAlbums ?: remember(allEntries) {
         val counts = HashMap<String, Int>(16)
         for (entry in allEntries) {
             when (entry) {
@@ -267,8 +280,10 @@ fun GalleryScreen(
         }
     }
 
-    val burstEntries = remember(allEntries) { allEntries.filterIsInstance<GalleryEntry.Burst>() }
-    val largePhotoEntries = remember(allEntries) {
+    val burstEntries = precomputed?.burstEntries ?: remember(allEntries) {
+        allEntries.filterIsInstance<GalleryEntry.Burst>()
+    }
+    val largePhotoEntries = precomputed?.largePhotoEntries ?: remember(allEntries) {
         allEntries.filter { entry ->
             when (entry) {
                 is GalleryEntry.Single -> !entry.photo.isVideo && entry.photo.fileSizeBytes >= LARGE_PHOTO_THRESHOLD_BYTES
@@ -276,7 +291,7 @@ fun GalleryScreen(
             }
         }
     }
-    val missingLocationEntries = remember(allEntries) {
+    val missingLocationEntries = precomputed?.missingLocationEntries ?: remember(allEntries) {
         allEntries.filter { entry ->
             when (entry) {
                 is GalleryEntry.Single ->
@@ -287,7 +302,7 @@ fun GalleryScreen(
         }
     }
 
-    val extractedKeywordTags = remember(allEntries) {
+    val extractedKeywordTags = precomputed?.extractedKeywordTags ?: remember(allEntries) {
         extractDescriptiveKeywordTags(allEntries)
     }
 
@@ -460,9 +475,9 @@ fun GalleryScreen(
                                     )
                                     Text(
                                         text = if (burstEntries.isNotEmpty()) {
-                                            "共 ${displayedEntries.size} 项 · 含 ${burstEntries.size} 组连拍"
+                                            "共 ${displayedEntries.size} 项 · 含 ${burstEntries.size} 组连拍 · 双指缩放"
                                         } else {
-                                            "共 ${displayedEntries.size} 项 · 长按可多选"
+                                            "共 ${displayedEntries.size} 项 · 双指缩放切大图 · 长按多选"
                                         },
                                         style = MaterialTheme.typography.bodySmall,
                                         color = InkSecondary,
@@ -648,16 +663,48 @@ fun GalleryScreen(
                                         if (missingLocationEntries.isNotEmpty()) add(GallerySmartFilter.MISSING_LOCATION to "缺定位 (${missingLocationEntries.size})")
                                     }
                                 }
-                                if (quickSmartChoices.size > 1) {
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    LazyRow(
-                                        contentPadding = PaddingValues(horizontal = 20.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(7.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .testTag("gallery_quick_smart_strip")
-                                    ) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 20.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("gallery_quick_smart_strip")
+                                ) {
+                                    // 1-tap Grid <-> Justified Waterfall toggle synchronized with 2-finger pinch-to-zoom
+                                    item(key = "zoom_tier_toggle") {
+                                        val isWaterfall = galleryZoomTier.isWaterfall
+                                        GallerySelectableChip(
+                                            selected = isWaterfall,
+                                            onClick = {
+                                                hapticEngine.pageFlipLift()
+                                                galleryZoomTier = when (galleryZoomTier) {
+                                                    GalleryZoomTier.COMPACT_4,
+                                                    GalleryZoomTier.STANDARD_3 -> GalleryZoomTier.WATERFALL_2
+                                                    GalleryZoomTier.WATERFALL_2 -> GalleryZoomTier.WATERFALL_1
+                                                    GalleryZoomTier.WATERFALL_1 -> defaultGalleryZoomTier(galleryColumns)
+                                                }
+                                            },
+                                            modifier = Modifier.testTag("gallery_zoom_tier_toggle")
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isWaterfall) Icons.Filled.Dashboard else Icons.Filled.GridView,
+                                                contentDescription = if (isWaterfall) "切换大图密度或返回网格" else "展开大图瀑布流",
+                                                tint = if (isWaterfall) SolarAmber else CobaltPrimary,
+                                                modifier = Modifier.size(13.5.dp)
+                                            )
+                                            Text(
+                                                text = if (isWaterfall) galleryZoomTier.shortChipLabel else "大图瀑布流",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontSize = 11.5.sp,
+                                                fontWeight = if (isWaterfall) FontWeight.Bold else FontWeight.SemiBold,
+                                                color = if (isWaterfall) Color.White else InkPrimary
+                                            )
+                                        }
+                                    }
+
+                                    if (quickSmartChoices.size > 1) {
                                         items(quickSmartChoices, key = { it.first.name }) { (filterOption, label) ->
                                             val isSel = smartFilter == filterOption
                                             GallerySelectableChip(
@@ -798,6 +845,13 @@ fun GalleryScreen(
                         },
                         monthStamps = uiState.monthStamps,
                         showMonthStampOverlay = true,
+                        precomputedClusterLayout = if (precomputed != null && displayedEntries === allEntries) {
+                            precomputed.defaultClusterLayout
+                        } else {
+                            null
+                        },
+                        zoomTier = galleryZoomTier,
+                        onZoomTierChanged = { galleryZoomTier = it },
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)

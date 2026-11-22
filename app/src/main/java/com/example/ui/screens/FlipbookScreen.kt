@@ -1,10 +1,21 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -40,7 +51,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.FilterNone
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PlayArrow
@@ -55,10 +68,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -71,6 +87,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -85,25 +103,39 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.zIndex
 import com.example.R
+import com.example.data.CompressionPreset
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
 import com.example.data.PhotoRepository
 import com.example.data.PhotoStatus
+import com.example.data.ResolvedGeoLocation
+import com.example.data.SameDayLocationMatch
+import com.example.data.inferSameDayLocations
 import com.example.sensor.rememberHapticEngine
 import com.example.ui.GalleryEntry
+import com.example.ui.LocationCluster
 import com.example.ui.MonthPageModel
 import com.example.ui.components.ArtisticGalleryBackdrop
+import com.example.ui.components.BatchCompressBottomSheet
+import com.example.ui.components.BatchLocationEditorSheet
 import com.example.ui.components.BurstGalleryGrid
 import com.example.ui.components.CleanedCompletionBadge
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.GalleryHeaderOrbButton
 import com.example.ui.components.GallerySculptedHeroButton
+import com.example.ui.components.GallerySelectableChip
+import com.example.ui.components.GalleryZoomTier
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.PhotoDetailLightbox
 import com.example.ui.components.activeChromeSatinBrush
+import com.example.ui.components.defaultGalleryZoomTier
 import com.example.ui.components.formatStorageSize
 import com.example.ui.components.monthChineseName
+import com.example.ui.screens.gallery.BulkMoveDestinationSheet
+import com.example.ui.screens.gallery.FloatingBulkActionBar
+import com.example.ui.screens.gallery.GalleryMoreBatchActionsSheet
+import com.example.ui.screens.gallery.GallerySelectionTopBar
 import com.example.ui.theme.GlassSpecularRimStart
 import com.example.ui.theme.LocalFlipYearPalette
 import com.example.ui.theme.CobaltDark
@@ -147,6 +179,11 @@ fun FlipbookScreen(
     timelineSortOrder: TimelineSortOrder = TimelineSortOrder.NEWEST_FIRST,
     showEmptyMonths: Boolean = false,
     defaultShowGalleryMode: Boolean = false,
+    galleryColumns: Int = 3,
+    existingAlbums: List<String> = emptyList(),
+    availableYears: List<Int> = emptyList(),
+    locationClusters: List<LocationCluster> = emptyList(),
+    allPhotos: List<PhotoItemEntity> = emptyList(),
     onBack: () -> Unit,
     onStartMonthCleanup: (year: Int, month: Int, includeReviewed: Boolean, focusDay: Int?) -> Unit,
     onSelectBestInBurst: (groupId: String, photoId: Long) -> Unit,
@@ -154,6 +191,13 @@ fun FlipbookScreen(
     onKeepPhoto: (PhotoItemEntity, Boolean) -> Unit,
     onTrashPhoto: (PhotoItemEntity) -> Unit,
     onToggleFavorite: (PhotoItemEntity, Boolean) -> Unit = { p, f -> onKeepPhoto(p, f) },
+    onBulkTrashPhotos: (List<PhotoItemEntity>) -> Unit = {},
+    onBulkKeepPhotos: (List<PhotoItemEntity>, Boolean) -> Unit = { _, _ -> },
+    onBulkMovePhotos: (List<PhotoItemEntity>, String?, Int?, Int?) -> Unit = { _, _, _, _ -> },
+    onBatchCompress: (List<PhotoItemEntity>, CompressionPreset) -> Unit = { _, _ -> },
+    onBatchManualLocation: (List<PhotoItemEntity>, String, Double, Double, Boolean) -> Unit = { _, _, _, _, _ -> },
+    onBatchSameDayLocation: (List<SameDayLocationMatch>, Boolean) -> Unit = { _, _ -> },
+    onGeocodeLocation: suspend (String) -> ResolvedGeoLocation? = { null },
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -163,313 +207,630 @@ fun FlipbookScreen(
     var lightboxPhoto by remember { mutableStateOf<PhotoItemEntity?>(null) }
     var lightboxContextPhotos by remember { mutableStateOf<List<PhotoItemEntity>>(emptyList()) }
 
+    var galleryZoomTier by rememberSaveable(year) { mutableStateOf(defaultGalleryZoomTier(galleryColumns)) }
+    LaunchedEffect(galleryColumns) {
+        if (!galleryZoomTier.isWaterfall) {
+            galleryZoomTier = defaultGalleryZoomTier(galleryColumns)
+        }
+    }
+
+    // Unified Multi-Select & Bulk Action state for Flipbook Month Gallery View
+    var explicitSelectionMode by remember { mutableStateOf(false) }
+    var selectedPhotoIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var showMoreActionsSheet by remember { mutableStateOf(false) }
+    var showMoveSheet by remember { mutableStateOf(false) }
+    var showCompressSheet by remember { mutableStateOf(false) }
+    var showLocationSheet by remember { mutableStateOf(false) }
+
+    val isSelectionMode = showGalleryMode && (explicitSelectionMode || selectedPhotoIds.isNotEmpty())
+    val exitSelectionMode = remember {
+        {
+            explicitSelectionMode = false
+            selectedPhotoIds = emptySet()
+            showMoreActionsSheet = false
+            showMoveSheet = false
+            showCompressSheet = false
+            showLocationSheet = false
+        }
+    }
+
+    BackHandler(enabled = isSelectionMode) {
+        exitSelectionMode()
+    }
+
+    LaunchedEffect(showGalleryMode) {
+        if (!showGalleryMode) {
+            exitSelectionMode()
+        }
+    }
+
+    val defaultPage = remember(year, timelineSortOrder, showEmptyMonths, monthPages.size) {
+        monthPages.indexOfFirst { it.totalPhotos > 0 }.takeIf { it >= 0 } ?: 0
+    }
+    var activePageIndex by remember(year, timelineSortOrder, showEmptyMonths) {
+        mutableIntStateOf(defaultPage)
+    }
+
+    val activeMonthPage = monthPages.getOrNull(activePageIndex)
+    val activeMonthPhotos = remember(activeMonthPage) {
+        activeMonthPage?.photos?.filter { it.photoStatus != PhotoStatus.TRASHED }.orEmpty()
+    }
+    val allYearVisiblePhotoMap = remember(monthPages, isSelectionMode) {
+        if (!isSelectionMode) {
+            emptyMap()
+        } else {
+            val map = LinkedHashMap<Long, PhotoItemEntity>()
+            for (page in monthPages) {
+                for (photo in page.photos) {
+                    if (photo.photoStatus != PhotoStatus.TRASHED) {
+                        map[photo.id] = photo
+                    }
+                }
+            }
+            map
+        }
+    }
+
+    LaunchedEffect(allYearVisiblePhotoMap, isSelectionMode) {
+        if (isSelectionMode && selectedPhotoIds.isNotEmpty()) {
+            val valid = selectedPhotoIds.filterTo(mutableSetOf()) { it in allYearVisiblePhotoMap }
+            if (valid.size != selectedPhotoIds.size) {
+                selectedPhotoIds = valid
+            }
+        }
+    }
+
+    val selectedPhotos = remember(selectedPhotoIds, allYearVisiblePhotoMap) {
+        if (selectedPhotoIds.isEmpty()) emptyList() else selectedPhotoIds.mapNotNull { allYearVisiblePhotoMap[it] }
+    }
+    val selectedBytes = remember(selectedPhotos) {
+        selectedPhotos.sumOf { it.fileSizeBytes }
+    }
+    val selectedCompressibleCount = remember(selectedPhotos) {
+        selectedPhotos.count { !it.isVideo }
+    }
+    val selectedMissingLocationCount = remember(selectedPhotos) {
+        selectedPhotos.count { it.locationName.isNullOrBlank() || it.latitude == null || it.longitude == null }
+    }
+    val allActiveMonthSelected = isSelectionMode &&
+        activeMonthPhotos.isNotEmpty() &&
+        activeMonthPhotos.all { it.id in selectedPhotoIds }
+
+    val toggleSelectPhotos = remember {
+        { photos: List<PhotoItemEntity> ->
+            val ids = photos.map { it.id }
+            val allAlreadySelected = ids.isNotEmpty() && ids.all { it in selectedPhotoIds }
+            selectedPhotoIds = if (allAlreadySelected) {
+                selectedPhotoIds - ids.toSet()
+            } else {
+                selectedPhotoIds + ids
+            }
+        }
+    }
+
+    val longPressSelectPhotos = remember(haptics) {
+        { photos: List<PhotoItemEntity> ->
+            haptics.bookshelfDetent()
+            explicitSelectionMode = true
+            selectedPhotoIds = selectedPhotoIds + photos.map { it.id }
+        }
+    }
+
     ArtisticGalleryBackdrop(
         warmAccent = true,
         modifier = modifier
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .widthIn(max = 640.dp)
-                .align(Alignment.TopCenter)
-        ) {
-            // Top Navigation Bar — unified 38dp frosted glass orb + restrained mode pill
-            val cleanedMonthCount = remember(monthPages) { monthPages.count { it.isCleaned } }
-            val populatedMonthCount = remember(monthPages) { monthPages.count { it.totalPhotos > 0 } }
-            val isDarkTop = LocalIsDarkTheme.current
-            Row(
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .widthIn(max = 640.dp)
+                    .align(Alignment.TopCenter)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    GalleryHeaderOrbButton(
-                        onClick = onBack,
-                        modifier = Modifier.testTag("flipbook_back_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.cd_back),
-                            tint = InkPrimary,
-                            modifier = Modifier.size(19.dp)
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "$year 年度影集",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = InkPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = if (showGalleryMode) {
-                                "${populatedMonthCount} 个活跃月 · 展开管理连拍"
-                            } else {
-                                "已归档 $cleanedMonthCount/$populatedMonthCount 月 · 轻触日期直达"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = InkSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
+                // Top Navigation Bar — seamlessly morphs into GallerySelectionTopBar during multi-select
+                val cleanedMonthCount = remember(monthPages) { monthPages.count { it.isCleaned } }
+                val populatedMonthCount = remember(monthPages) { monthPages.count { it.totalPhotos > 0 } }
 
-                // Optically matched 38dp frosted pill switcher with sliding satin thumb (48dp touch target)
-                FlipbookViewModeSwitch(
-                    showGalleryMode = showGalleryMode,
-                    onSelectMode = { targetGallery ->
-                        if (targetGallery != showGalleryMode) {
-                            haptics.pageFlipLift()
-                            showGalleryMode = targetGallery
+                AnimatedContent(
+                    targetState = isSelectionMode,
+                    transitionSpec = {
+                        (fadeIn(tween(180)) + slideInVertically(tween(200)) { -it / 4 }) togetherWith
+                            (fadeOut(tween(140)) + slideOutVertically(tween(160)) { -it / 4 })
+                    },
+                    label = "flipbook_header_mode"
+                ) { selecting ->
+                    if (selecting) {
+                        GallerySelectionTopBar(
+                            selectedCount = selectedPhotos.size,
+                            selectedBytes = selectedBytes,
+                            allSelected = allActiveMonthSelected,
+                            onCancel = {
+                                haptics.pageFlipLift()
+                                exitSelectionMode()
+                            },
+                            onToggleSelectAll = {
+                                haptics.bookshelfDetent()
+                                val monthIds = activeMonthPhotos.map { it.id }.toSet()
+                                selectedPhotoIds = if (allActiveMonthSelected) {
+                                    selectedPhotoIds - monthIds
+                                } else {
+                                    selectedPhotoIds + monthIds
+                                }
+                            }
+                        )
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                GalleryHeaderOrbButton(
+                                    onClick = onBack,
+                                    modifier = Modifier.testTag("flipbook_back_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = stringResource(R.string.cd_back),
+                                        tint = InkPrimary,
+                                        modifier = Modifier.size(19.dp)
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "$year 年度影集",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = InkPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = if (showGalleryMode) {
+                                            "${populatedMonthCount} 个活跃月 · 双指放大 · 长按多选"
+                                        } else {
+                                            "已归档 $cleanedMonthCount/$populatedMonthCount 月 · 轻触日期直达"
+                                        },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = InkSecondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+
+                            AnimatedVisibility(
+                                visible = showGalleryMode && activeMonthPhotos.isNotEmpty(),
+                                enter = fadeIn(tween(160)),
+                                exit = fadeOut(tween(120))
+                            ) {
+                                GalleryHeaderOrbButton(
+                                    onClick = {
+                                        haptics.bookshelfDetent()
+                                        explicitSelectionMode = true
+                                    },
+                                    modifier = Modifier.testTag("flipbook_enter_multiselect_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.CheckBox,
+                                        contentDescription = stringResource(R.string.action_enter_multiselect),
+                                        tint = CobaltPrimary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+
+                            // Optically matched 38dp frosted pill switcher with sliding satin thumb (48dp touch target)
+                            FlipbookViewModeSwitch(
+                                showGalleryMode = showGalleryMode,
+                                onSelectMode = { targetGallery ->
+                                    if (targetGallery != showGalleryMode) {
+                                        haptics.pageFlipLift()
+                                        showGalleryMode = targetGallery
+                                    }
+                                }
+                            )
                         }
                     }
-                )
-            }
-
-            if (monthPages.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("该年份暂无照片或视频", color = InkSecondary)
-                }
-            } else {
-                key(year, timelineSortOrder, showEmptyMonths) {
-                    val defaultPage = remember(year, timelineSortOrder, showEmptyMonths, monthPages.size) {
-                        monthPages.indexOfFirst { it.totalPhotos > 0 }.takeIf { it >= 0 } ?: 0
-                    }
-                    val pagerState = rememberPagerState(initialPage = defaultPage, pageCount = { monthPages.size })
-                    val monthPillListState = rememberLazyListState()
-
-                LaunchedEffect(pagerState.currentPage, monthPages.size) {
-                    if (pagerState.currentPage in monthPages.indices) {
-                        monthPillListState.animateScrollToItem(
-                            index = (pagerState.currentPage - 1).coerceAtLeast(0)
-                        )
-                    }
                 }
 
-                // Tactile 3D Calendar Page-Flip Haptics:
-                // 1) Paper-hinge lift tick halfway through dragging a page across the spine
-                LaunchedEffect(pagerState) {
-                    var midpointTriggered = false
-                    snapshotFlow { pagerState.currentPageOffsetFraction.absoluteValue }
-                        .collect { absOffset ->
-                            if (absOffset >= 0.42f && !midpointTriggered) {
-                                midpointTriggered = true
-                                haptics.pageFlipLift()
-                            } else if (absOffset < 0.12f) {
-                                midpointTriggered = false
+                if (monthPages.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("该年份暂无照片或视频", color = InkSecondary)
+                    }
+                } else {
+                    key(year, timelineSortOrder, showEmptyMonths) {
+                        val pagerState = rememberPagerState(initialPage = defaultPage, pageCount = { monthPages.size })
+                        val monthPillListState = rememberLazyListState()
+
+                        LaunchedEffect(pagerState.currentPage, monthPages.size) {
+                            activePageIndex = pagerState.currentPage
+                            if (pagerState.currentPage in monthPages.indices) {
+                                monthPillListState.animateScrollToItem(
+                                    index = (pagerState.currentPage - 1).coerceAtLeast(0)
+                                )
                             }
                         }
-                }
 
-                // 2) Soft double-beat paper settle whenever flipping lands on a new month page
-                LaunchedEffect(pagerState) {
-                    snapshotFlow { pagerState.currentPage }
-                        .drop(1)
-                        .distinctUntilChanged()
-                        .collect {
-                            haptics.pageFlipSettle()
+                        // Tactile 3D Calendar Page-Flip Haptics:
+                        // 1) Paper-hinge lift tick halfway through dragging a page across the spine
+                        LaunchedEffect(pagerState) {
+                            var midpointTriggered = false
+                            snapshotFlow { pagerState.currentPageOffsetFraction.absoluteValue }
+                                .collect { absOffset ->
+                                    if (absOffset >= 0.42f && !midpointTriggered) {
+                                        midpointTriggered = true
+                                        haptics.pageFlipLift()
+                                    } else if (absOffset < 0.12f) {
+                                        midpointTriggered = false
+                                    }
+                                }
                         }
-                }
 
-                // Full-bleed HorizontalPager stage: keeps pages cleanly inset at rest via contentPadding
-                // while letting turning pages glide all the way to the screen edges without harsh 16dp slicing.
-                val scrollFraction = pagerState.currentPageOffsetFraction
-                    .let { if (it.isFinite()) it.absoluteValue else 0f }
-                val restingStackAlpha = (1f - scrollFraction * 4.2f).coerceIn(0f, 1f)
+                        // 2) Soft double-beat paper settle whenever flipping lands on a new month page
+                        LaunchedEffect(pagerState) {
+                            snapshotFlow { pagerState.currentPage }
+                                .drop(1)
+                                .distinctUntilChanged()
+                                .collect {
+                                    haptics.pageFlipSettle()
+                                }
+                        }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Underlying crisp page stack thickness — visible at rest, recedes smoothly during swipe
-                    if (monthPages.size > 1 && restingStackAlpha > 0.01f) {
+                        // Full-bleed HorizontalPager stage: keeps pages cleanly inset at rest via contentPadding
+                        // while letting turning pages glide all the way to the screen edges without harsh 16dp slicing.
                         Box(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(start = 22.dp, end = 12.dp, top = 14.dp, bottom = 6.dp)
-                                .graphicsLayer { alpha = restingStackAlpha }
-                                .clip(RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 22.dp, bottomEnd = 22.dp))
-                                .background(SurfaceSubtle)
-                                .border(
-                                    0.8.dp,
-                                    HairlineBorder.copy(alpha = 0.7f),
-                                    RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 22.dp, bottomEnd = 22.dp)
-                                )
-                        )
-                    }
-
-                    HorizontalPager(
-                        state = pagerState,
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-                        pageSpacing = 14.dp,
-                        beyondViewportPageCount = (monthPages.size - 1).coerceIn(0, 1),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .testTag("flipbook_3d_pager")
-                    ) { index ->
-                        val pageModel = monthPages.getOrNull(index) ?: return@HorizontalPager
-                        val rawOffset = pagerState.currentPageOffsetFraction
-                        val safeOffset = if (rawOffset.isFinite()) rawOffset else 0f
-                        val pageOffset = ((pagerState.currentPage - index) + safeOffset)
-                        val clamped = pageOffset.coerceIn(-1f, 1f)
-                        val isRecentStamp = recentlyStampedMonthKey == PhotoRepository.yearMonthKey(pageModel.year, pageModel.month)
-
-                        ModernCalendarBookPage(
-                            page = pageModel,
-                            pageOffset = clamped,
-                            animateBadge = isRecentStamp,
-                            showGalleryMode = showGalleryMode,
-                            timelineSortOrder = timelineSortOrder,
-                            expandedBurstIds = expandedBurstIds,
-                            onToggleBurst = { gid ->
-                                expandedBurstIds = if (gid in expandedBurstIds) {
-                                    expandedBurstIds - gid
-                                } else {
-                                    expandedBurstIds + gid
-                                }
-                            },
-                            onSelectBestInBurst = onSelectBestInBurst,
-                            onKeepBestInBurst = { burst, chosen ->
-                                haptics.swipeDeleteConfirm()
-                                expandedBurstIds = expandedBurstIds - burst.groupId
-                                onKeepBestInBurst(burst, chosen)
-                            },
-                            onTrashPhoto = { photo ->
-                                haptics.swipeDeleteConfirm()
-                                onTrashPhoto(photo)
-                            },
-                            onPhotoClick = { photo ->
-                                val visible = pageModel.photos.filter { it.photoStatus != PhotoStatus.TRASHED }
-                                lightboxContextPhotos = if (timelineSortOrder == TimelineSortOrder.NEWEST_FIRST) {
-                                    visible.sortedByDescending { it.takenAtMillis }
-                                } else {
-                                    visible.sortedBy { it.takenAtMillis }
-                                }
-                                lightboxPhoto = photo
-                            },
-                            onCleanClick = {
-                                onStartMonthCleanup(
-                                    pageModel.year,
-                                    pageModel.month,
-                                    pageModel.unreviewedCount == 0,
-                                    null
-                                )
-                            },
-                            onDayClick = { dayNum ->
-                                val dayPhotos = pageModel.photosByDay[dayNum].orEmpty()
-                                val dayHasUnreviewed = dayPhotos.any { it.photoStatus == PhotoStatus.UNREVIEWED }
-                                onStartMonthCleanup(
-                                    pageModel.year,
-                                    pageModel.month,
-                                    !dayHasUnreviewed,
-                                    dayNum
+                                .fillMaxWidth()
+                                .weight(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Underlying crisp page stack thickness — alpha driven strictly in graphicsLayer (0 recompositions!)
+                            if (monthPages.size > 1) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(start = 22.dp, end = 12.dp, top = 14.dp, bottom = 6.dp)
+                                        .graphicsLayer {
+                                            val scrollFraction = pagerState.currentPageOffsetFraction
+                                                .let { if (it.isFinite()) it.absoluteValue else 0f }
+                                            alpha = (1f - scrollFraction * 4.2f).coerceIn(0f, 1f)
+                                        }
+                                        .clip(RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 22.dp, bottomEnd = 22.dp))
+                                        .background(SurfaceSubtle)
+                                        .border(
+                                            0.8.dp,
+                                            HairlineBorder.copy(alpha = 0.7f),
+                                            RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 22.dp, bottomEnd = 22.dp)
+                                        )
                                 )
                             }
-                        )
-                    }
-                }
 
-                // Frameless Watchmaker Precision Month Scale (mirrors Bookshelf's year dial)
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp, bottom = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    LazyRow(
-                        state = monthPillListState,
-                        contentPadding = PaddingValues(horizontal = 20.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        itemsIndexed(monthPages) { index, monthModel ->
-                            val selected = pagerState.currentPage == index
-                            val hasMedia = monthModel.totalPhotos > 0
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center,
+                            HorizontalPager(
+                                state = pagerState,
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                                pageSpacing = 14.dp,
+                                beyondViewportPageCount = (monthPages.size - 1).coerceIn(0, 1),
                                 modifier = Modifier
-                                    .heightIn(min = 48.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable {
-                                        scope.launch { pagerState.animateScrollToPage(index) }
-                                    }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
-                                    .testTag("month_pill_${monthModel.month}")
-                            ) {
-                                // Subtle watchmaker tick above month numeral
-                                Box(
-                                    modifier = Modifier
-                                        .width(if (selected) 2.dp else 1.dp)
-                                        .height(if (selected) 6.dp else 4.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            when {
-                                                selected -> CobaltPrimary
-                                                monthModel.isCleaned -> EmeraldKeep
-                                                hasMedia -> InkTertiary.copy(alpha = 0.45f)
-                                                else -> InkTertiary.copy(alpha = 0.20f)
-                                            }
-                                        )
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                ) {
-                                    Text(
-                                        text = monthChineseName(monthModel.month),
-                                        fontFamily = if (selected) OutfitFontFamily else JetBrainsMonoFontFamily,
-                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                        fontSize = if (selected) 14.sp else 12.sp,
-                                        color = when {
-                                            selected -> InkPrimary
-                                            monthModel.isCleaned -> EmeraldKeep
-                                            hasMedia -> InkSecondary
-                                            else -> InkTertiary.copy(alpha = 0.50f)
+                                    .fillMaxSize()
+                                    .testTag("flipbook_3d_pager")
+                            ) { index ->
+                                val pageModel = monthPages.getOrNull(index) ?: return@HorizontalPager
+                                val isCurrentPage by remember(index, pagerState) {
+                                    derivedStateOf { pagerState.currentPage == index }
+                                }
+                                val isRecentStamp = recentlyStampedMonthKey == PhotoRepository.yearMonthKey(pageModel.year, pageModel.month)
+
+                                ModernCalendarBookPage(
+                                    page = pageModel,
+                                    isCurrentPage = isCurrentPage,
+                                    pageOffsetProvider = {
+                                        val rawOffset = pagerState.currentPageOffsetFraction
+                                        val safeOffset = if (rawOffset.isFinite()) rawOffset else 0f
+                                        ((pagerState.currentPage - index) + safeOffset).coerceIn(-1f, 1f)
+                                    },
+                                    animateBadge = isRecentStamp,
+                                    showGalleryMode = showGalleryMode,
+                                    timelineSortOrder = timelineSortOrder,
+                                    galleryColumns = galleryColumns,
+                                    galleryZoomTier = galleryZoomTier,
+                                    onGalleryZoomTierChanged = { galleryZoomTier = it },
+                                    isSelectionMode = isSelectionMode,
+                                    selectedPhotoIds = selectedPhotoIds,
+                                    onToggleSelectPhotos = toggleSelectPhotos,
+                                    onLongPressSelectPhotos = longPressSelectPhotos,
+                                    expandedBurstIds = expandedBurstIds,
+                                    onToggleBurst = { gid ->
+                                        expandedBurstIds = if (gid in expandedBurstIds) {
+                                            expandedBurstIds - gid
+                                        } else {
+                                            expandedBurstIds + gid
                                         }
-                                    )
-                                    if (monthModel.isCleaned) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(5.dp)
-                                                .clip(CircleShape)
-                                                .background(if (selected) SolarAmber else EmeraldKeep)
+                                    },
+                                    onSelectBestInBurst = onSelectBestInBurst,
+                                    onKeepBestInBurst = { burst, chosen ->
+                                        haptics.swipeDeleteConfirm()
+                                        expandedBurstIds = expandedBurstIds - burst.groupId
+                                        onKeepBestInBurst(burst, chosen)
+                                    },
+                                    onTrashPhoto = { photo ->
+                                        haptics.swipeDeleteConfirm()
+                                        onTrashPhoto(photo)
+                                    },
+                                    onPhotoClick = { photo ->
+                                        val visible = pageModel.photos.filter { it.photoStatus != PhotoStatus.TRASHED }
+                                        lightboxContextPhotos = if (timelineSortOrder == TimelineSortOrder.NEWEST_FIRST) {
+                                            visible.sortedByDescending { it.takenAtMillis }
+                                        } else {
+                                            visible.sortedBy { it.takenAtMillis }
+                                        }
+                                        lightboxPhoto = photo
+                                    },
+                                    onCleanClick = {
+                                        onStartMonthCleanup(
+                                            pageModel.year,
+                                            pageModel.month,
+                                            pageModel.unreviewedCount == 0,
+                                            null
                                         )
+                                    },
+                                    onDayClick = { dayNum ->
+                                        val dayPhotos = pageModel.photosByDay[dayNum].orEmpty()
+                                        val dayHasUnreviewed = dayPhotos.any { it.photoStatus == PhotoStatus.UNREVIEWED }
+                                        onStartMonthCleanup(
+                                            pageModel.year,
+                                            pageModel.month,
+                                            !dayHasUnreviewed,
+                                            dayNum
+                                        )
+                                    }
+                                )
+                            }
+                        }
+
+                        // Frameless Watchmaker Precision Month Scale (mirrors Bookshelf's year dial; hides during multi-select for bulk bar clarity)
+                        AnimatedVisibility(
+                            visible = !isSelectionMode,
+                            enter = fadeIn(tween(180)),
+                            exit = fadeOut(tween(120))
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp, bottom = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                LazyRow(
+                                    state = monthPillListState,
+                                    contentPadding = PaddingValues(horizontal = 20.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    itemsIndexed(monthPages) { index, monthModel ->
+                                        val selected = pagerState.currentPage == index
+                                        val hasMedia = monthModel.totalPhotos > 0
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center,
+                                            modifier = Modifier
+                                                .heightIn(min = 48.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .clickable {
+                                                    scope.launch { pagerState.animateScrollToPage(index) }
+                                                }
+                                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                                .testTag("month_pill_${monthModel.month}")
+                                        ) {
+                                            // Subtle watchmaker tick above month numeral
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(if (selected) 2.dp else 1.dp)
+                                                    .height(if (selected) 6.dp else 4.dp)
+                                                    .clip(CircleShape)
+                                                    .background(
+                                                        when {
+                                                            selected -> CobaltPrimary
+                                                            monthModel.isCleaned -> EmeraldKeep
+                                                            hasMedia -> InkTertiary.copy(alpha = 0.45f)
+                                                            else -> InkTertiary.copy(alpha = 0.20f)
+                                                        }
+                                                    )
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                            ) {
+                                                Text(
+                                                    text = monthChineseName(monthModel.month),
+                                                    fontFamily = if (selected) OutfitFontFamily else JetBrainsMonoFontFamily,
+                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                                    fontSize = if (selected) 14.sp else 12.sp,
+                                                    color = when {
+                                                        selected -> InkPrimary
+                                                        monthModel.isCleaned -> EmeraldKeep
+                                                        hasMedia -> InkSecondary
+                                                        else -> InkTertiary.copy(alpha = 0.50f)
+                                                    }
+                                                )
+                                                if (monthModel.isCleaned) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(5.dp)
+                                                            .clip(CircleShape)
+                                                            .background(if (selected) SolarAmber else EmeraldKeep)
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(if (selected) 20.dp else 0.dp)
+                                                    .height(2.dp)
+                                                    .clip(CircleShape)
+                                                    .background(if (selected) InkPrimary else Color.Transparent)
+                                            )
+                                        }
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .width(if (selected) 20.dp else 0.dp)
-                                        .height(2.dp)
-                                        .clip(CircleShape)
-                                        .background(if (selected) InkPrimary else Color.Transparent)
-                                )
                             }
                         }
                     }
                 }
+            }
+
+            // Floating 4-Action Obsidian Glass Bulk Action Capsule — unified with Main Gallery
+            AnimatedVisibility(
+                visible = isSelectionMode,
+                enter = fadeIn(tween(200)) + slideInVertically(
+                    initialOffsetY = { it / 2 },
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                ),
+                exit = fadeOut(tween(150)) + slideOutVertically(
+                    targetOffsetY = { it / 2 },
+                    animationSpec = tween(150)
+                ),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .widthIn(max = 420.dp)
+                        .pointerInput(Unit) {}
+                ) {
+                    FloatingBulkActionBar(
+                        selectedCount = selectedPhotos.size,
+                        onKeep = {
+                            if (selectedPhotos.isNotEmpty()) {
+                                haptics.swipeKeepConfirm()
+                                onBulkKeepPhotos(selectedPhotos, false)
+                                exitSelectionMode()
+                            }
+                        },
+                        onFavorite = {
+                            if (selectedPhotos.isNotEmpty()) {
+                                haptics.swipeKeepConfirm()
+                                onBulkKeepPhotos(selectedPhotos, true)
+                                exitSelectionMode()
+                            }
+                        },
+                        onTrash = {
+                            if (selectedPhotos.isNotEmpty()) {
+                                haptics.swipeDeleteConfirm()
+                                onBulkTrashPhotos(selectedPhotos)
+                                exitSelectionMode()
+                            }
+                        },
+                        onMore = {
+                            if (selectedPhotos.isNotEmpty()) {
+                                haptics.pageFlipLift()
+                                showMoreActionsSheet = true
+                            }
+                        }
+                    )
                 }
             }
         }
+    }
+
+    if (showMoreActionsSheet && selectedPhotos.isNotEmpty()) {
+        GalleryMoreBatchActionsSheet(
+            selectedCount = selectedPhotos.size,
+            compressibleCount = selectedCompressibleCount,
+            missingLocationCount = selectedMissingLocationCount,
+            onCompress = {
+                showMoreActionsSheet = false
+                showCompressSheet = true
+            },
+            onEditLocation = {
+                showMoreActionsSheet = false
+                showLocationSheet = true
+            },
+            onMove = {
+                showMoreActionsSheet = false
+                showMoveSheet = true
+            },
+            onDismiss = { showMoreActionsSheet = false }
+        )
+    }
+
+    if (showMoveSheet && selectedPhotos.isNotEmpty()) {
+        val yearsList = remember(availableYears, year) {
+            availableYears.ifEmpty { listOf(year) }
+        }
+        BulkMoveDestinationSheet(
+            selectedCount = selectedPhotos.size,
+            selectedBytes = selectedBytes,
+            existingAlbums = existingAlbums,
+            availableYears = yearsList,
+            defaultYear = selectedPhotos.firstOrNull()?.year ?: year,
+            defaultMonth = selectedPhotos.firstOrNull()?.month ?: activeMonthPage?.month ?: 1,
+            onDismiss = { showMoveSheet = false },
+            onConfirmMove = { albumName, targetYear, targetMonth ->
+                haptics.swipeKeepConfirm()
+                onBulkMovePhotos(selectedPhotos, albumName, targetYear, targetMonth)
+                showMoveSheet = false
+                exitSelectionMode()
+            }
+        )
+    }
+
+    if (showCompressSheet && selectedPhotos.isNotEmpty()) {
+        BatchCompressBottomSheet(
+            selectedPhotos = selectedPhotos,
+            onDismiss = { showCompressSheet = false },
+            onConfirmCompress = { preset ->
+                haptics.swipeKeepConfirm()
+                onBatchCompress(selectedPhotos, preset)
+                showCompressSheet = false
+                exitSelectionMode()
+            }
+        )
+    }
+
+    if (showLocationSheet && selectedPhotos.isNotEmpty()) {
+        val referencePhotos = remember(allPhotos, monthPages) {
+            allPhotos.ifEmpty { monthPages.flatMap { it.photos } }
+        }
+        val sameDayMatches = remember(selectedPhotos, referencePhotos) {
+            inferSameDayLocations(selectedPhotos, referencePhotos)
+        }
+        BatchLocationEditorSheet(
+            targetPhotos = selectedPhotos,
+            existingClusters = locationClusters,
+            sameDayMatches = sameDayMatches,
+            onResolveQuery = onGeocodeLocation,
+            onApplySameDayInference = { matches, writeExif ->
+                haptics.swipeKeepConfirm()
+                onBatchSameDayLocation(matches, writeExif)
+                showLocationSheet = false
+                exitSelectionMode()
+            },
+            onConfirmManualLocation = { locName, lat, lon, writeExif ->
+                haptics.swipeKeepConfirm()
+                onBatchManualLocation(selectedPhotos, locName, lat, lon, writeExif)
+                showLocationSheet = false
+                exitSelectionMode()
+            },
+            onDismiss = { showLocationSheet = false }
+        )
     }
 
     lightboxPhoto?.let { photo ->
@@ -501,14 +862,16 @@ private fun FlipbookViewModeSwitch(
     val isDark = LocalIsDarkTheme.current
     val palette = LocalFlipYearPalette.current
     val activeBrush = activeChromeSatinBrush()
+    val density = LocalDensity.current
     val segmentWidth = 62.dp
+    val segmentWidthPx = with(density) { segmentWidth.toPx() }
     val trackPadding = 3.dp
     val trackHeight = 38.dp
     val thumbHeight = trackHeight - trackPadding * 2
     val totalWidth = segmentWidth * 2 + trackPadding * 2
 
-    val thumbOffsetX by animateDpAsState(
-        targetValue = if (showGalleryMode) segmentWidth else 0.dp,
+    val thumbOffsetPxState = animateFloatAsState(
+        targetValue = if (showGalleryMode) segmentWidthPx else 0f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow
@@ -552,29 +915,24 @@ private fun FlipbookViewModeSwitch(
             .width(totalWidth)
             .height(48.dp)
     ) {
-        // Visual 38dp frosted glass housing (exact same height & finish as left back orb)
+        // Visual 38dp frosted glass housing (zero HWUI shadow on translucent pill)
         Box(
             modifier = Modifier
                 .width(totalWidth)
                 .height(trackHeight)
-                .shadow(
-                    elevation = if (isDark) 2.dp else 3.dp,
-                    shape = CircleShape,
-                    spotColor = if (isDark) Color.Black.copy(alpha = 0.45f) else InkPrimary.copy(alpha = 0.14f)
-                )
                 .clip(CircleShape)
-                .background(if (isDark) SurfacePure.copy(alpha = 0.72f) else SurfacePure.copy(alpha = 0.90f))
+                .background(if (isDark) SurfacePure.copy(alpha = 0.80f) else SurfacePure.copy(alpha = 0.94f))
                 .border(
-                    width = 0.85.dp,
+                    width = 0.95.dp,
                     color = if (isDark) HairlineBorder else GlassSpecularRimStart,
                     shape = CircleShape
                 )
                 .padding(trackPadding)
         ) {
-            // Sliding sculpted satin active indicator
+            // Sliding sculpted satin active indicator (draw-phase translationX -> zero layout passes!)
             Box(
                 modifier = Modifier
-                    .offset(x = thumbOffsetX)
+                    .graphicsLayer { translationX = thumbOffsetPxState.value }
                     .width(segmentWidth)
                     .height(thumbHeight)
                     .clip(CircleShape)
@@ -683,10 +1041,18 @@ private fun FlipbookViewModeSwitch(
 @Composable
 private fun ModernCalendarBookPage(
     page: MonthPageModel,
-    pageOffset: Float,
+    isCurrentPage: Boolean,
+    pageOffsetProvider: () -> Float,
     animateBadge: Boolean,
     showGalleryMode: Boolean,
     timelineSortOrder: TimelineSortOrder,
+    galleryColumns: Int,
+    galleryZoomTier: GalleryZoomTier,
+    onGalleryZoomTierChanged: (GalleryZoomTier) -> Unit,
+    isSelectionMode: Boolean,
+    selectedPhotoIds: Set<Long>,
+    onToggleSelectPhotos: (List<PhotoItemEntity>) -> Unit,
+    onLongPressSelectPhotos: (List<PhotoItemEntity>) -> Unit,
     expandedBurstIds: Set<String>,
     onToggleBurst: (String) -> Unit,
     onSelectBestInBurst: (String, Long) -> Unit,
@@ -696,13 +1062,7 @@ private fun ModernCalendarBookPage(
     onCleanClick: () -> Unit,
     onDayClick: (Int) -> Unit
 ) {
-    val absOffset = pageOffset.absoluteValue.coerceIn(0f, 1f)
-    // Realistic left-spine hardcover hinge: turning pages pivot along the bound left spine (x=0.06f)
-    // with restrained perspective angle so the page glides cleanly without clipping header/footer chrome.
-    val rotationDeg = (-pageOffset * 20f).coerceIn(-24f, 24f)
-    val scale = lerp(1f, 0.92f, absOffset)
-    val pageAlpha = lerp(1f, 0.76f, absOffset)
-    val pageShape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 22.dp, bottomEnd = 22.dp)
+    val pageShape = remember { RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 22.dp, bottomEnd = 22.dp) }
 
     val isDark = LocalIsDarkTheme.current
     val pageShadowColor = if (isDark) Color.Black.copy(alpha = 0.55f) else InkPrimary.copy(alpha = 0.14f)
@@ -711,16 +1071,20 @@ private fun ModernCalendarBookPage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .zIndex(1f - absOffset)
+            .zIndex(if (isCurrentPage) 2f else 1f)
             .graphicsLayer {
+                val pageOffset = pageOffsetProvider().coerceIn(-1f, 1f)
+                val absOffset = pageOffset.absoluteValue.coerceIn(0f, 1f)
+                // Realistic left-spine hardcover hinge evaluated strictly in draw phase (0 recompositions!)
                 transformOrigin = TransformOrigin(0.06f, 0.5f)
-                rotationY = rotationDeg
+                rotationY = (-pageOffset * 20f).coerceIn(-24f, 24f)
+                val scale = lerp(1f, 0.92f, absOffset)
                 scaleX = scale
                 scaleY = scale
-                alpha = pageAlpha
+                alpha = lerp(1f, 0.76f, absOffset)
                 cameraDistance = 26f * density
             }
-            .shadow(elevation = lerp(12f, 4f, absOffset).dp, shape = pageShape, spotColor = pageShadowColor)
+            .shadow(elevation = 8.dp, shape = pageShape, spotColor = pageShadowColor)
             .clip(pageShape)
             .background(SurfacePure)
             .border(1.dp, HairlineBorder, pageShape)
@@ -791,15 +1155,51 @@ private fun ModernCalendarBookPage(
                             if (page.burstGroupCount > 0) append(" · ${page.burstGroupCount} 组连拍")
                         }
                     }
-                    Text(
-                        text = editorialMetaLine,
-                        fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = InkSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = editorialMetaLine,
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = InkSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (showGalleryMode && page.totalPhotos > 0) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            GallerySelectableChip(
+                                selected = galleryZoomTier.isWaterfall,
+                                onClick = {
+                                    val next = if (galleryZoomTier.isWaterfall) {
+                                        defaultGalleryZoomTier(galleryColumns)
+                                    } else {
+                                        GalleryZoomTier.WATERFALL_2
+                                    }
+                                    onGalleryZoomTierChanged(next)
+                                },
+                                modifier = Modifier.testTag("flipbook_waterfall_toggle_${page.month}")
+                            ) {
+                                Icon(
+                                    imageVector = if (galleryZoomTier.isWaterfall) Icons.Filled.Dashboard else Icons.Filled.GridView,
+                                    contentDescription = if (galleryZoomTier.isWaterfall) "切换为标准网格" else "展开大图瀑布流",
+                                    tint = if (galleryZoomTier.isWaterfall) SolarAmber else CobaltPrimary,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text(
+                                    text = if (galleryZoomTier.isWaterfall) galleryZoomTier.shortChipLabel else "瀑布流",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (galleryZoomTier.isWaterfall) Color.White else InkPrimary
+                                )
+                            }
+                        }
+                    }
                 }
 
                 if (page.isCleaned) {
@@ -848,83 +1248,124 @@ private fun ModernCalendarBookPage(
                         textAlign = TextAlign.Center
                     )
                 }
-            } else if (showGalleryMode) {
-                val monthGalleryEntries = remember(page.photos, timelineSortOrder) {
-                    com.example.ui.domain.LibraryDerivationEngine.buildGalleryEntries(
-                        photos = page.photos.filter { it.photoStatus != PhotoStatus.TRASHED },
-                        sortOrder = timelineSortOrder
-                    )
-                }
-
-                BurstGalleryGrid(
-                    entries = monthGalleryEntries,
-                    expandedBurstIds = expandedBurstIds,
-                    onToggleBurst = onToggleBurst,
-                    onSelectBestInBurst = onSelectBestInBurst,
-                    onKeepBestInBurst = onKeepBestInBurst,
-                    onTrashSinglePhoto = onTrashPhoto,
-                    onPhotoClick = onPhotoClick,
-                    columns = 3,
-                    contentPadding = PaddingValues(vertical = 4.dp),
+            } else {
+                AnimatedContent(
+                    targetState = showGalleryMode,
+                    transitionSpec = {
+                        val enter = fadeIn(tween(185, easing = FastOutSlowInEasing)) +
+                            slideInHorizontally(tween(205, easing = FastOutSlowInEasing)) { width ->
+                                if (targetState) width / 14 else -width / 14
+                            }
+                        val exit = fadeOut(tween(120)) +
+                            slideOutHorizontally(tween(145, easing = FastOutSlowInEasing)) { width ->
+                                if (targetState) -width / 16 else width / 16
+                            }
+                        enter togetherWith exit
+                    },
+                    label = "flipbook_calendar_gallery_switch",
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .testTag("flipbook_month_gallery_${page.month}")
-                )
-            } else {
-                // Modern Monthly Calendar Grid
-                MonthCalendarGrid(
-                    page = page,
-                    onDayClick = onDayClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                )
-            }
+                ) { galleryActive ->
+                    if (galleryActive) {
+                        val monthGalleryEntries = remember(page.photos, timelineSortOrder) {
+                            com.example.ui.domain.LibraryDerivationEngine.buildGalleryEntries(
+                                photos = page.photos.filter { it.photoStatus != PhotoStatus.TRASHED },
+                                sortOrder = timelineSortOrder
+                            )
+                        }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Footer CTA — sculpted satin hero button with embedded telemetry badge
-            if (page.totalPhotos > 0) {
-                val monthName = monthChineseName(page.month)
-                val isCleanup = page.unreviewedCount > 0
-                val badge = if (isCleanup) {
-                    "待清 ${page.unreviewedCount} · ${formatStorageSize(page.reclaimableBytes)}"
-                } else {
-                    "已归档 ${page.keptCount}"
+                        BurstGalleryGrid(
+                            entries = monthGalleryEntries,
+                            expandedBurstIds = expandedBurstIds,
+                            onToggleBurst = onToggleBurst,
+                            onSelectBestInBurst = onSelectBestInBurst,
+                            onKeepBestInBurst = onKeepBestInBurst,
+                            onTrashSinglePhoto = onTrashPhoto,
+                            onPhotoClick = onPhotoClick,
+                            columns = galleryColumns.coerceIn(3, 4),
+                            contentPadding = PaddingValues(
+                                top = 4.dp,
+                                bottom = if (isSelectionMode) 82.dp else 4.dp
+                            ),
+                            isSelectionMode = isSelectionMode,
+                            selectedPhotoIds = selectedPhotoIds,
+                            onToggleSelectPhotos = onToggleSelectPhotos,
+                            onLongPressSelectPhotos = onLongPressSelectPhotos,
+                            zoomTier = galleryZoomTier,
+                            onZoomTierChanged = onGalleryZoomTierChanged,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag("flipbook_month_gallery_${page.month}")
+                        )
+                    } else {
+                        // Modern Monthly Calendar Grid
+                        MonthCalendarGrid(
+                            page = page,
+                            onDayClick = onDayClick,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
-                GallerySculptedHeroButton(
-                    title = if (isCleanup) "直接开始 ${monthName}清理" else "重温 ${monthName}回忆",
-                    leadingIcon = if (isCleanup) Icons.Filled.CleaningServices else Icons.Filled.AutoAwesome,
-                    badgeText = badge,
-                    tone = GalleryButtonTone.OBSIDIAN,
-                    height = 52.dp,
-                    onClick = onCleanClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("clean_month_button_${page.month}")
-                )
-            } else {
-                Text(
-                    text = "本月无媒体记录",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = InkTertiary,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                )
+            }
+
+            // Footer CTA — sculpted satin hero button with embedded telemetry badge (smoothly hidden during multi-select)
+            AnimatedVisibility(
+                visible = !isSelectionMode,
+                enter = fadeIn(tween(180)),
+                exit = fadeOut(tween(120))
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    if (page.totalPhotos > 0) {
+                        val monthName = monthChineseName(page.month)
+                        val isCleanup = page.unreviewedCount > 0
+                        val badge = if (isCleanup) {
+                            "待清 ${page.unreviewedCount} · ${formatStorageSize(page.reclaimableBytes)}"
+                        } else {
+                            "已归档 ${page.keptCount}"
+                        }
+                        GallerySculptedHeroButton(
+                            title = if (isCleanup) "直接开始 ${monthName}清理" else "重温 ${monthName}回忆",
+                            leadingIcon = if (isCleanup) Icons.Filled.CleaningServices else Icons.Filled.AutoAwesome,
+                            badgeText = badge,
+                            tone = GalleryButtonTone.OBSIDIAN,
+                            height = 52.dp,
+                            onClick = onCleanClick,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("clean_month_button_${page.month}")
+                        )
+                    } else {
+                        Text(
+                            text = "本月无媒体记录",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = InkTertiary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        )
+                    }
+                }
             }
         }
 
-        if (absOffset > 0.02f) {
-            val turnShadeColor = if (isDark) Color.Black else InkPrimary
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(turnShadeColor.copy(alpha = (absOffset * if (isDark) 0.24f else 0.12f).coerceIn(0f, 0.26f)))
-            )
-        }
+        val turnShadeColor = if (isDark) Color.Black else InkPrimary
+        val maxShadeAlpha = if (isDark) 0.24f else 0.12f
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val absOffset = pageOffsetProvider().absoluteValue.coerceIn(0f, 1f)
+                    alpha = if (absOffset > 0.02f) {
+                        (absOffset * maxShadeAlpha).coerceIn(0f, 0.26f)
+                    } else {
+                        0f
+                    }
+                }
+                .background(turnShadeColor)
+        )
     }
 }
 
