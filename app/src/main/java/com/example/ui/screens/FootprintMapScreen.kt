@@ -176,6 +176,8 @@ fun FootprintMapScreen(
     var tileFailedCount by remember(mapStyle, tileRetryTrigger) { mutableIntStateOf(0) }
 
     val showingUnlocated = selectedLocationName == UNLOCATED_LOCATION_KEY && unlocatedPhotos.isNotEmpty()
+    // 详情卡展开态（默认展开；显式按钮已移除，由竖拖/卡头点按驱动）
+    var isCardExpanded by rememberSaveable { mutableStateOf(true) }
     val selectedCluster = remember(clusters, selectedLocationName, showingUnlocated, mapStyle) {
         if (showingUnlocated) {
             null
@@ -319,12 +321,11 @@ fun FootprintMapScreen(
         // 纯描边 Canvas，不注册 pointerInput，手势完全穿透到地图。
         // 画框顶线在状态栏下方（遥测卡下移入框内）；底线停在停靠栏上方——
         // floatingDockInset 只含 dock 高度，须再叠加系统导航条 inset，否则底线被 dock 吞掉
-        val hasBottomCardEarly = selectedCluster != null || showingUnlocated
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(bottom = floatingDockInset + (if (hasBottomCardEarly) 292.dp else 44.dp))
+                .padding(bottom = floatingDockInset + 10.dp)
                 .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(top = 8.dp)
         ) {
@@ -373,7 +374,7 @@ fun FootprintMapScreen(
                 .navigationBarsPadding()
                 .padding(
                     start = 24.dp,
-                    bottom = 14.dp + floatingDockInset + if (selectedCluster != null || showingUnlocated) 306.dp else 0.dp
+                    bottom = 14.dp + floatingDockInset + if (selectedCluster != null || showingUnlocated) 132.dp else 0.dp
                 )
         )
 
@@ -656,7 +657,8 @@ fun FootprintMapScreen(
         val density = LocalDensity.current
         val targetControlsShiftPx = with(density) {
             when {
-                hasBottomCard -> -244.dp.toPx()
+                hasBottomCard && isCardExpanded -> -244.dp.toPx()
+                hasBottomCard -> -102.dp.toPx()
                 else -> 0f
             }
         }
@@ -669,9 +671,9 @@ fun FootprintMapScreen(
             label = "map_controls_clearance"
         )
 
-        // 详情卡常显（缩略图轨道 + 朱红通栏），高度≈展开态
         val railBottomClearance = when {
-            hasBottomCard -> 268.dp + floatingDockInset
+            hasBottomCard && isCardExpanded -> 268.dp + floatingDockInset
+            hasBottomCard -> 124.dp + floatingDockInset
             else -> 36.dp + floatingDockInset
         }
 
@@ -888,6 +890,17 @@ fun FootprintMapScreen(
                             stiffness = Spring.StiffnessMediumLow
                         )
                     )
+                    .pointerInput(Unit) {
+                        var totalDrag = 0f
+                        detectVerticalDragGestures(
+                            onDragStart = { totalDrag = 0f },
+                            onVerticalDrag = { _, dragAmount -> totalDrag += dragAmount },
+                            onDragEnd = {
+                                if (totalDrag < -36f) isCardExpanded = true
+                                else if (totalDrag > 36f) isCardExpanded = false
+                            }
+                        )
+                    }
                     .testTag("unlocated_detail_card")
             ) {
                 Column(
@@ -908,7 +921,8 @@ fun FootprintMapScreen(
                                         else if (totalDx > 48f) stepFootprintStop(-1)
                                     }
                                 )
-                            },
+                            }
+                            .clickable { isCardExpanded = !isCardExpanded },
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -937,8 +951,9 @@ fun FootprintMapScreen(
 
                     }
 
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        val orderedUnlocated = remember(unlocatedPhotos, uiState.timelineSortOrder) {
+                    AnimatedVisibility(visible = isCardExpanded) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            val orderedUnlocated = remember(unlocatedPhotos, uiState.timelineSortOrder) {
                                 when (uiState.timelineSortOrder) {
                                     TimelineSortOrder.NEWEST_FIRST -> unlocatedPhotos.sortedByDescending { it.takenAtMillis }
                                     TimelineSortOrder.OLDEST_FIRST -> unlocatedPhotos.sortedBy { it.takenAtMillis }
@@ -968,6 +983,7 @@ fun FootprintMapScreen(
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
+                    }
                 }
             }
         } else selectedCluster?.let { activeCluster ->
@@ -981,6 +997,17 @@ fun FootprintMapScreen(
                             stiffness = Spring.StiffnessMediumLow
                         )
                     )
+                    .pointerInput(Unit) {
+                        var totalDrag = 0f
+                        detectVerticalDragGestures(
+                            onDragStart = { totalDrag = 0f },
+                            onVerticalDrag = { _, dragAmount -> totalDrag += dragAmount },
+                            onDragEnd = {
+                                if (totalDrag < -36f) isCardExpanded = true
+                                else if (totalDrag > 36f) isCardExpanded = false
+                            }
+                        )
+                    }
                     .testTag("location_detail_card")
             ) {
                 AnimatedContent(
@@ -1013,7 +1040,8 @@ fun FootprintMapScreen(
                                         else if (totalDx > 48f) stepFootprintStop(-1)
                                     }
                                 )
-                            },
+                            }
+                            .clickable { isCardExpanded = !isCardExpanded },
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1085,8 +1113,9 @@ fun FootprintMapScreen(
                         }
                     }
 
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        val orderedClusterPhotos = remember(cluster.photos, uiState.timelineSortOrder) {
+                    AnimatedVisibility(visible = isCardExpanded) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            val orderedClusterPhotos = remember(cluster.photos, uiState.timelineSortOrder) {
                                 when (uiState.timelineSortOrder) {
                                     TimelineSortOrder.NEWEST_FIRST -> cluster.photos.sortedByDescending { it.takenAtMillis }
                                     TimelineSortOrder.OLDEST_FIRST -> cluster.photos.sortedBy { it.takenAtMillis }
@@ -1122,6 +1151,7 @@ fun FootprintMapScreen(
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
+                    }
                 }
                 }
             }
