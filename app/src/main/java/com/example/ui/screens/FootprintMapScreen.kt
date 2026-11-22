@@ -45,8 +45,6 @@ import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.EditLocationAlt
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.GpsFixed
@@ -164,7 +162,6 @@ fun FootprintMapScreen(
     val totalVisibleCount = locatedCount + unlocatedPhotos.size
 
     var selectedLocationName by rememberSaveable { mutableStateOf<String?>(null) }
-    var isCardExpanded by rememberSaveable { mutableStateOf(false) }
     var showMapZoomControls by rememberSaveable { mutableStateOf(false) }
     var lightboxPhoto by remember { mutableStateOf<PhotoItemEntity?>(null) }
     var lightboxPhotos by remember { mutableStateOf<List<PhotoItemEntity>>(emptyList()) }
@@ -274,11 +271,7 @@ fun FootprintMapScreen(
     val commitFootprintStop: (FootprintScrubStop, Boolean) -> Unit = { stop, shouldExpand ->
         selectedLocationName = stop.id
         if (stop.isUnlocated) {
-            isCardExpanded = true
         } else {
-            if (shouldExpand) {
-                isCardExpanded = true
-            }
             cameraState.animateToLatLng(
                 scope = scope,
                 lat = stop.latitude,
@@ -313,7 +306,6 @@ fun FootprintMapScreen(
             mapStyle = mapStyle,
             onSelectCluster = { cluster ->
                 selectedLocationName = cluster.locationName
-                isCardExpanded = true
             },
             tileRetryTrigger = tileRetryTrigger,
             onTileStatusChanged = { loaded, failed ->
@@ -327,11 +319,12 @@ fun FootprintMapScreen(
         // 纯描边 Canvas，不注册 pointerInput，手势完全穿透到地图。
         // 画框顶线在状态栏下方（遥测卡下移入框内）；底线停在停靠栏上方——
         // floatingDockInset 只含 dock 高度，须再叠加系统导航条 inset，否则底线被 dock 吞掉
+        val hasBottomCardEarly = selectedCluster != null || showingUnlocated
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(bottom = floatingDockInset + 10.dp)
+                .padding(bottom = floatingDockInset + (if (hasBottomCardEarly) 292.dp else 44.dp))
                 .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(top = 8.dp)
         ) {
@@ -380,7 +373,7 @@ fun FootprintMapScreen(
                 .navigationBarsPadding()
                 .padding(
                     start = 24.dp,
-                    bottom = 14.dp + floatingDockInset + if (selectedCluster != null || showingUnlocated) 132.dp else 0.dp
+                    bottom = 14.dp + floatingDockInset + if (selectedCluster != null || showingUnlocated) 306.dp else 0.dp
                 )
         )
 
@@ -663,8 +656,7 @@ fun FootprintMapScreen(
         val density = LocalDensity.current
         val targetControlsShiftPx = with(density) {
             when {
-                hasBottomCard && isCardExpanded -> -244.dp.toPx()
-                hasBottomCard -> -102.dp.toPx()
+                hasBottomCard -> -244.dp.toPx()
                 else -> 0f
             }
         }
@@ -677,9 +669,9 @@ fun FootprintMapScreen(
             label = "map_controls_clearance"
         )
 
+        // 详情卡常显（缩略图轨道 + 朱红通栏），高度≈展开态
         val railBottomClearance = when {
-            hasBottomCard && isCardExpanded -> 268.dp + floatingDockInset
-            hasBottomCard -> 124.dp + floatingDockInset
+            hasBottomCard -> 268.dp + floatingDockInset
             else -> 36.dp + floatingDockInset
         }
 
@@ -856,7 +848,6 @@ fun FootprintMapScreen(
                                     text = "查看 (${unlocatedPhotos.size})",
                                     onClick = {
                                         selectedLocationName = UNLOCATED_LOCATION_KEY
-                                        isCardExpanded = true
                                     },
                                     modifier = Modifier.weight(0.85f)
                                 )
@@ -897,32 +888,12 @@ fun FootprintMapScreen(
                             stiffness = Spring.StiffnessMediumLow
                         )
                     )
-                    .pointerInput(Unit) {
-                        var totalDrag = 0f
-                        detectVerticalDragGestures(
-                            onDragStart = { totalDrag = 0f },
-                            onVerticalDrag = { _, dragAmount -> totalDrag += dragAmount },
-                            onDragEnd = {
-                                if (totalDrag < -36f) isCardExpanded = true
-                                else if (totalDrag > 36f) isCardExpanded = false
-                            }
-                        )
-                    }
                     .testTag("unlocated_detail_card")
             ) {
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // 拖拽提手：金短杠
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .width(36.dp)
-                            .height(3.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(gold.copy(alpha = 0.60f))
-                    )
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -937,8 +908,7 @@ fun FootprintMapScreen(
                                         else if (totalDx > 48f) stepFootprintStop(-1)
                                     }
                                 )
-                            }
-                            .clickable { isCardExpanded = !isCardExpanded },
+                            },
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -965,29 +935,10 @@ fun FootprintMapScreen(
                             )
                         }
 
-                        if (scrubStops.size >= 2) {
-                            CompactLocationStepper(
-                                onPrevious = { stepFootprintStop(-1) },
-                                onNext = { stepFootprintStop(+1) }
-                            )
-                        }
-
-                        // 画报展开/收起方钮（HEAD 保留的显式开合暗示）
-                        IconButton(
-                            onClick = { isCardExpanded = !isCardExpanded },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isCardExpanded) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
-                                contentDescription = if (isCardExpanded) "收起卡片" else "展开卡片",
-                                tint = ink.copy(alpha = 0.75f)
-                            )
-                        }
                     }
 
-                    AnimatedVisibility(visible = isCardExpanded) {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            val orderedUnlocated = remember(unlocatedPhotos, uiState.timelineSortOrder) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        val orderedUnlocated = remember(unlocatedPhotos, uiState.timelineSortOrder) {
                                 when (uiState.timelineSortOrder) {
                                     TimelineSortOrder.NEWEST_FIRST -> unlocatedPhotos.sortedByDescending { it.takenAtMillis }
                                     TimelineSortOrder.OLDEST_FIRST -> unlocatedPhotos.sortedBy { it.takenAtMillis }
@@ -1017,7 +968,6 @@ fun FootprintMapScreen(
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
-                    }
                 }
             }
         } else selectedCluster?.let { activeCluster ->
@@ -1031,17 +981,6 @@ fun FootprintMapScreen(
                             stiffness = Spring.StiffnessMediumLow
                         )
                     )
-                    .pointerInput(Unit) {
-                        var totalDrag = 0f
-                        detectVerticalDragGestures(
-                            onDragStart = { totalDrag = 0f },
-                            onVerticalDrag = { _, dragAmount -> totalDrag += dragAmount },
-                            onDragEnd = {
-                                if (totalDrag < -36f) isCardExpanded = true
-                                else if (totalDrag > 36f) isCardExpanded = false
-                            }
-                        )
-                    }
                     .testTag("location_detail_card")
             ) {
                 AnimatedContent(
@@ -1060,14 +999,6 @@ fun FootprintMapScreen(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .width(36.dp)
-                            .height(3.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(gold.copy(alpha = 0.60f))
-                    )
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1082,8 +1013,7 @@ fun FootprintMapScreen(
                                         else if (totalDx > 48f) stepFootprintStop(-1)
                                     }
                                 )
-                            }
-                            .clickable { isCardExpanded = !isCardExpanded },
+                            },
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1152,33 +1082,11 @@ fun FootprintMapScreen(
                                 verm = verm,
                                 gold = gold
                             )
-
-                            IconButton(
-                                onClick = { isCardExpanded = !isCardExpanded },
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .testTag("toggle_location_card_button")
-                            ) {
-                                Icon(
-                                    imageVector = if (isCardExpanded) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
-                                    contentDescription = if (isCardExpanded) "收起卡片" else "展开卡片",
-                                    tint = ink.copy(alpha = 0.75f)
-                                )
-                            }
-
-                            // theirs 新增：单手地点快切步进器（逻辑原样保留）
-                            if (scrubStops.size >= 2) {
-                                CompactLocationStepper(
-                                    onPrevious = { stepFootprintStop(-1) },
-                                    onNext = { stepFootprintStop(+1) }
-                                )
-                            }
                         }
                     }
 
-                    AnimatedVisibility(visible = isCardExpanded) {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            val orderedClusterPhotos = remember(cluster.photos, uiState.timelineSortOrder) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        val orderedClusterPhotos = remember(cluster.photos, uiState.timelineSortOrder) {
                                 when (uiState.timelineSortOrder) {
                                     TimelineSortOrder.NEWEST_FIRST -> cluster.photos.sortedByDescending { it.takenAtMillis }
                                     TimelineSortOrder.OLDEST_FIRST -> cluster.photos.sortedBy { it.takenAtMillis }
@@ -1214,7 +1122,6 @@ fun FootprintMapScreen(
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
-                    }
                 }
                 }
             }
@@ -1380,59 +1287,4 @@ private fun DecoGhostButton(
     }
 }
 
-/** theirs 新增：底部卡头单手地点步进器（逻辑与 testTag 原样保留，样式画报化：纸面 + 金发丝描边） */
-@Composable
-private fun CompactLocationStepper(
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val palette = LocalFlipYearPalette.current
-    val gold = palette.decoGold
-    val ink = palette.decoInkOnGround
-    val pillShape = RoundedCornerShape(3.dp)
-    Row(
-        modifier = modifier
-            .height(34.dp)
-            .clip(pillShape)
-            .background(ink.copy(alpha = 0.05f))
-            .border(0.8.dp, gold.copy(alpha = 0.55f), pillShape),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(width = 34.dp, height = 34.dp)
-                .clickable(onClick = onPrevious)
-                .testTag("map_prev_location_button")
-        ) {
-            Icon(
-                imageVector = Icons.Filled.ChevronLeft,
-                contentDescription = stringResource(R.string.cd_footprint_prev_location),
-                tint = ink,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-        Box(
-            modifier = Modifier
-                .width(0.8.dp)
-                .height(16.dp)
-                .background(gold.copy(alpha = 0.45f))
-        )
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(width = 34.dp, height = 34.dp)
-                .clickable(onClick = onNext)
-                .testTag("map_next_location_button")
-        ) {
-            Icon(
-                imageVector = Icons.Filled.ChevronRight,
-                contentDescription = stringResource(R.string.cd_footprint_next_location),
-                tint = ink,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-    }
-}
 
