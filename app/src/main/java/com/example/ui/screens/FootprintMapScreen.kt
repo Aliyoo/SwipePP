@@ -325,9 +325,9 @@ fun FootprintMapScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars)
-                // 上下外扩：顶线贴状态栏下缘；底线落进「卡片-底座」10dp 缝隙正中（避开卡片投影）
-                .padding(bottom = (floatingDockInset - 2.dp).coerceAtLeast(4.dp))
-                .windowInsetsPadding(WindowInsets.navigationBars)
+                // 上下外扩：顶线贴状态栏下缘；底线落进「卡片-底座」缝隙正中
+                //（floatingDockInset 已含导航条，勿再叠加 navigationBars）
+                .padding(bottom = floatingDockInset + 10.dp)
                 .padding(top = 2.dp)
         ) {
             val frameInset = 7.dp.toPx()
@@ -372,7 +372,6 @@ fun FootprintMapScreen(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 // 题签上抬：避开导航条 + 停靠栏 + 底部地点卡（与画框底线同源 clearance）
-                .navigationBarsPadding()
                 .padding(
                     start = 24.dp,
                     bottom = 14.dp + floatingDockInset + if (selectedCluster != null || showingUnlocated) 132.dp else 0.dp
@@ -882,7 +881,7 @@ fun FootprintMapScreen(
             val totalBytes = remember(unlocatedPhotos) { unlocatedPhotos.sumOf { it.fileSizeBytes } }
 
             DecoPosterPanel(
-                shadowElevation = 14.dp,
+                shadowElevation = 8.dp,
                 modifier = Modifier
                     .fillMaxWidth()
                     .animateContentSize(
@@ -989,7 +988,7 @@ fun FootprintMapScreen(
             }
         } else selectedCluster?.let { activeCluster ->
             DecoPosterPanel(
-                shadowElevation = 14.dp,
+                shadowElevation = 8.dp,
                 modifier = Modifier
                     .fillMaxWidth()
                     .animateContentSize(
