@@ -29,7 +29,8 @@ val EditorialSerifFontFamily = FontFamily(
  * 上游字体的囗封闭结构字轮廓同向绕行（TrueType nonzero 下镂空被填成实心块），
  * 经大字号逐字实证，真缺陷仅 8 字：回圃圊徊痼圄崮蛔——已用内轮廓反向修复
  * （回 呈「外环 + 内实心口」，用户确认的小薇原生设计味）；其余字形一律原生保留。
- * 剥离 fpgm/prep/cvt/gasp 提示表保证渲染一致。单字重(400)：Bold/Medium 请求都解析到本字面。
+ * 字库无此字时按用户口径并入同形字：祇浐垊（思源 Bold 经 Cu2Qu）。剥离 fpgm/prep/cvt/gasp
+ * 提示表保证渲染一致。单字重(400)：Bold/Medium 请求都解析到本字面。
  */
 val DecoDisplayFontFamily = FontFamily(
     Font(R.font.zcool_xiaowei, FontWeight.Normal),
