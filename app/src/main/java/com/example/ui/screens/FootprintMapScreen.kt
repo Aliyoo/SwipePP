@@ -311,7 +311,7 @@ fun FootprintMapScreen(
                 .widthIn(max = 640.dp)
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
-                .padding(top = 6.dp),
+                .padding(top = 18.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
@@ -611,7 +611,7 @@ fun FootprintMapScreen(
                 stops = scrubStops,
                 activeIndex = activeStopIndex,
                 onCommitStop = { stop -> commitFootprintStop(stop, false) },
-                topPadding = if (uiState.hasDeviceMedia && !uiState.hasMediaLocationPermission) 144.dp else 68.dp,
+                topPadding = if (uiState.hasDeviceMedia && !uiState.hasMediaLocationPermission) 156.dp else 80.dp,
                 bottomPadding = railBottomClearance,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)

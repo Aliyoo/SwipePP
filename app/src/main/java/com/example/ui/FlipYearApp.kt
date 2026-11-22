@@ -1069,6 +1069,18 @@ private fun FloatingGalleryDock(
             )
         )
     }
+    val activeTopSheenBrush = remember(density) {
+        val sheenFadeEndY = with(density) { 16.dp.toPx() }
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0.0f to Color.White.copy(alpha = 0.34f),
+                0.35f to Color.White.copy(alpha = 0.10f),
+                1.0f to Color.Transparent
+            ),
+            startY = 0f,
+            endY = sheenFadeEndY
+        )
+    }
 
     // Optimistic route responds on frame 0 when tapped, staying synced with NavController backstack
     var visualRoute by remember { mutableStateOf(currentRoute) }
@@ -1152,26 +1164,29 @@ private fun FloatingGalleryDock(
                             size = pillSize,
                             cornerRadius = CornerRadius(cornerPx, cornerPx)
                         )
-                        // Subtle top specular highlight arc
-                        val sheenInset = cornerPx * 0.55f
-                        if (pillSize.width > sheenInset * 2f) {
-                            drawLine(
-                                color = Color.White.copy(alpha = 0.28f),
-                                start = Offset(topLeft.x + sheenInset, 0.75.dp.toPx()),
-                                end = Offset(topLeft.x + pillSize.width - sheenInset, 0.75.dp.toPx()),
-                                strokeWidth = 0.9.dp.toPx()
-                            )
-                        }
-                        // Crisp gradient rim contour
+                        // Crisp gradient rim contour + curved top specular sheen (strictly concentric, zero corner overflow)
                         val strokeWidthPx = 1.dp.toPx()
+                        val rimTopLeft = Offset(topLeft.x + strokeWidthPx / 2f, strokeWidthPx / 2f)
+                        val rimSize = Size(
+                            (pillSize.width - strokeWidthPx).coerceAtLeast(1f),
+                            (pillSize.height - strokeWidthPx).coerceAtLeast(1f)
+                        )
+                        val rimCornerRadius = CornerRadius(
+                            (cornerPx - strokeWidthPx / 2f).coerceAtLeast(0f),
+                            (cornerPx - strokeWidthPx / 2f).coerceAtLeast(0f)
+                        )
                         drawRoundRect(
                             brush = activeRimBrush,
-                            topLeft = Offset(topLeft.x + strokeWidthPx / 2f, strokeWidthPx / 2f),
-                            size = Size(
-                                (pillSize.width - strokeWidthPx).coerceAtLeast(1f),
-                                (pillSize.height - strokeWidthPx).coerceAtLeast(1f)
-                            ),
-                            cornerRadius = CornerRadius(cornerPx, cornerPx),
+                            topLeft = rimTopLeft,
+                            size = rimSize,
+                            cornerRadius = rimCornerRadius,
+                            style = Stroke(width = strokeWidthPx)
+                        )
+                        drawRoundRect(
+                            brush = activeTopSheenBrush,
+                            topLeft = rimTopLeft,
+                            size = rimSize,
+                            cornerRadius = rimCornerRadius,
                             style = Stroke(width = strokeWidthPx)
                         )
                     },
