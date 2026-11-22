@@ -323,13 +323,13 @@ fun FootprintMapScreen(
         )
 
         // 金双线画框：外 1.5dp 金 + mat 内衬带 + 1dp 弱金（deco-app.html GoldFrame 语法）
-        // 纯描边 Canvas，不注册 pointerInput，手势完全穿透到地图；
-        // 画框收进安全区：顶部避开状态栏、底部避开全局停靠栏（floatingDockInset 含导航栏）
+        // 纯描边 Canvas，不注册 pointerInput，手势完全穿透到地图。
+        // 画框顶线在状态栏下方（遥测卡下移入框内），底线停在停靠栏上方
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(top = 6.dp, bottom = floatingDockInset + 10.dp)
+                .padding(top = 8.dp, bottom = floatingDockInset + 10.dp)
         ) {
             val frameInset = 7.dp.toPx()
             val frameRadius = 2.dp.toPx()
@@ -380,13 +380,14 @@ fun FootprintMapScreen(
         )
 
         // Top Compact Telemetry Pill + Map Layer Switcher
+        // 下移入画框内：框线在状态栏下 ~15dp，卡片区再留 12dp 呼吸
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 640.dp)
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
-                .padding(top = 10.dp),
+                .padding(top = 26.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
