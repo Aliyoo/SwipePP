@@ -96,7 +96,10 @@ import com.example.data.PhotoStatus
 import com.example.sensor.rememberHapticEngine
 import com.example.ui.theme.CoralDanger
 import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.EmeraldKeep
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.ObsidianOverlayGlass
@@ -562,7 +565,7 @@ private fun PhotoDetailLightboxContent(
                         fontFamily = JetBrainsMonoFontFamily,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
+                        color = DecoPaperCream,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -579,23 +582,27 @@ private fun PhotoDetailLightboxContent(
                         text = metaLine,
                         fontFamily = JetBrainsMonoFontFamily,
                         fontSize = 11.sp,
-                        color = Color.White.copy(alpha = 0.78f),
+                        color = DecoPaperCream.copy(alpha = 0.72f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
                 // Quality Score Badge with explicit "画质" label (Stage 4)
-                ObsidianGlassPill {
+                Surface(
+                    shape = RoundedCornerShape(3.dp),
+                    color = DecoVerm,
+                    border = BorderStroke(1.dp, DecoPaperCream.copy(alpha = 0.28f))
+                ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Star,
                             contentDescription = null,
-                            tint = SolarAmber,
+                            tint = DecoPaperCream,
                             modifier = Modifier.size(13.dp)
                         )
                         Text(
@@ -603,7 +610,7 @@ private fun PhotoDetailLightboxContent(
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = DecoPaperCream
                         )
                     }
                 }
@@ -797,10 +804,10 @@ private fun LightboxBottomHud(
                                             LightboxActionPill(
                                                 icon = Icons.Filled.DeleteOutline,
                                                 label = "移入回收站",
-                                                containerColor = Color.White.copy(alpha = 0.08f),
-                                                iconTint = Color(0xFFFF7A8A),
-                                                labelColor = Color.White.copy(alpha = 0.92f),
-                                                borderColor = Color.White.copy(alpha = 0.14f),
+                                                containerColor = DecoVerm,
+                                                iconTint = DecoPaperCream,
+                                                labelColor = DecoPaperCream,
+                                                borderColor = DecoVerm,
                                                 onClick = onTrash,
                                                 modifier = Modifier
                                                     .weight(1.15f)
@@ -812,16 +819,16 @@ private fun LightboxBottomHud(
                                                 icon = if (photo.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                                 label = if (photo.isFavorite) "已收藏" else "收藏",
                                                 containerColor = if (photo.isFavorite) {
-                                                    SolarAmber.copy(alpha = 0.20f)
+                                                    DecoGold.copy(alpha = 0.28f)
                                                 } else {
-                                                    Color.White.copy(alpha = 0.08f)
+                                                    DecoGold.copy(alpha = 0.12f)
                                                 },
-                                                iconTint = if (photo.isFavorite) Color(0xFFFDE047) else Color(0xFFFCD34D),
-                                                labelColor = if (photo.isFavorite) Color(0xFFFDE68A) else Color.White.copy(alpha = 0.92f),
+                                                iconTint = if (photo.isFavorite) DecoGold else DecoGold.copy(alpha = 0.8f),
+                                                labelColor = DecoPaperCream,
                                                 borderColor = if (photo.isFavorite) {
-                                                    SolarAmber.copy(alpha = 0.45f)
+                                                    DecoGold
                                                 } else {
-                                                    Color.White.copy(alpha = 0.14f)
+                                                    DecoGold.copy(alpha = 0.5f)
                                                 },
                                                 onClick = onFavorite,
                                                 modifier = Modifier
@@ -833,10 +840,10 @@ private fun LightboxBottomHud(
                                             LightboxActionPill(
                                                 icon = Icons.Filled.Check,
                                                 label = "保留",
-                                                containerColor = Color.White.copy(alpha = 0.08f),
-                                                iconTint = Color(0xFF6EE7B7),
-                                                labelColor = Color.White.copy(alpha = 0.92f),
-                                                borderColor = Color.White.copy(alpha = 0.14f),
+                                                containerColor = DecoMat,
+                                                iconTint = DecoInkOnGround,
+                                                labelColor = DecoInkOnGround,
+                                                borderColor = DecoGold.copy(alpha = 0.45f),
                                                 onClick = onKeep,
                                                 modifier = Modifier
                                                     .weight(0.95f)

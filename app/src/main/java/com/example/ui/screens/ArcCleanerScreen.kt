@@ -739,7 +739,11 @@ fun ArcCleanerScreen(
                         .weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    val cardWidth = (maxWidth * 0.75f).coerceIn(244.dp, 326.dp)
+                    // 卡宽同时受宽与高约束：卡比例 0.75（宽:高），纵向溢出会压住日期 pill 与金刻度
+                    val cardWidth = minOf(
+                        (maxWidth * 0.75f).coerceIn(244.dp, 326.dp),
+                        ((maxHeight * 0.92f) * 0.75f).coerceAtLeast(244.dp),
+                    )
                     val sidePad = ((maxWidth - cardWidth) / 2f).coerceAtLeast(24.dp)
 
                     HorizontalPager(

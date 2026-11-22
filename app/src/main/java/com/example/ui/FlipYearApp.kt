@@ -133,6 +133,10 @@ import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.EditorialSerifFontFamily
 import com.example.ui.theme.CobaltSoft
+import com.example.ui.theme.DecoGround
+import com.example.ui.theme.DecoGroundDeep
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.Brush
 import com.example.ui.theme.CoralDanger
 import com.example.ui.theme.HairlineBorder
 import com.example.ui.theme.InkPrimary
@@ -871,7 +875,6 @@ fun FlipYearApp(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
-                        .padding(horizontal = 22.dp, vertical = 12.dp)
                 ) {
                     FloatingGalleryDock(
                         tabs = tabs,
@@ -917,6 +920,11 @@ private fun FloatingGalleryDock(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(listOf(DecoGround, DecoGroundDeep)),
+            )
+            .border(1.dp, DecoGold.copy(alpha = 0.5f))
+            .padding(horizontal = 10.dp, vertical = 8.dp)
             .testTag("floating_gallery_dock"),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
