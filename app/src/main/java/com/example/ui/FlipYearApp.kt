@@ -110,6 +110,8 @@ import com.example.R
 import com.example.data.MediaAccessLevel
 import com.example.data.PhotoItemEntity
 import com.example.ui.components.DecoPosterPanel
+import com.example.ui.components.DecoTabIcon
+import com.example.ui.components.DecoTabIconKind
 import com.example.ui.components.FullScreenOverlayHost
 import com.example.ui.components.FullScreenOverlayLayer
 import com.example.ui.components.LocalFullScreenOverlayHost
@@ -1090,7 +1092,15 @@ private fun FloatingGalleryDock(
             .background(
                 Brush.verticalGradient(listOf(DecoGround, DecoGroundDeep)),
             )
-            .border(1.dp, DecoGold.copy(alpha = 0.5f))
+            // 仅顶部金细线：圆角实机上左右边框会被屏幕圆角截断产生割裂
+            .drawBehind {
+                drawLine(
+                    color = gold.copy(alpha = 0.5f),
+                    start = Offset(0f, 0.5.dp.toPx()),
+                    end = Offset(size.width, 0.5.dp.toPx()),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
             .padding(horizontal = 10.dp, vertical = 8.dp)
             .onGloballyPositioned { onTopEdgeMeasured(it.positionInRoot().y) }
             .testTag("floating_gallery_dock"),
@@ -1183,7 +1193,19 @@ private fun FloatingGalleryDock(
                                 .padding(horizontal = 6.dp)
                                 .testTag(tab.testTag)
                         ) {
-                            // 原型 DecoNav：纯文字（无图标），选中金下划线由外层 drawBehind 绘制
+                            // 画报细线图标（Canvas 手绘语汇）+ 小薇文字
+                            DecoTabIcon(
+                                kind = when (tab.route) {
+                                    FlipYearRoutes.BOOKSHELF -> DecoTabIconKind.ALBUM
+                                    FlipYearRoutes.GALLERY -> DecoTabIconKind.GALLERY
+                                    FlipYearRoutes.MAP -> DecoTabIconKind.FOOTPRINT
+                                    else -> DecoTabIconKind.VAULT
+                                },
+                                color = if (isSelected) gold else ink.copy(alpha = 0.72f),
+                                selected = isSelected,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(7.dp))
                             Text(
                                 text = tabLabel,
                                 fontFamily = DecoDisplayFontFamily,
