@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "low-contrast",
+        "value": "*",
+        "files": [
+          "design/immersive-v2/icon/deco-icon.html"
+        ],
+        "createdAt": "2026-11-22T06:43:55.849Z",
+        "reason": "fixture: 图标渲染夹具（artboard），SVG <text> 的 fill=#EFE3C8 扫描器不解析、误判为默认黑字；非出货 UI 文本 (agent, 2026-11-22)"
+      }
+    ]
+  }
+}

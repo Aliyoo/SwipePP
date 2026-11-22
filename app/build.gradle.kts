@@ -14,6 +14,8 @@ android {
 
   defaultConfig {
     applicationId = "com.aistudio.flipyear.xkqmvz"
+    // 画报版并存安装：后缀 .deco 与主分支应用（无后缀）互不覆盖，配方同 immersiveb 后缀
+    applicationIdSuffix = ".deco"
     minSdk = 24
     targetSdk = 36
     versionCode = 1

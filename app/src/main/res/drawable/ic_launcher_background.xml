@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 摩登画报图标背景：墨绿纸地垂直渐变（decoGround → decoGroundDeep） -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="#0E121D" />
+    <gradient
+        android:angle="270"
+        android:startColor="#17352F"
+        android:endColor="#143029"
+        android:type="linear" />
 </shape>
