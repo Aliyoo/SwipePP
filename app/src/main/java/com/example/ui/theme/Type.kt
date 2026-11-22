@@ -26,13 +26,10 @@ val EditorialSerifFontFamily = FontFamily(
 
 /**
  * 站酷小薇（画报美术字·汉字展示专用，原型同源字体 ZCOOL XiaoWei，OFL 授权）。
- * 上游字体在部分封闭结构字上轮廓绕行同向（TrueType nonzero 规则下镂空被填成实心块），
- * 本文件已做两步修复：
- *  1) 回圃圊徊痼 —— 内轮廓反向（恢复镂空）；
- *  2) 85 个 App 语料内缺陷字（仅例依停包呼…我收断斯版留网藏雾预题级线维缩缺等）——
- *     以思源宋体 Bold 同形字经 Cu2Qu 转换替换（advance 不变），并剥离 fpgm/prep/cvt/gasp
- *     提示表避免小薇削细指令作用于替换字形。检测口径：封闭镂空面积 vs 参考字体。
- * 单字重(400)：Bold/Medium 请求都解析到本字面。
+ * 上游字体的囗封闭结构字轮廓同向绕行（TrueType nonzero 下镂空被填成实心块），
+ * 经大字号逐字实证，真缺陷仅 8 字：回圃圊徊痼圄崮蛔——已用内轮廓反向修复
+ * （回 呈「外环 + 内实心口」，用户确认的小薇原生设计味）；其余字形一律原生保留。
+ * 剥离 fpgm/prep/cvt/gasp 提示表保证渲染一致。单字重(400)：Bold/Medium 请求都解析到本字面。
  */
 val DecoDisplayFontFamily = FontFamily(
     Font(R.font.zcool_xiaowei, FontWeight.Normal),
