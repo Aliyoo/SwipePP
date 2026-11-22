@@ -22,12 +22,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.SwipeVertical
-import androidx.compose.material.icons.filled.TouchApp
-import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material.icons.outlined.ArrowUpward
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.SwipeVertical
+import androidx.compose.material.icons.outlined.TouchApp
+import androidx.compose.material.icons.outlined.Vibration
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -56,7 +56,7 @@ import com.example.ui.theme.DecoScrimInk
 import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.DecoVermInk
 import com.example.ui.theme.DecoVermShadowInk
-import com.example.ui.theme.EditorialSerifFontFamily
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.LocalIsDarkTheme
@@ -89,31 +89,31 @@ fun OnboardingGestureGuideOverlay(
     val items = remember(vermSeal, goldSeal) {
         listOf(
             GestureGuideRow(
-                icon = Icons.Filled.ArrowUpward,
+                icon = Icons.Outlined.ArrowUpward,
                 sealColor = vermSeal,
                 title = "上滑 · 移入回收站",
                 detail = "在弧形清理中向上滑动，将不需要的照片或视频先暂存到回收站，不会立刻删除。"
             ),
             GestureGuideRow(
-                icon = Icons.Filled.ArrowDownward,
+                icon = Icons.Outlined.ArrowDownward,
                 sealColor = goldSeal,
                 title = "下滑 · 保留（连拍全部保留）",
                 detail = "向下滑动直接保留当前照片或整组连拍；如需仅留最佳帧，可点底部“仅留最佳”。"
             ),
             GestureGuideRow(
-                icon = Icons.Filled.Vibration,
+                icon = Icons.Outlined.Vibration,
                 sealColor = goldSeal,
                 title = "摇一摇 · 撤销清理",
                 detail = "在清理页面误操作时轻摇手机，即可撤销本次清理会话内的上一步决定。"
             ),
             GestureGuideRow(
-                icon = Icons.Filled.TouchApp,
+                icon = Icons.Outlined.TouchApp,
                 sealColor = goldSeal,
                 title = "长按 · 多选批量整理",
                 detail = "在画廊中长按任意照片进入多选模式，可批量保留、收藏、移入回收站或压缩。"
             ),
             GestureGuideRow(
-                icon = Icons.Filled.SwipeVertical,
+                icon = Icons.Outlined.SwipeVertical,
                 sealColor = goldSeal,
                 title = "右侧快速滚动条 · 飞跃月份",
                 detail = "拖动画廊右侧的时间滑块，快速跨年跨月定位照片。"
@@ -166,9 +166,10 @@ fun OnboardingGestureGuideOverlay(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "快速上手 · 整理手势",
-                                fontFamily = EditorialSerifFontFamily,
+                                fontFamily = DecoDisplayFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 22.sp,
+                                letterSpacing = 1.2.sp,
                                 color = InkPrimary,
                                 modifier = Modifier.semantics { heading() }
                             )
@@ -176,6 +177,7 @@ fun OnboardingGestureGuideOverlay(
                                 text = "所有删除都先进入安全回收站，随时可撤销或还原",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontSize = 13.sp,
+                                letterSpacing = 1.sp,
                                 color = InkSecondary
                             )
                         }
@@ -195,7 +197,7 @@ fun OnboardingGestureGuideOverlay(
                                 .testTag("onboarding_skip_icon_button")
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.Close,
+                                imageVector = Icons.Outlined.Close,
                                 contentDescription = "跳过引导",
                                 tint = DecoGold,
                                 modifier = Modifier.size(20.dp)
@@ -240,9 +242,10 @@ fun OnboardingGestureGuideOverlay(
                                     ) {
                                         Text(
                                             text = row.title,
-                                            fontFamily = EditorialSerifFontFamily,
+                                            fontFamily = DecoDisplayFontFamily,
                                             fontSize = 15.sp,
                                             fontWeight = FontWeight.Bold,
+                                            letterSpacing = 1.sp,
                                             color = InkPrimary
                                         )
                                         Text(
@@ -277,7 +280,7 @@ fun OnboardingGestureGuideOverlay(
                         ) {
                             Text(
                                 text = "跳过",
-                                fontFamily = EditorialSerifFontFamily,
+                                fontFamily = DecoDisplayFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp,
                                 letterSpacing = 2.sp,
@@ -311,7 +314,7 @@ fun OnboardingGestureGuideOverlay(
                         ) {
                             Text(
                                 text = "知道了，开始整理",
-                                fontFamily = EditorialSerifFontFamily,
+                                fontFamily = DecoDisplayFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 20.sp,
                                 letterSpacing = 1.5.sp,

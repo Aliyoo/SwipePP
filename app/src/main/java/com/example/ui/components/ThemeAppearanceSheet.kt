@@ -20,10 +20,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Contrast
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Contrast
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -57,7 +57,7 @@ import com.example.ui.theme.DecoInkDeep
 import com.example.ui.theme.DecoInkOnGround
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoVerm
-import com.example.ui.theme.EditorialSerifFontFamily
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.JetBrainsMonoFontFamily
@@ -102,15 +102,17 @@ fun ThemeAppearanceSheet(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = stringResource(R.string.theme_appearance_title),
-                    fontFamily = EditorialSerifFontFamily,
+                    fontFamily = DecoDisplayFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 24.sp,
+                    letterSpacing = 1.2.sp,
                     color = InkPrimary
                 )
                 Text(
                     text = stringResource(R.string.theme_appearance_subtitle),
                     fontFamily = JetBrainsMonoFontFamily,
                     fontSize = 12.sp,
+                    letterSpacing = 1.sp,
                     color = InkSecondary
                 )
             }
@@ -138,7 +140,7 @@ internal fun ThemePreviewCardsRow(
     ) {
         ThemePreviewCard(
             mode = AppThemeMode.SYSTEM,
-            icon = Icons.Filled.Contrast,
+            icon = Icons.Outlined.Contrast,
             selected = currentMode == AppThemeMode.SYSTEM,
             onClick = { onSelectMode(AppThemeMode.SYSTEM) },
             modifier = Modifier
@@ -147,7 +149,7 @@ internal fun ThemePreviewCardsRow(
         )
         ThemePreviewCard(
             mode = AppThemeMode.LIGHT,
-            icon = Icons.Filled.LightMode,
+            icon = Icons.Outlined.LightMode,
             selected = currentMode == AppThemeMode.LIGHT,
             onClick = { onSelectMode(AppThemeMode.LIGHT) },
             modifier = Modifier
@@ -156,7 +158,7 @@ internal fun ThemePreviewCardsRow(
         )
         ThemePreviewCard(
             mode = AppThemeMode.DARK,
-            icon = Icons.Filled.DarkMode,
+            icon = Icons.Outlined.DarkMode,
             selected = currentMode == AppThemeMode.DARK,
             onClick = { onSelectMode(AppThemeMode.DARK) },
             modifier = Modifier
@@ -379,7 +381,7 @@ private fun ThemePreviewCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Check,
+                        imageVector = Icons.Outlined.Check,
                         contentDescription = null,
                         tint = DecoPaperCream,
                         modifier = Modifier.size(11.dp)
@@ -401,7 +403,7 @@ private fun ThemePreviewCard(
             )
             Text(
                 text = mode.label,
-                fontFamily = EditorialSerifFontFamily,
+                fontFamily = DecoDisplayFontFamily,
                 fontSize = 13.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
                 letterSpacing = 1.sp,

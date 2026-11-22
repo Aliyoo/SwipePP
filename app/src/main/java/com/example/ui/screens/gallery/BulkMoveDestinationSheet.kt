@@ -58,7 +58,7 @@ import com.example.ui.theme.DecoInkOnGround
 import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoVerm
-import com.example.ui.theme.EditorialSerifFontFamily
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.JetBrainsMonoFontFamily
 
 private val CURATED_ALBUM_PRESETS = listOf("精选珍藏", "旅行日记", "家庭相册", "灵感素材")
@@ -116,7 +116,7 @@ internal fun BulkMoveDestinationSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.bulk_move_title),
-                        fontFamily = EditorialSerifFontFamily,
+                        fontFamily = DecoDisplayFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 19.sp,
                         color = DecoInkOnGround

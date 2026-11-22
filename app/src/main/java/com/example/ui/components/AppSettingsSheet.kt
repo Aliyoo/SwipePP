@@ -30,11 +30,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material.icons.outlined.ArrowUpward
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -74,7 +74,7 @@ import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.DecoVermInk
 import com.example.ui.theme.DefaultStartTab
-import com.example.ui.theme.EditorialSerifFontFamily
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.FlipbookDefaultView
 import com.example.ui.theme.GalleryGridDensity
 import com.example.ui.theme.InkPrimary
@@ -149,15 +149,17 @@ fun AppSettingsSheet(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = stringResource(R.string.settings_sheet_title),
-                    fontFamily = EditorialSerifFontFamily,
+                    fontFamily = DecoDisplayFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 24.sp,
+                    letterSpacing = 1.2.sp,
                     color = InkPrimary
                 )
                 Text(
                     text = stringResource(R.string.settings_sheet_subtitle),
                     fontFamily = JetBrainsMonoFontFamily,
                     fontSize = 12.sp,
+                    letterSpacing = 1.sp,
                     color = InkSecondary
                 )
             }
@@ -178,12 +180,14 @@ fun AppSettingsSheet(
                             fontFamily = OutfitFontFamily,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.8.sp,
                             color = InkPrimary
                         )
                         Text(
                             text = "年度 · 月历 · 画廊 · 整理",
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 12.sp,
+                            letterSpacing = 1.sp,
                             color = InkTertiary
                         )
                     }
@@ -193,13 +197,13 @@ fun AppSettingsSheet(
                             SegmentedOption(
                                 value = TimelineSortOrder.NEWEST_FIRST,
                                 label = "最新优先（倒序）",
-                                icon = Icons.Filled.ArrowDownward,
+                                icon = Icons.Outlined.ArrowDownward,
                                 testTag = "settings_sort_newest"
                             ),
                             SegmentedOption(
                                 value = TimelineSortOrder.OLDEST_FIRST,
                                 label = "最早优先（正序）",
-                                icon = Icons.Filled.ArrowUpward,
+                                icon = Icons.Outlined.ArrowUpward,
                                 testTag = "settings_sort_oldest"
                             )
                         ),
@@ -223,6 +227,7 @@ fun AppSettingsSheet(
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
+                            letterSpacing = 1.sp,
                             color = InkSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -260,12 +265,14 @@ fun AppSettingsSheet(
                             fontFamily = OutfitFontFamily,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.8.sp,
                             color = InkPrimary
                         )
                         Text(
                             text = "关闭时仅展示含照片或视频的月份",
                             style = MaterialTheme.typography.bodySmall,
                             fontSize = 12.sp,
+                            letterSpacing = 1.sp,
                             color = InkSecondary
                         )
                     }
@@ -302,6 +309,7 @@ fun AppSettingsSheet(
                         fontFamily = OutfitFontFamily,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.8.sp,
                         color = InkPrimary
                     )
                     SettingsSegmentedCapsule(
@@ -347,12 +355,14 @@ fun AppSettingsSheet(
                             fontFamily = OutfitFontFamily,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.8.sp,
                             color = InkPrimary
                         )
                         Text(
                             text = "下次启动生效",
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 12.sp,
+                            letterSpacing = 1.sp,
                             color = InkTertiary
                         )
                     }
@@ -399,6 +409,7 @@ fun AppSettingsSheet(
                         fontFamily = OutfitFontFamily,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.8.sp,
                         color = InkPrimary
                     )
                     SettingsSegmentedCapsule(
@@ -445,7 +456,7 @@ fun AppSettingsSheet(
                     else -> "扫描设备相册以构建年度影集"
                 }
                 SettingsActionRow(
-                    icon = Icons.Filled.Refresh,
+                    icon = Icons.Outlined.Refresh,
                     iconTint = DecoGold,
                     title = stringResource(R.string.action_scan_media),
                     subtitle = scanSubtitle,
@@ -473,7 +484,7 @@ fun AppSettingsSheet(
                     MediaAccessLevel.NONE -> "尚未授予相册访问权限"
                 }
                 SettingsActionRow(
-                    icon = Icons.Filled.FolderOpen,
+                    icon = Icons.Outlined.FolderOpen,
                     iconTint = DecoGold,
                     title = "管理相册访问权限",
                     subtitle = permissionStatus,
@@ -525,7 +536,7 @@ private fun DecoSectionHeader(title: String, modifier: Modifier = Modifier) {
     ) {
         Text(
             text = title,
-            fontFamily = EditorialSerifFontFamily,
+            fontFamily = DecoDisplayFontFamily,
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 2.sp,
@@ -649,9 +660,10 @@ private fun <T> SettingsSegmentedCapsule(
                         }
                         Text(
                             text = option.label,
-                            fontFamily = if (isSelected) EditorialSerifFontFamily else OutfitFontFamily,
+                            fontFamily = if (isSelected) DecoDisplayFontFamily else OutfitFontFamily,
                             fontSize = 12.5.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            letterSpacing = 0.8.sp,
                             color = textColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -711,19 +723,21 @@ private fun SettingsActionRow(
                 fontFamily = OutfitFontFamily,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.8.sp,
                 color = titleColor
             )
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 fontSize = 12.sp,
+                letterSpacing = 1.sp,
                 color = InkSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
         Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
             contentDescription = null,
             tint = InkTertiary,
             modifier = Modifier.size(18.dp)

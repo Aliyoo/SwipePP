@@ -971,9 +971,7 @@ fun ArcCleanerScreen(
                                     // 入站：朱红实印
                                     DecoSealOrb(
                                         label = "回收",
-                                        icon = Icons.Filled.DeleteOutline,
                                         orbSize = 64.dp,
-                                        iconSize = 26.dp,
                                         tone = DecoOrbTone.VERM_SOLID,
                                         onClick = {
                                             haptics.swipeDeleteConfirm()
@@ -982,12 +980,10 @@ fun ArcCleanerScreen(
                                         modifier = Modifier.testTag("arc_trash_button")
                                     )
 
-                                    // 收藏：金环小章
+                                    // 收藏：金环小章（原型印钮纯美术字，无图标）
                                     DecoSealOrb(
                                         label = "收藏",
-                                        icon = if (current.photo.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                         orbSize = 54.dp,
-                                        iconSize = 22.dp,
                                         tone = DecoOrbTone.GOLD_RING,
                                         onClick = {
                                             haptics.swipeKeepConfirm()
@@ -999,9 +995,7 @@ fun ArcCleanerScreen(
                                     // 保留：金环印钮（外圈余辉）
                                     DecoSealOrb(
                                         label = "保留",
-                                        icon = Icons.Filled.Check,
                                         orbSize = 64.dp,
-                                        iconSize = 26.dp,
                                         tone = DecoOrbTone.GOLD_RING_HALO,
                                         onClick = {
                                             haptics.swipeKeepConfirm()

@@ -46,14 +46,14 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Restore
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Restore
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -621,7 +621,7 @@ private fun PhotoDetailLightboxContent(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 ObsidianIconOrb(
-                    icon = Icons.Filled.Close,
+                    icon = Icons.Outlined.Close,
                     contentDescription = "关闭预览",
                     onClick = { requestAnimatedDismiss() },
                     color = ObsidianOverlayGlass,
@@ -644,6 +644,7 @@ private fun PhotoDetailLightboxContent(
                         fontFamily = JetBrainsMonoFontFamily,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 1.sp,
                         color = DecoPaperCream,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -661,6 +662,7 @@ private fun PhotoDetailLightboxContent(
                         text = metaLine,
                         fontFamily = JetBrainsMonoFontFamily,
                         fontSize = 11.sp,
+                        letterSpacing = 1.sp,
                         color = DecoPaperCream.copy(alpha = 0.72f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -679,7 +681,7 @@ private fun PhotoDetailLightboxContent(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.Star,
+                            imageVector = Icons.Outlined.Star,
                             contentDescription = null,
                             tint = DecoPaperCream,
                             modifier = Modifier.size(13.dp)
@@ -689,6 +691,7 @@ private fun PhotoDetailLightboxContent(
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.8.sp,
                             color = DecoPaperCream
                         )
                     }
@@ -769,7 +772,7 @@ private fun LightboxBottomHud(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Filled.LocationOn,
+                                    imageVector = Icons.Outlined.LocationOn,
                                     contentDescription = null,
                                     tint = Color(0xFF8FB0FF),
                                     modifier = Modifier.size(14.dp)
@@ -778,6 +781,7 @@ private fun LightboxBottomHud(
                                     text = photo.locationName.orEmpty(),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 1.2.sp,
                                     color = Color.White,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -788,6 +792,7 @@ private fun LightboxBottomHud(
                                     text = photo.caption,
                                     fontFamily = if (isMachineGeneratedFilename(photo.caption)) JetBrainsMonoFontFamily else null,
                                     style = MaterialTheme.typography.labelSmall,
+                                    letterSpacing = 1.sp,
                                     color = Color.White.copy(alpha = 0.56f),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -798,6 +803,7 @@ private fun LightboxBottomHud(
                                 text = editorialTitle,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 1.2.sp,
                                 color = Color.White,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -808,6 +814,7 @@ private fun LightboxBottomHud(
                                     text = photo.caption,
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontSize = 10.5.sp,
+                                    letterSpacing = 1.sp,
                                     color = Color.White.copy(alpha = 0.50f),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -825,6 +832,7 @@ private fun LightboxBottomHud(
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.8.sp,
                                 color = Color.White,
                                 modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
                             )
@@ -869,9 +877,7 @@ private fun LightboxBottomHud(
                                     // 回收站流内还原：金环印钮（onRestore 仅在 photoStatus==TRASHED 时出现）
                                     DecoSealOrb(
                                         label = "还原",
-                                        icon = Icons.Filled.Restore,
                                         orbSize = 64.dp,
-                                        iconSize = 26.dp,
                                         tone = DecoOrbTone.GOLD_RING_HALO,
                                         onClick = onRestore,
                                         testTag = "lightbox_restore_button"
@@ -881,21 +887,17 @@ private fun LightboxBottomHud(
                                         // 入站：朱红实印
                                         DecoSealOrb(
                                             label = "回收",
-                                            icon = Icons.Filled.DeleteOutline,
                                             orbSize = 64.dp,
-                                            iconSize = 26.dp,
                                             tone = DecoOrbTone.VERM_SOLID,
                                             onClick = onTrash,
                                             testTag = "lightbox_trash_button"
                                         )
                                     }
                                     if (onFavorite != null) {
-                                        // 收藏：金环小章；已收藏加外圈余辉 + 实心心
+                                        // 收藏：金环小章；已收藏加外圈余辉（原型印钮纯美术字）
                                         DecoSealOrb(
                                             label = if (photo.isFavorite) "已藏" else "收藏",
-                                            icon = if (photo.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                             orbSize = 54.dp,
-                                            iconSize = 22.dp,
                                             tone = if (photo.isFavorite) DecoOrbTone.GOLD_RING_HALO else DecoOrbTone.GOLD_RING,
                                             onClick = onFavorite,
                                             testTag = "lightbox_favorite_button"
@@ -905,9 +907,7 @@ private fun LightboxBottomHud(
                                         // 保留：金环印钮（外圈余辉）
                                         DecoSealOrb(
                                             label = "保留",
-                                            icon = Icons.Filled.Check,
                                             orbSize = 64.dp,
-                                            iconSize = 26.dp,
                                             tone = DecoOrbTone.GOLD_RING_HALO,
                                             onClick = onKeep,
                                             testTag = "lightbox_keep_button"

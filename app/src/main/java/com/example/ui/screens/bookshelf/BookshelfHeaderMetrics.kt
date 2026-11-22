@@ -49,7 +49,7 @@ import com.example.ui.theme.DecoInkOnGround
 import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoVerm
-import com.example.ui.theme.EditorialSerifFontFamily
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LocalFlipYearPalette
 
@@ -91,7 +91,7 @@ internal fun BookshelfStorageLedgerSheet(
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
                     text = "空间释放账本",
-                    fontFamily = EditorialSerifFontFamily,
+                    fontFamily = DecoDisplayFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 22.sp,
                     color = DecoInkOnGround
@@ -338,7 +338,7 @@ internal fun EmptyLibraryPermissionCard(
 
                 Text(
                     text = title,
-                    fontFamily = EditorialSerifFontFamily,
+                    fontFamily = DecoDisplayFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 21.sp,
                     lineHeight = 27.sp,

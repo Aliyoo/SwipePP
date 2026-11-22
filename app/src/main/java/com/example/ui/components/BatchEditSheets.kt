@@ -70,7 +70,7 @@ import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.DecoPaperCream
-import com.example.ui.theme.EditorialSerifFontFamily
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.InkTertiary
@@ -119,7 +119,7 @@ fun BatchCompressBottomSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.batch_compress_title),
-                        fontFamily = EditorialSerifFontFamily,
+                        fontFamily = DecoDisplayFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 24.sp,
                         color = InkPrimary
@@ -377,7 +377,7 @@ fun BatchLocationEditorSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.batch_location_title),
-                        fontFamily = EditorialSerifFontFamily,
+                        fontFamily = DecoDisplayFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 24.sp,
                         color = InkPrimary

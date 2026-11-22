@@ -105,6 +105,7 @@ import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoGround
 import com.example.ui.theme.DecoGroundDeep
 import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoVerm
@@ -606,6 +607,7 @@ private fun VaultCompactSummaryContent(
                 VaultArtText(
                     text = formatStorageSize(displayBytes),
                     fontSize = 38.sp,
+                    fontFamily = EditorialSerifFontFamily,
                     color = numberColor,
                     modifier = Modifier.padding(top = 2.dp)
                 )
@@ -878,7 +880,7 @@ private fun VaultArtText(
     fontSize: TextUnit,
     modifier: Modifier = Modifier,
     color: Color = DecoInkOnGround,
-    fontFamily: FontFamily = EditorialSerifFontFamily,
+    fontFamily: FontFamily = DecoDisplayFontFamily,
     fontWeight: FontWeight = FontWeight.Bold
 ) {
     val verm = DecoVerm

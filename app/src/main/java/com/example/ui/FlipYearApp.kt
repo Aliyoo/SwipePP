@@ -43,10 +43,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoStories
-import androidx.compose.material.icons.filled.BurstMode
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.BurstMode
 import androidx.compose.material.icons.outlined.DeleteSweep
@@ -129,6 +125,7 @@ import com.example.ui.theme.FlipbookDefaultView
 import com.example.ui.theme.GalleryGridDensity
 import com.example.ui.theme.TimelineSortOrder
 import com.example.ui.theme.UserPreferences
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoInkOnGround
 import com.example.ui.theme.DecoMat
@@ -136,6 +133,7 @@ import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.DecoVermInk
 import com.example.ui.theme.EditorialSerifFontFamily
+import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.DecoGround
 import com.example.ui.theme.DecoGroundDeep
 import androidx.compose.foundation.border
@@ -326,28 +324,28 @@ fun FlipYearApp(
             TopLevelTab(
                 route = FlipYearRoutes.BOOKSHELF,
                 labelRes = R.string.nav_bookshelf,
-                selectedIcon = Icons.Filled.AutoStories,
+                selectedIcon = Icons.Outlined.AutoStories,
                 unselectedIcon = Icons.Outlined.AutoStories,
                 testTag = "nav_tab_bookshelf"
             ),
             TopLevelTab(
                 route = FlipYearRoutes.GALLERY,
                 labelRes = R.string.nav_gallery,
-                selectedIcon = Icons.Filled.BurstMode,
+                selectedIcon = Icons.Outlined.BurstMode,
                 unselectedIcon = Icons.Outlined.BurstMode,
                 testTag = "nav_tab_gallery"
             ),
             TopLevelTab(
                 route = FlipYearRoutes.MAP,
                 labelRes = R.string.nav_map,
-                selectedIcon = Icons.Filled.Explore,
+                selectedIcon = Icons.Outlined.Explore,
                 unselectedIcon = Icons.Outlined.Explore,
                 testTag = "nav_tab_map"
             ),
             TopLevelTab(
                 route = FlipYearRoutes.VAULT,
                 labelRes = R.string.nav_vault,
-                selectedIcon = Icons.Filled.DeleteSweep,
+                selectedIcon = Icons.Outlined.DeleteSweep,
                 unselectedIcon = Icons.Outlined.DeleteSweep,
                 testTag = "nav_tab_vault"
             )
@@ -423,7 +421,8 @@ fun FlipYearApp(
                                 label = {
                                     Text(
                                         text = tabLabel,
-                                        style = MaterialTheme.typography.labelSmall
+                                        style = MaterialTheme.typography.labelSmall,
+                                        letterSpacing = 1.5.sp
                                     )
                                 },
                                 colors = NavigationRailItemDefaults.colors(
@@ -1036,15 +1035,11 @@ fun FlipYearApp(
     }
 }
 
-private const val ACTIVE_DOCK_TAB_WEIGHT = 1.95f
-
 /**
  * 摩登画报底部导航（deco-app.html:126 DecoNav）：纸地渐变底 + 1dp 金细线，无玻璃胶囊、无缎面药丸。
- * 交互/动画逻辑沿用主仓库重写版：乐观路由 visualRoute、临界阻尼 spring、自定义 Layout 加权槽位、
- * GPU graphicsLayer 图标渐变、Modifier.layout 标签展开（动画帧零重组）；
- * 样式回归画报语法——选中槽位以 drawBehind 金下划线 + DecoGold 字标表达，
- * 未选中 DecoInkOnGround(0.72)。回收站待清理数以朱红计费小签随行（原型计数徽语法）。
- * 交互基线不变：tab.testTag / Role.Tab / selected 语义 / onSelectTab 全部保留。
+ * 原型同款纯文字：无图标、等宽槽位，站酷小薇 13sp 字距 1.7sp，选中金下划线 + DecoGold 字标，
+ * 未选中 DecoInkOnGround(0.72)。回收站待清理数以朱红计费小签随行。
+ * 交互基线不变：乐观路由 visualRoute、临界阻尼 spring、tab.testTag / Role.Tab / selected 语义 / onSelectTab。
  */
 @Composable
 private fun FloatingGalleryDock(
@@ -1076,15 +1071,6 @@ private fun FloatingGalleryDock(
         tabs.indexOfFirst { it.route == visualRoute }.coerceAtLeast(0)
     }
 
-    // Hold State<Float> handles without reading `.value` in composition scope -> 0 recompositions per frame!
-    val expandStates: List<State<Float>> = tabs.mapIndexed { index, tab ->
-        animateFloatAsState(
-            targetValue = if (index == selectedIndex) 1f else 0f,
-            animationSpec = dockSpringSpec,
-            label = "dock_tab_expand_${tab.route}"
-        )
-    }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1107,11 +1093,12 @@ private fun FloatingGalleryDock(
             val gapPxInt = gapPxFloat.roundToInt()
             val heightPxInt = with(density) { 48.dp.roundToPx() }
             val containerWidthPx = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
-            val totalWeight = (tabs.size - 1) + ACTIVE_DOCK_TAB_WEIGHT
+            // 原型 DecoNav：纯文字等宽槽位，金下划线滑到选中槽
+            val totalWeight = tabs.size.toFloat()
             val availableWidthPx = (containerWidthPx - gapPxFloat * (tabs.size - 1)).coerceAtLeast(1f)
             val unitWidthPx = availableWidthPx / totalWeight
             val targetPillOffsetX = selectedIndex * (unitWidthPx + gapPxFloat)
-            val targetPillWidth = unitWidthPx * ACTIVE_DOCK_TAB_WEIGHT
+            val targetPillWidth = unitWidthPx
 
             val pillOffsetXState = animateFloatAsState(
                 targetValue = targetPillOffsetX,
@@ -1138,7 +1125,6 @@ private fun FloatingGalleryDock(
                 content = {
                     tabs.forEachIndexed { index, tab ->
                         val isSelected = index == selectedIndex
-                        val expandState = expandStates[index]
                         val tabLabel = stringResource(tab.labelRes)
                         val tabAccessibilityDesc = if (tab.route == FlipYearRoutes.VAULT && trashedCount > 0) {
                             "$tabLabel，${trashedCount} 项待清理"
@@ -1183,48 +1169,30 @@ private fun FloatingGalleryDock(
                                 .padding(horizontal = 6.dp)
                                 .testTag(tab.testTag)
                         ) {
-                            AnimatedDockTabIcon(
-                                tab = tab,
-                                expandState = expandState,
-                                trashedCount = trashedCount,
-                                unselectedTint = ink.copy(alpha = 0.72f)
+                            // 原型 DecoNav：纯文字（无图标），选中金下划线由外层 drawBehind 绘制
+                            Text(
+                                text = tabLabel,
+                                fontFamily = DecoDisplayFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                // 原型 0.14em @12px ≈ 1.7sp
+                                letterSpacing = 1.7.sp,
+                                color = if (isSelected) gold else ink.copy(alpha = 0.72f),
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Clip
                             )
-
-                            // Natural-width label reveal: read expandState.value ONLY in layout & draw phase
-                            // -> 0 recompositions, centered pure icon when inactive, zero "..." clipping!
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.layout { measurable, constraints ->
-                                    val progress = expandState.value.coerceIn(0f, 1f)
-                                    val placeable = measurable.measure(
-                                        constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity)
-                                    )
-                                    val revealedWidth = (placeable.width * progress).roundToInt()
-                                        .coerceIn(0, constraints.maxWidth)
-                                    layout(revealedWidth, placeable.height) {
-                                        if (progress > 0.02f) {
-                                            val labelAlpha = ((progress - 0.18f) / 0.82f).coerceIn(0f, 1f)
-                                            val shiftX = -(1f - progress) * 5.dp.toPx()
-                                            placeable.placeWithLayer(0, 0) {
-                                                alpha = labelAlpha
-                                                translationX = shiftX
-                                            }
-                                        }
-                                    }
-                                }
-                            ) {
-                                Spacer(modifier = Modifier.width(6.dp))
+                            if (tab.route == FlipYearRoutes.VAULT && trashedCount > 0) {
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = tabLabel,
-                                    fontFamily = EditorialSerifFontFamily,
+                                    text = trashedCount.toString(),
+                                    fontFamily = JetBrainsMonoFontFamily,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                    // 原型 0.14em @12px ≈ 1.7sp
-                                    letterSpacing = 1.7.sp,
-                                    color = gold,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    overflow = TextOverflow.Clip
+                                    fontSize = 10.sp,
+                                    color = DecoPaperCream,
+                                    modifier = Modifier
+                                        .background(DecoVerm, RoundedCornerShape(2.dp))
+                                        .padding(horizontal = 4.dp, vertical = 1.dp)
                                 )
                             }
                         }
@@ -1239,19 +1207,15 @@ private fun FloatingGalleryDock(
                 val totalGaps = gapPxInt * (count - 1)
                 val availWidth = (totalWidth - totalGaps).coerceAtLeast(count)
 
-                val weights = FloatArray(count) { i ->
-                    1f + (ACTIVE_DOCK_TAB_WEIGHT - 1f) * expandStates[i].value.coerceIn(0f, 1f)
-                }
-                var sumWeights = 0f
-                for (w in weights) sumWeights += w
-                if (sumWeights <= 0f) sumWeights = count.toFloat()
+                // 原型等宽槽位：文字导航不再做选中槽扩张
+                val slotWidth = (availWidth / count).coerceAtLeast(1)
 
                 var usedWidth = 0
                 val placeables = Array(count) { i ->
                     val slotW = if (i == count - 1) {
                         (availWidth - usedWidth).coerceAtLeast(1)
                     } else {
-                        ((availWidth * (weights[i] / sumWeights)).roundToInt()).coerceAtLeast(1)
+                        slotWidth
                     }
                     usedWidth += slotW
                     measurables[i].measure(Constraints.fixed(slotW, heightPxInt))
@@ -1270,63 +1234,9 @@ private fun FloatingGalleryDock(
 }
 
 /**
- * Zero-recomposition dual-layer icon crossfade (outlined DecoInkOnGround(0.72) <-> filled DecoGold)
- * driven strictly in GPU `graphicsLayer` from `expandState`.
- * 回收站待清理数以朱红计费小签随行（原型计数徽语法：DecoVerm 底 + DecoPaperCream 字）。
+ * 宽屏 NavigationRail 图标（不属原型手机版范围，保留图标语言但统一 Outlined 细线）。
+ * 回收站待清理数以朱红计数徽随行。
  */
-@Composable
-private fun AnimatedDockTabIcon(
-    tab: TopLevelTab,
-    expandState: State<Float>,
-    trashedCount: Int,
-    unselectedTint: Color
-) {
-    val iconStack: @Composable () -> Unit = {
-        Box(
-            modifier = Modifier.size(22.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = tab.unselectedIcon,
-                contentDescription = null,
-                tint = unselectedTint,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        alpha = (1f - expandState.value * 1.45f).coerceIn(0f, 1f)
-                    }
-            )
-            Icon(
-                imageVector = tab.selectedIcon,
-                contentDescription = null,
-                tint = DecoGold,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        alpha = ((expandState.value - 0.14f) / 0.86f).coerceIn(0f, 1f)
-                    }
-            )
-        }
-    }
-
-    if (tab.route == FlipYearRoutes.VAULT && trashedCount > 0) {
-        BadgedBox(
-            badge = {
-                Badge(
-                    containerColor = DecoVerm,
-                    contentColor = DecoPaperCream
-                ) {
-                    Text(trashedCount.toString())
-                }
-            }
-        ) {
-            iconStack()
-        }
-    } else {
-        iconStack()
-    }
-}
-
 @Composable
 private fun TabIconWithBadge(
     tab: TopLevelTab,

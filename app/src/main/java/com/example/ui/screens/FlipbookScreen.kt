@@ -131,6 +131,7 @@ import com.example.ui.theme.DecoGroundDeep
 import com.example.ui.theme.DecoInkDeep
 import com.example.ui.theme.DecoScrimInk
 import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoVerm
@@ -371,7 +372,7 @@ fun FlipbookScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "${ganzhiOfYear(year)}年 · 年鉴",
-                                fontFamily = EditorialSerifFontFamily,
+                                fontFamily = DecoDisplayFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 21.sp,
                                 letterSpacing = 1.2.sp,

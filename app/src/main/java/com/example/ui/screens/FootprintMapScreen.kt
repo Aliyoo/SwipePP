@@ -115,7 +115,7 @@ import com.example.ui.components.isInsideChinaMainland
 import com.example.ui.components.rememberSlippyMapCameraState
 import com.example.ui.theme.TimelineSortOrder
 import com.example.ui.theme.DecoPaperCream
-import com.example.ui.theme.EditorialSerifFontFamily
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LocalFlipYearPalette
 import java.util.Locale
@@ -353,7 +353,7 @@ fun FootprintMapScreen(
         // 足迹山河图 水印（deco-app.html MapScreen 左下题签）
         Text(
             text = "足迹山河图",
-            fontFamily = EditorialSerifFontFamily,
+            fontFamily = DecoDisplayFontFamily,
             fontWeight = FontWeight.Bold,
             fontSize = 13.sp,
             letterSpacing = 2.1.sp,
@@ -503,7 +503,7 @@ fun FootprintMapScreen(
                         )
                         Text(
                             text = mapStyle.label,
-                            fontFamily = EditorialSerifFontFamily,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp,
                             color = ink
@@ -601,7 +601,7 @@ fun FootprintMapScreen(
                         TextButton(onClick = onResetGlobalMediaFilter) {
                             Text(
                                 "显示全部",
-                                fontFamily = EditorialSerifFontFamily,
+                                fontFamily = DecoDisplayFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 color = gold
                             )
@@ -804,7 +804,7 @@ fun FootprintMapScreen(
                             } else {
                                 "尚未发现带定位信息的照片"
                             },
-                            fontFamily = EditorialSerifFontFamily,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp,
                             color = ink,
@@ -932,7 +932,7 @@ fun FootprintMapScreen(
                         ) {
                             Text(
                                 text = "无定位信息的照片与视频",
-                                fontFamily = EditorialSerifFontFamily,
+                                fontFamily = DecoDisplayFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 18.sp,
                                 color = ink,
@@ -1099,7 +1099,7 @@ fun FootprintMapScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = cluster.locationName,
-                                    fontFamily = EditorialSerifFontFamily,
+                                    fontFamily = DecoDisplayFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 20.sp,
                                     color = ink,
@@ -1265,7 +1265,7 @@ private fun DecoSealTag(
     ) {
         Text(
             text = if (hasPending) "$pendingCount 待理" else "已整理",
-            fontFamily = EditorialSerifFontFamily,
+            fontFamily = DecoDisplayFontFamily,
             fontWeight = FontWeight.Bold,
             fontSize = 12.sp,
             color = if (hasPending) DecoPaperCream else ink,
@@ -1320,7 +1320,7 @@ private fun DecoThumbRail(
                 ) {
                     Text(
                         text = showAllLabel,
-                        fontFamily = EditorialSerifFontFamily,
+                        fontFamily = DecoDisplayFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
                         color = gold,
@@ -1354,7 +1354,7 @@ private fun DecoGhostButton(
     ) {
         Text(
             text = text,
-            fontFamily = EditorialSerifFontFamily,
+            fontFamily = DecoDisplayFontFamily,
             fontWeight = FontWeight.Bold,
             fontSize = 15.sp,
             letterSpacing = 1.4.sp,

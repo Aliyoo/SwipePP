@@ -67,6 +67,7 @@ import coil.compose.AsyncImage
 import com.example.data.FlipYearImageLoaders
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoGround
 import com.example.ui.theme.DecoGroundDeep
@@ -726,9 +727,9 @@ fun DecoPaperGround(
 }
 
 /**
- * 方章按钮（原型 SealBtn）：38~42dp 正方、1.5dp 金描边、竖排两字，
+ * 方章按钮（原型 SealBtn）：38~42dp 正方、1.5dp 金描边、竖排两字、4dp 圆角，
  * 视觉 ≥48dp 命中区（可及性红线），按压 0.92 缩放 + 金色涟漪。
- * 金墨字走 Editorial 衬线；地面取色读主题 deco 令牌。
+ * 金墨字走站酷小薇画报美术字（DecoDisplayFontFamily）；地面取色读主题 deco 令牌。
  */
 @Composable
 fun DecoSealButton(
@@ -762,7 +763,7 @@ fun DecoSealButton(
                 scaleX = pressScale
                 scaleY = pressScale
             }
-            .clip(RoundedCornerShape(3.dp))
+            .clip(RoundedCornerShape(4.dp))
             .clickable(
                 interactionSource = interactionSource,
                 indication = ripple(color = gold),
@@ -781,24 +782,24 @@ fun DecoSealButton(
             modifier = Modifier
                 .size(size)
                 .background(ground.copy(alpha = 0.55f))
-                .border(1.5.dp, gold.copy(alpha = borderAlpha), RoundedCornerShape(3.dp))
+                .border(1.5.dp, gold.copy(alpha = borderAlpha), RoundedCornerShape(4.dp))
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = labelTop,
-                    fontFamily = EditorialSerifFontFamily,
+                    fontFamily = DecoDisplayFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = fontSize,
-                    lineHeight = fontSize * 1.08f,
+                    lineHeight = fontSize * 1.15f,
                     letterSpacing = 0.5.sp,
                     color = gold.copy(alpha = textAlpha)
                 )
                 Text(
                     text = labelBottom,
-                    fontFamily = EditorialSerifFontFamily,
+                    fontFamily = DecoDisplayFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = fontSize,
-                    lineHeight = fontSize * 1.08f,
+                    lineHeight = fontSize * 1.15f,
                     letterSpacing = 0.5.sp,
                     color = gold.copy(alpha = textAlpha)
                 )
@@ -811,18 +812,16 @@ fun DecoSealButton(
 enum class DecoOrbTone { GOLD_RING, GOLD_RING_HALO, VERM_SOLID }
 
 /**
- * 决断印钮（原型 SealOrb）：圆形印章钮，图标 + 12sp SemiBold 标签居中。
- * 保留=金环印钮（外圈余辉）/ 收藏=金环小章 / 入站(回收)=朱红实印。
+ * 决断印钮（原型 SealOrb）：圆形印章钮，**纯美术字居中、无图标**（原型同款：
+ * 保留=金环印钮 15sp（外圈余辉）/ 收藏=金环小章 / 入站(回收)=朱红实印 14sp）。
  * 按压 0.9 缩放 + 内容色涟漪；取色一律读主题 deco 令牌。
  */
 @Composable
 fun DecoSealOrb(
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     orbSize: Dp = 64.dp,
-    iconSize: Dp = 26.dp,
     tone: DecoOrbTone,
     testTag: String? = null
 ) {
@@ -842,6 +841,12 @@ fun DecoSealOrb(
     val ringColor = if (tone == DecoOrbTone.VERM_SOLID) cream.copy(alpha = 0.35f) else gold
     val fillColor = if (tone == DecoOrbTone.VERM_SOLID) verm else ground.copy(alpha = 0.42f)
     val contentColor = if (tone == DecoOrbTone.VERM_SOLID) cream else gold
+    // 原型字号：64dp 金环 15sp / 朱红实印 14sp；54dp 小章按比例收一档
+    val labelSize = when {
+        tone == DecoOrbTone.VERM_SOLID -> 14.sp
+        orbSize >= 60.dp -> 15.sp
+        else -> 13.sp
+    }
 
     // 外层承载：金环印钮的外圈余辉（原型 0 0 0 5px goldDim(0.12)）画在按钮外沿
     Box(
@@ -872,21 +877,13 @@ fun DecoSealOrb(
                 )
                 .then(testTag?.let { Modifier.testTag(it) } ?: Modifier)
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = contentColor,
-                    modifier = Modifier.size(iconSize)
-                )
-                Spacer(modifier = Modifier.height(3.dp))
-                Text(
-                    text = label,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = contentColor
-                )
-            }
+            Text(
+                text = label,
+                fontFamily = DecoDisplayFontFamily,
+                fontSize = labelSize,
+                letterSpacing = 1.sp,
+                color = contentColor
+            )
         }
     }
 }

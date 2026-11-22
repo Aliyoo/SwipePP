@@ -41,15 +41,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.BurstMode
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.UnfoldLess
-import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.BurstMode
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.UnfoldLess
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -94,7 +94,7 @@ import com.example.ui.GalleryEntry
 import kotlinx.coroutines.launch
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoPaperCream
-import com.example.ui.theme.EditorialSerifFontFamily
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LocalFlipYearPalette
 import com.example.ui.theme.LocalIsDarkTheme
@@ -529,6 +529,7 @@ fun BurstGalleryGrid(
                     text = activeZoomTier.label,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
                     color = DecoPaperCream
                 )
 
@@ -677,7 +678,7 @@ private fun SingleGalleryTile(
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Videocam,
+                    imageVector = Icons.Outlined.Videocam,
                     contentDescription = null,
                     tint = DecoPaperCream,
                     modifier = Modifier.size(11.dp)
@@ -686,6 +687,7 @@ private fun SingleGalleryTile(
                     text = "视频",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
                     color = DecoPaperCream
                 )
             }
@@ -718,7 +720,7 @@ private fun SingleGalleryTile(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Filled.CheckCircle,
+                    imageVector = Icons.Outlined.CheckCircle,
                     contentDescription = "已保留",
                     tint = LocalFlipYearPalette.current.decoMat,
                     modifier = Modifier.size(13.dp)
@@ -765,7 +767,7 @@ internal fun SelectionCheckIndicator(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Check,
+                    imageVector = Icons.Outlined.Check,
                     contentDescription = "已选中",
                     tint = DecoPaperCream,
                     modifier = Modifier.size(14.dp)
@@ -787,6 +789,7 @@ internal fun SelectionCheckIndicator(
                     fontFamily = JetBrainsMonoFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
+                    letterSpacing = 0.8.sp,
                     color = DecoPaperCream
                 )
             }
@@ -1078,7 +1081,7 @@ private fun CollapsedBurstStackTile(
                     horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.BurstMode,
+                        imageVector = Icons.Outlined.BurstMode,
                         contentDescription = null,
                         tint = DecoPaperCream,
                         modifier = Modifier.size(11.dp)
@@ -1087,6 +1090,7 @@ private fun CollapsedBurstStackTile(
                         text = "连拍 ${burst.photos.size}",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp,
                         color = DecoPaperCream
                     )
                 }
@@ -1095,11 +1099,12 @@ private fun CollapsedBurstStackTile(
                         text = if (allSelected) "已选整组" else "点击选整组",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
                         color = DecoPaperCream
                     )
                 } else {
                     Icon(
-                        imageVector = Icons.Filled.ExpandMore,
+                        imageVector = Icons.Outlined.ExpandMore,
                         contentDescription = stringResource(R.string.burst_expand),
                         tint = DecoPaperCream,
                         modifier = Modifier.size(14.dp)
@@ -1170,7 +1175,7 @@ internal fun ExpandedBurstStackTray(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.BurstMode,
+                            imageVector = Icons.Outlined.BurstMode,
                             contentDescription = null,
                             tint = LocalFlipYearPalette.current.decoGold,
                             modifier = Modifier.size(18.dp)
@@ -1181,12 +1186,14 @@ internal fun ExpandedBurstStackTray(
                             text = "快速连拍组 · ${burst.photos.size} 张",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.2.sp,
                             color = LocalFlipYearPalette.current.decoInkOnGround
                         )
                         Text(
                             text = headerSubtitle,
                             style = MaterialTheme.typography.labelSmall,
                             fontSize = 12.sp,
+                            letterSpacing = 1.sp,
                             color = LocalFlipYearPalette.current.decoInkOnGround.copy(alpha = 0.65f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -1208,7 +1215,7 @@ internal fun ExpandedBurstStackTray(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.UnfoldLess,
+                            imageVector = Icons.Outlined.UnfoldLess,
                             contentDescription = stringResource(R.string.burst_collapse),
                             tint = LocalFlipYearPalette.current.decoInkOnGround,
                             modifier = Modifier.size(15.dp)
@@ -1217,6 +1224,7 @@ internal fun ExpandedBurstStackTray(
                             text = "收起",
                             style = MaterialTheme.typography.labelLarge,
                             fontSize = 12.sp,
+                            letterSpacing = 0.8.sp,
                             color = LocalFlipYearPalette.current.decoInkOnGround
                         )
                     }
@@ -1262,7 +1270,7 @@ internal fun ExpandedBurstStackTray(
             ) {
                 GalleryActionButton(
                     text = keepBestLabel,
-                    leadingIcon = Icons.Filled.AutoAwesome,
+                    leadingIcon = Icons.Outlined.AutoAwesome,
                     tone = GalleryButtonTone.IMMERSIVE,
                     height = 44.dp,
                     shape = TileShape,
@@ -1352,6 +1360,7 @@ private fun BurstFrameCard(
                     text = "#${index + 1} +${deltaSeconds}s",
                     fontFamily = JetBrainsMonoFontFamily,
                     fontSize = 12.sp,
+                    letterSpacing = 0.8.sp,
                     color = DecoPaperCream
                 )
             }
@@ -1387,6 +1396,7 @@ private fun BurstFrameCard(
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp,
                         color = DecoPaperCream
                     )
                 }
@@ -1405,12 +1415,14 @@ private fun BurstFrameCard(
                 fontFamily = JetBrainsMonoFontFamily,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp,
                 color = deco.decoInkOnGround.copy(alpha = if (isBest) 0.95f else 0.78f)
             )
             Text(
                 text = formatStorageSize(photo.fileSizeBytes),
                 fontFamily = JetBrainsMonoFontFamily,
                 fontSize = 12.sp,
+                letterSpacing = 0.8.sp,
                 color = deco.decoInkOnGround.copy(alpha = 0.55f)
             )
         }
@@ -1451,6 +1463,7 @@ private fun BurstFrameCard(
                     style = MaterialTheme.typography.labelSmall,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.8.sp,
                     color = if (isBest) deco.decoMat else deco.decoInkOnGround
                 )
             }
@@ -1465,7 +1478,7 @@ private fun BurstFrameCard(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = Icons.Filled.DeleteOutline,
+                            imageVector = Icons.Outlined.DeleteOutline,
                             contentDescription = "移入回收站",
                             tint = deco.decoVerm,
                             modifier = Modifier.size(18.dp)
@@ -1507,7 +1520,7 @@ private fun DecoMonthClusterHeader(
         ) {
             Text(
                 text = decoChineseMonth(cluster.month),
-                fontFamily = EditorialSerifFontFamily,
+                fontFamily = DecoDisplayFontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp,
                 letterSpacing = 0.6.sp,
@@ -1538,6 +1551,7 @@ private fun DecoMonthClusterHeader(
                 text = cluster.compactSummaryText,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
+                letterSpacing = 1.sp,
                 color = deco.decoInkOnGround.copy(alpha = 0.62f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1554,6 +1568,7 @@ private fun DecoMonthClusterHeader(
                         text = if (isMonthAllSelected) "已选本月" else "选本月",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp,
                         color = if (isMonthAllSelected) deco.decoMat else deco.decoGold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
@@ -1570,13 +1585,14 @@ private fun DecoMonthClusterHeader(
                         text = if (cluster.isCleaned) "重温" else "整理",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp,
                         color = if (cluster.isCleaned) deco.decoMat else deco.decoGold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
             } else if (cluster.isCleaned) {
                 Icon(
-                    imageVector = Icons.Filled.CheckCircle,
+                    imageVector = Icons.Outlined.CheckCircle,
                     contentDescription = stringResource(R.string.timeline_month_cleaned_tag),
                     tint = deco.decoGold,
                     modifier = Modifier.size(13.dp)

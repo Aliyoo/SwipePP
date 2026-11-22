@@ -92,6 +92,7 @@ import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoGround
 import com.example.ui.theme.DecoInkOnGround
 import com.example.ui.theme.DecoMat
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.DefaultStartTab
@@ -823,7 +824,7 @@ private fun DecoVermilionActionStrip(
         ) {
             Text(
                 text = "翻阅月历",
-                fontFamily = EditorialSerifFontFamily,
+                fontFamily = DecoDisplayFontFamily,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 20.sp,
                 letterSpacing = 2.6.sp,
@@ -862,7 +863,7 @@ private fun DecoVermilionActionStrip(
         ) {
             Text(
                 text = if (isCleanupMode) "进入整理" else "重温回忆",
-                fontFamily = EditorialSerifFontFamily,
+                fontFamily = DecoDisplayFontFamily,
                 fontWeight = FontWeight.Medium,
                 fontSize = 17.sp,
                 letterSpacing = 2.2.sp,

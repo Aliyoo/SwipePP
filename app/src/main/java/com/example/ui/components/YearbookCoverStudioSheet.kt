@@ -81,6 +81,7 @@ import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.EditionCobalt
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.EditionObsidian
 import com.example.ui.theme.EditionSlatePlum
 import com.example.ui.theme.EditionTeal
@@ -217,7 +218,7 @@ fun YearbookCoverStudioSheet(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = "${stringResource(R.string.cover_studio_title)} · ${summary.year}",
-                    fontFamily = EditorialSerifFontFamily,
+                    fontFamily = DecoDisplayFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 21.sp,
                     color = DecoInkOnGround

@@ -121,7 +121,7 @@ import com.example.ui.theme.DecoGroundDeep
 import com.example.ui.theme.DecoInkOnGround
 import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoVerm
-import com.example.ui.theme.EditorialSerifFontFamily
+import com.example.ui.theme.DecoDisplayFontFamily
 import kotlinx.coroutines.delay
 import java.util.Calendar
 
@@ -163,7 +163,7 @@ private fun DecoArtTitle(
         }
     }
     val baseStyle = TextStyle(
-        fontFamily = EditorialSerifFontFamily,
+        fontFamily = DecoDisplayFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = fontSize,
         letterSpacing = 0.8.sp

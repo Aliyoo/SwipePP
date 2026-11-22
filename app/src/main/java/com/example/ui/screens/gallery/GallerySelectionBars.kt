@@ -60,7 +60,7 @@ import com.example.ui.theme.DecoInkOnGround
 import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoVerm
-import com.example.ui.theme.EditorialSerifFontFamily
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.JetBrainsMonoFontFamily
 
 /* ---- 摩登画报 · 选择栏装饰（deco-app.html 金双线画框 / 朱红通栏 / 方章） ---- */
@@ -97,7 +97,7 @@ internal fun GalleryMoreBatchActionsSheet(
         ) {
             Text(
                 text = "更多批量操作（已选 $selectedCount 项）",
-                fontFamily = EditorialSerifFontFamily,
+                fontFamily = DecoDisplayFontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 17.sp,
                 color = DecoInkOnGround
@@ -276,7 +276,7 @@ internal fun GallerySelectionTopBar(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "已选 $selectedCount 项",
-                    fontFamily = EditorialSerifFontFamily,
+                    fontFamily = DecoDisplayFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     color = DecoInkOnGround,

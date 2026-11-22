@@ -37,11 +37,11 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BurstMode
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.outlined.BurstMode
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -87,7 +87,7 @@ import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoScrimInk
 import com.example.ui.theme.DecoVerm
-import com.example.ui.theme.EditorialSerifFontFamily
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.LocalFlipYearPalette
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -308,7 +308,7 @@ fun MonthlyClusterHeaderStamp(
         ) {
             Text(
                 text = stampChineseMonth(cluster.month),
-                fontFamily = EditorialSerifFontFamily,
+                fontFamily = DecoDisplayFontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp,
                 letterSpacing = 0.6.sp,
@@ -339,6 +339,7 @@ fun MonthlyClusterHeaderStamp(
                 text = cluster.compactSummaryText,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
+                letterSpacing = 1.sp,
                 color = deco.decoInkOnGround.copy(alpha = 0.62f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -355,6 +356,7 @@ fun MonthlyClusterHeaderStamp(
                         text = if (isMonthAllSelected) "已选本月" else "选本月",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp,
                         color = if (isMonthAllSelected) deco.decoMat else deco.decoGold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
@@ -371,13 +373,14 @@ fun MonthlyClusterHeaderStamp(
                         text = if (cluster.isCleaned) "重温" else "整理",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp,
                         color = if (cluster.isCleaned) deco.decoMat else deco.decoGold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
             } else if (cluster.isCleaned) {
                 Icon(
-                    imageVector = Icons.Filled.CheckCircle,
+                    imageVector = Icons.Outlined.CheckCircle,
                     contentDescription = stringResource(R.string.timeline_month_cleaned_tag),
                     tint = deco.decoGold,
                     modifier = Modifier.size(13.dp)
@@ -585,7 +588,7 @@ private fun TimelineMonthStampOverlayCore(
                                     .border(1.dp, VermTagCreamRim, RoundedCornerShape(3.dp))
                             ) {
                                 Icon(
-                                    imageVector = Icons.Filled.CalendarMonth,
+                                    imageVector = Icons.Outlined.CalendarMonth,
                                     contentDescription = null,
                                     tint = cream,
                                     modifier = Modifier.size(15.dp)
@@ -599,7 +602,7 @@ private fun TimelineMonthStampOverlayCore(
                                 ) {
                                     Text(
                                         text = cluster.stampLabel,
-                                        fontFamily = EditorialSerifFontFamily,
+                                        fontFamily = DecoDisplayFontFamily,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 17.sp,
                                         letterSpacing = 0.5.sp,
@@ -623,7 +626,7 @@ private fun TimelineMonthStampOverlayCore(
                                                 .padding(horizontal = 7.dp, vertical = 2.dp)
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Filled.CheckCircle,
+                                                imageVector = Icons.Outlined.CheckCircle,
                                                 contentDescription = null,
                                                 tint = gold,
                                                 modifier = Modifier.size(12.dp)
@@ -632,6 +635,7 @@ private fun TimelineMonthStampOverlayCore(
                                                 text = stringResource(R.string.timeline_month_cleaned_tag),
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold,
+                                                letterSpacing = 0.8.sp,
                                                 color = gold
                                             )
                                         }
@@ -645,19 +649,19 @@ private fun TimelineMonthStampOverlayCore(
                                 ) {
                                     if (cluster.photoCount > 0) {
                                         StampMetricTag(
-                                            icon = Icons.Filled.PhotoLibrary,
+                                            icon = Icons.Outlined.PhotoLibrary,
                                             text = "${cluster.photoCount}"
                                         )
                                     }
                                     if (cluster.videoCount > 0) {
                                         StampMetricTag(
-                                            icon = Icons.Filled.Videocam,
+                                            icon = Icons.Outlined.Videocam,
                                             text = "${cluster.videoCount}"
                                         )
                                     }
                                     if (cluster.burstGroupCount > 0) {
                                         StampMetricTag(
-                                            icon = Icons.Filled.BurstMode,
+                                            icon = Icons.Outlined.BurstMode,
                                             text = "${cluster.burstGroupCount}组"
                                         )
                                     }
@@ -665,6 +669,7 @@ private fun TimelineMonthStampOverlayCore(
                                         text = formatStorageSize(cluster.totalBytes),
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold,
+                                        letterSpacing = 1.sp,
                                         color = ink.copy(alpha = 0.66f)
                                     )
                                 }
@@ -770,7 +775,7 @@ private fun TimelineMonthStampOverlayCore(
                         ) {
                             Text(
                                 text = currentCluster.stampLabel,
-                                fontFamily = EditorialSerifFontFamily,
+                                fontFamily = DecoDisplayFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp,
                                 letterSpacing = 0.4.sp,
@@ -823,6 +828,7 @@ private fun StampMetricTag(
             text = text,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.8.sp,
             color = ink.copy(alpha = 0.66f)
         )
     }

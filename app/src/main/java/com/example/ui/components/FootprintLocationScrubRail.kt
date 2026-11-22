@@ -31,9 +31,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.LocationOff
-import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.LocationOff
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -75,7 +75,7 @@ import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoScrimInk
 import com.example.ui.theme.DecoVerm
-import com.example.ui.theme.EditorialSerifFontFamily
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
@@ -441,16 +441,17 @@ private fun CompactIdleFootprintFlag(
             .padding(horizontal = 9.dp, vertical = 6.dp)
     ) {
         Icon(
-            imageVector = if (stop.isUnlocated) Icons.Filled.LocationOff else Icons.Filled.LocationOn,
+            imageVector = if (stop.isUnlocated) Icons.Outlined.LocationOff else Icons.Outlined.LocationOn,
             contentDescription = null,
             tint = iconTint,
             modifier = Modifier.size(13.dp)
         )
         Text(
             text = stop.shortIdleLabel,
-            fontFamily = EditorialSerifFontFamily,
+            fontFamily = DecoDisplayFontFamily,
             fontWeight = FontWeight.Bold,
             fontSize = 12.sp,
+            letterSpacing = 0.8.sp,
             color = ink,
             maxLines = 1
         )
@@ -507,7 +508,7 @@ private fun ExpandedFootprintScrubFlag(
                         .border(1.dp, gold.copy(alpha = 0.6f), RoundedCornerShape(3.dp))
                 ) {
                     Icon(
-                        imageVector = if (activeStop.isUnlocated) Icons.Filled.LocationOff else Icons.Filled.LocationOn,
+                        imageVector = if (activeStop.isUnlocated) Icons.Outlined.LocationOff else Icons.Outlined.LocationOn,
                         contentDescription = null,
                         tint = if (activeStop.isUnlocated) verm else gold,
                         modifier = Modifier.size(16.dp)
@@ -521,9 +522,10 @@ private fun ExpandedFootprintScrubFlag(
                     ) {
                         Text(
                             text = activeStop.displayName,
-                            fontFamily = EditorialSerifFontFamily,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.5.sp,
+                            letterSpacing = 1.2.sp,
                             color = ink,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -534,6 +536,7 @@ private fun ExpandedFootprintScrubFlag(
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.8.sp,
                             color = gold
                         )
                     }
@@ -547,6 +550,7 @@ private fun ExpandedFootprintScrubFlag(
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
+                            letterSpacing = 1.sp,
                             color = ink.copy(alpha = 0.62f),
                             maxLines = 1
                         )
@@ -561,7 +565,7 @@ private fun ExpandedFootprintScrubFlag(
                                     .padding(horizontal = 5.dp, vertical = 1.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Filled.CheckCircle,
+                                    imageVector = Icons.Outlined.CheckCircle,
                                     contentDescription = null,
                                     tint = mat,
                                     modifier = Modifier.size(11.dp)
@@ -570,6 +574,7 @@ private fun ExpandedFootprintScrubFlag(
                                     text = "已整理",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.8.sp,
                                     color = mat
                                 )
                             }
@@ -587,6 +592,7 @@ private fun ExpandedFootprintScrubFlag(
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.8.sp,
                                     color = cream
                                 )
                             }

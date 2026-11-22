@@ -36,14 +36,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.BurstMode
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.ViewAgenda
+import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.BurstMode
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -528,12 +528,14 @@ internal fun GalleryJustifiedWaterfallList(
                             fontFamily = OutfitFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp,
+                            letterSpacing = 1.2.sp,
                             color = DecoInkOnGround
                         )
                         Text(
                             text = "${row.itemCount} 项",
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 12.sp,
+                            letterSpacing = 1.sp,
                             color = DecoInkOnGround.copy(alpha = 0.62f)
                         )
                     }
@@ -700,7 +702,7 @@ private fun JustifiedWaterfallRow(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Filled.CheckCircle,
+                                        imageVector = Icons.Outlined.CheckCircle,
                                         contentDescription = "已保留",
                                         tint = DecoMat,
                                         modifier = Modifier.size(14.dp)
@@ -820,7 +822,7 @@ private fun JustifiedWaterfallRow(
                                 horizontalArrangement = Arrangement.spacedBy(3.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Filled.BurstMode,
+                                    imageVector = Icons.Outlined.BurstMode,
                                     contentDescription = null,
                                     tint = DecoPaperCream,
                                     modifier = Modifier.size(11.dp)
@@ -830,6 +832,7 @@ private fun JustifiedWaterfallRow(
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp,
+                                    letterSpacing = 0.8.sp,
                                     color = DecoPaperCream
                                 )
                             }
@@ -861,11 +864,12 @@ private fun JustifiedWaterfallRow(
                                     style = MaterialTheme.typography.labelSmall,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp,
                                     color = DecoPaperCream
                                 )
                                 if (!isSelectionMode) {
                                     Icon(
-                                        imageVector = Icons.Filled.ExpandMore,
+                                        imageVector = Icons.Outlined.ExpandMore,
                                         contentDescription = stringResource(R.string.burst_expand),
                                         tint = DecoPaperCream,
                                         modifier = Modifier.size(15.dp)
@@ -921,10 +925,10 @@ fun GalleryZoomTierIconButton(
                 label = "gallery_zoom_tier_icon"
             ) { tier ->
                 val icon = when (tier) {
-                    GalleryZoomTier.COMPACT_4 -> Icons.Filled.Apps
-                    GalleryZoomTier.STANDARD_3 -> Icons.Filled.GridView
-                    GalleryZoomTier.WATERFALL_2 -> Icons.Filled.Dashboard
-                    GalleryZoomTier.WATERFALL_1 -> Icons.Filled.ViewAgenda
+                    GalleryZoomTier.COMPACT_4 -> Icons.Outlined.Apps
+                    GalleryZoomTier.STANDARD_3 -> Icons.Outlined.GridView
+                    GalleryZoomTier.WATERFALL_2 -> Icons.Outlined.Dashboard
+                    GalleryZoomTier.WATERFALL_1 -> Icons.Outlined.ViewAgenda
                 }
                 Icon(
                     imageVector = icon,

@@ -67,6 +67,7 @@ import com.example.ui.components.PhotoArtwork
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoGround
 import com.example.ui.theme.DecoArtShadowVerm
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoScrimInk
@@ -472,7 +473,7 @@ internal fun ModernYearbook3DCard(
 
                         Text(
                             text = "${decoGanzhiOfYear(summary.year)}年",
-                            fontFamily = EditorialSerifFontFamily,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 20.sp,
                             color = gold,
