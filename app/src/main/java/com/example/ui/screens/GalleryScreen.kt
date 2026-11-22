@@ -142,8 +142,8 @@ private val GalleryTileOutline = RoundedCornerShape(3.dp)
 private val GallerySealShape = RoundedCornerShape(3.dp)
 
 /**
- * 美术字标题：EditorialSerif Bold + 完整 artShadow 三层错位影
- * （2dp 黑 → 4dp 朱红 → 6dp 软模糊），与回收站 VaultArtText 同构（deco-app.html:140 artShadow）。
+ * 美术字标题：DecoDisplay Bold + artShadow 三层错位影（随字号等比：
+ * 黑 0.024em → 朱红 0.049em → 软模糊 0.073em，同 VaultArtText，deco-app.html:140 artShadow）。
  */
 @Composable
 private fun DecoArtTitle(
@@ -153,15 +153,16 @@ private fun DecoArtTitle(
 ) {
     val verm = DecoVerm
     val density = LocalDensity.current
-    val blurShadow = remember(density) {
-        with(density) {
-            Shadow(
-                color = Color.Black.copy(alpha = 0.35f),
-                offset = Offset(6.dp.toPx(), 6.dp.toPx()),
-                blurRadius = 14.dp.toPx()
-            )
-        }
+    fun emOffset(ratio: Float): androidx.compose.ui.unit.Dp = with(fontSize) { value * ratio }.dp
+    val blurShadow = remember(fontSize, density) {
+        Shadow(
+            color = Color.Black.copy(alpha = 0.35f),
+            offset = with(density) { Offset(emOffset(0.073f).toPx(), emOffset(0.073f).toPx()) },
+            blurRadius = with(density) { emOffset(0.17f).toPx() }
+        )
     }
+    val vermOffset = remember(fontSize, density) { emOffset(0.049f) }
+    val inkOffset = remember(fontSize, density) { emOffset(0.024f) }
     val baseStyle = TextStyle(
         fontFamily = DecoDisplayFontFamily,
         fontWeight = FontWeight.Bold,
@@ -181,7 +182,7 @@ private fun DecoArtTitle(
             color = verm.copy(alpha = 0.60f),
             style = baseStyle,
             modifier = Modifier
-                .offset(x = 4.dp, y = 4.dp)
+                .offset(x = vermOffset, y = vermOffset)
                 .clearAndSetSemantics { }
         )
         Text(
@@ -189,7 +190,7 @@ private fun DecoArtTitle(
             color = Color.Black.copy(alpha = 0.55f),
             style = baseStyle,
             modifier = Modifier
-                .offset(x = 2.dp, y = 2.dp)
+                .offset(x = inkOffset, y = inkOffset)
                 .clearAndSetSemantics { }
         )
         Text(

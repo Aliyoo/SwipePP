@@ -890,7 +890,7 @@ private fun VaultGoldFrame(
     }
 }
 
-/** 美术字（EditorialSerif Bold(700，900 请求回落 Bold)/错位阴影 2dp 黑 · 4dp 朱 · 6dp 模糊） */
+/** 美术字（DecoDisplay 小薇 Bold）/错位阴影随字号等比：黑 0.024em · 朱 0.049em · 模糊 0.073em（原型 82px 大年份 2/4/6px 的同比例） */
 @Composable
 private fun VaultArtText(
     text: String,
@@ -902,15 +902,17 @@ private fun VaultArtText(
 ) {
     val verm = DecoVerm
     val density = LocalDensity.current
-    val blurShadow = remember(density) {
-        with(density) {
-            Shadow(
-                color = VaultArtShadowBlur,
-                offset = Offset(6.dp.toPx(), 6.dp.toPx()),
-                blurRadius = 14.dp.toPx()
-            )
-        }
+    // 错位影偏移随字号等比（原型 artShadow 只用于 82px 大年份，固定 dp 在中小标题上会糊成叠影）
+    fun emOffset(ratio: Float): androidx.compose.ui.unit.Dp = with(fontSize) { value * ratio }.dp
+    val blurShadow = remember(fontSize, density) {
+        Shadow(
+            color = VaultArtShadowBlur,
+            offset = with(density) { Offset(emOffset(0.073f).toPx(), emOffset(0.073f).toPx()) },
+            blurRadius = with(density) { emOffset(0.17f).toPx() }
+        )
     }
+    val vermOffset = remember(fontSize, density) { emOffset(0.049f) }
+    val inkOffset = remember(fontSize, density) { emOffset(0.024f) }
     val style = remember(fontSize, fontFamily, fontWeight) {
         TextStyle(
             fontFamily = fontFamily,
@@ -932,7 +934,7 @@ private fun VaultArtText(
             color = verm.copy(alpha = 0.60f),
             style = style,
             modifier = Modifier
-                .offset(x = 4.dp, y = 4.dp)
+                .offset(x = vermOffset, y = vermOffset)
                 .clearAndSetSemantics { }
         )
         Text(
@@ -940,7 +942,7 @@ private fun VaultArtText(
             color = VaultArtShadowBlack,
             style = style,
             modifier = Modifier
-                .offset(x = 2.dp, y = 2.dp)
+                .offset(x = inkOffset, y = inkOffset)
                 .clearAndSetSemantics { }
         )
         Text(text = text, color = color, style = style)
