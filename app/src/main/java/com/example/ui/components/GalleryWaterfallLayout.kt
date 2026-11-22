@@ -76,6 +76,7 @@ import com.example.data.PhotoItemEntity
 import com.example.data.PhotoStatus
 import com.example.data.PhotoRepository
 import com.example.ui.GalleryEntry
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoGroundDeep
 import com.example.ui.theme.DecoInkOnGround
@@ -83,8 +84,6 @@ import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoScrimInk
 import com.example.ui.theme.DecoVerm
-import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.OutfitFontFamily
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -525,7 +524,7 @@ internal fun GalleryJustifiedWaterfallList(
                     ) {
                         Text(
                             text = if (showMonthHeaders) "${row.month}月${row.day}日" else "${row.day}日",
-                            fontFamily = OutfitFontFamily,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp,
                             letterSpacing = 1.2.sp,
@@ -533,7 +532,7 @@ internal fun GalleryJustifiedWaterfallList(
                         )
                         Text(
                             text = "${row.itemCount} 项",
-                            fontFamily = JetBrainsMonoFontFamily,
+                            fontFamily = DecoDisplayFontFamily,
                             fontSize = 12.sp,
                             letterSpacing = 1.sp,
                             color = DecoInkOnGround.copy(alpha = 0.62f)
@@ -829,7 +828,7 @@ private fun JustifiedWaterfallRow(
                                 )
                                 Text(
                                     text = "${entry.photos.size} 连拍",
-                                    fontFamily = JetBrainsMonoFontFamily,
+                                    fontFamily = DecoDisplayFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp,
                                     letterSpacing = 0.8.sp,
@@ -862,6 +861,7 @@ private fun JustifiedWaterfallRow(
                                         "点击展开对比"
                                     },
                                     style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = DecoDisplayFontFamily,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 1.sp,

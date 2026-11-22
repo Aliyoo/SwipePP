@@ -256,7 +256,7 @@ fun BookshelfScreen(
                                 )
                                 Text(
                                     text = summaryText,
-                                    fontFamily = JetBrainsMonoFontFamily,
+                                    fontFamily = DecoDisplayFontFamily,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = groundInk.copy(alpha = 0.82f),
@@ -361,6 +361,7 @@ fun BookshelfScreen(
                             Text(
                                 text = "移除示例",
                                 fontSize = 14.sp,
+                                fontFamily = DecoDisplayFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.14.sp,
                                 color = DecoPaperCream
@@ -397,6 +398,7 @@ fun BookshelfScreen(
                         Text(
                             text = "去授权",
                             fontSize = 12.sp,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.14.sp,
                             color = gold
@@ -457,6 +459,7 @@ fun BookshelfScreen(
                                     Text(
                                         text = filter.label,
                                         fontSize = if (isSelected) 14.5.sp else 13.5.sp,
+                                        fontFamily = DecoDisplayFontFamily,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                         letterSpacing = 0.14.sp,
                                         color = labelColor
@@ -740,6 +743,7 @@ private fun DecoYearCell(
             Text(
                 text = decoGanzhiOfYear(year),
                 fontSize = 12.sp,
+                fontFamily = DecoDisplayFontFamily,
                 letterSpacing = 0.2.sp,
                 color = if (isSelected) groundInk.copy(alpha = 0.88f) else groundInk.copy(alpha = 0.55f)
             )

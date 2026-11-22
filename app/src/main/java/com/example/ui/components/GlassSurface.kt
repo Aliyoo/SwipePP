@@ -77,7 +77,6 @@ import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.DecoVermShadowInk
-import com.example.ui.theme.EditorialSerifFontFamily
 import com.example.ui.theme.GlassDarkRimEnd
 import com.example.ui.theme.GlassDarkRimMid
 import com.example.ui.theme.GlassDarkRimStart
@@ -600,7 +599,7 @@ fun DecoSunburst(
 
 /**
  * 朱红通栏双动作条：左主动作 20sp 纸黄 + 1dp 金渐变中缝 + 右次动作 17sp 纸黄(0.88)。
- * 纸黄只压朱红底（可读性红线允许的组合），文字用 Editorial 衬线 + 0.14em 字距。
+ * 纸黄只压朱红底（可读性红线允许的组合），文字用站酷小薇画报美术字（DecoDisplayFontFamily）+ 0.14em 字距。
  */
 @Composable
 fun DecoVermStrip(
@@ -649,7 +648,7 @@ fun DecoVermStrip(
         ) {
             Text(
                 text = leftLabel,
-                fontFamily = EditorialSerifFontFamily,
+                fontFamily = DecoDisplayFontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp,
                 letterSpacing = 2.8.sp,
@@ -681,7 +680,7 @@ fun DecoVermStrip(
         ) {
             Text(
                 text = rightLabel,
-                fontFamily = EditorialSerifFontFamily,
+                fontFamily = DecoDisplayFontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 17.sp,
                 letterSpacing = 2.4.sp,

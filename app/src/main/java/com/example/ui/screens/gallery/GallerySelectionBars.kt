@@ -61,7 +61,6 @@ import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.DecoDisplayFontFamily
-import com.example.ui.theme.JetBrainsMonoFontFamily
 
 /* ---- 摩登画报 · 选择栏装饰（deco-app.html 金双线画框 / 朱红通栏 / 方章） ---- */
 private val SelectionBarShape = RoundedCornerShape(3.dp)
@@ -285,7 +284,7 @@ internal fun GallerySelectionTopBar(
                 )
                 Text(
                     text = "合计 ${formatStorageSize(selectedBytes)} · 点击可增减项目",
-                    fontFamily = JetBrainsMonoFontFamily,
+                    fontFamily = DecoDisplayFontFamily,
                     fontSize = 12.sp,
                     color = DecoInkOnGround.copy(alpha = 0.62f),
                     maxLines = 1,
@@ -319,6 +318,7 @@ internal fun GallerySelectionTopBar(
                             if (allSelected) R.string.action_deselect_all else R.string.action_select_all
                         ),
                         style = MaterialTheme.typography.labelLarge,
+                        fontFamily = DecoDisplayFontFamily,
                         fontSize = 12.sp,
                         color = if (allSelected) DecoMat else DecoInkOnGround.copy(alpha = 0.78f)
                     )

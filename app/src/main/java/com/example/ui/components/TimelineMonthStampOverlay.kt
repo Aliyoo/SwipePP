@@ -317,6 +317,7 @@ fun MonthlyClusterHeaderStamp(
             Text(
                 text = "${stampGanZhi(cluster.year)}年",
                 fontSize = 12.sp,
+                fontFamily = DecoDisplayFontFamily,
                 letterSpacing = 1.2.sp,
                 color = deco.decoGold
             )
@@ -338,6 +339,7 @@ fun MonthlyClusterHeaderStamp(
             Text(
                 text = cluster.compactSummaryText,
                 fontSize = 12.sp,
+                fontFamily = DecoDisplayFontFamily,
                 fontWeight = FontWeight.Medium,
                 letterSpacing = 1.sp,
                 color = deco.decoInkOnGround.copy(alpha = 0.62f),
@@ -355,6 +357,7 @@ fun MonthlyClusterHeaderStamp(
                     Text(
                         text = if (isMonthAllSelected) "已选本月" else "选本月",
                         fontSize = 12.sp,
+                        fontFamily = DecoDisplayFontFamily,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp,
                         color = if (isMonthAllSelected) deco.decoMat else deco.decoGold,
@@ -372,6 +375,7 @@ fun MonthlyClusterHeaderStamp(
                     Text(
                         text = if (cluster.isCleaned) "重温" else "整理",
                         fontSize = 12.sp,
+                        fontFamily = DecoDisplayFontFamily,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp,
                         color = if (cluster.isCleaned) deco.decoMat else deco.decoGold,
@@ -612,6 +616,7 @@ private fun TimelineMonthStampOverlayCore(
                                     Text(
                                         text = "${stampGanZhi(cluster.year)}年",
                                         fontSize = 12.sp,
+                                        fontFamily = DecoDisplayFontFamily,
                                         letterSpacing = 1.2.sp,
                                         color = gold
                                     )
@@ -634,6 +639,7 @@ private fun TimelineMonthStampOverlayCore(
                                             Text(
                                                 text = stringResource(R.string.timeline_month_cleaned_tag),
                                                 fontSize = 12.sp,
+                                                fontFamily = DecoDisplayFontFamily,
                                                 fontWeight = FontWeight.Bold,
                                                 letterSpacing = 0.8.sp,
                                                 color = gold
@@ -827,6 +833,7 @@ private fun StampMetricTag(
         Text(
             text = text,
             fontSize = 12.sp,
+            fontFamily = DecoDisplayFontFamily,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 0.8.sp,
             color = ink.copy(alpha = 0.66f)

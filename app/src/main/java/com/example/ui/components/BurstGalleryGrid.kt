@@ -528,6 +528,7 @@ fun BurstGalleryGrid(
                 Text(
                     text = activeZoomTier.label,
                     style = MaterialTheme.typography.labelMedium,
+                    fontFamily = DecoDisplayFontFamily,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.8.sp,
                     color = DecoPaperCream
@@ -686,6 +687,7 @@ private fun SingleGalleryTile(
                 Text(
                     text = "视频",
                     fontSize = 12.sp,
+                    fontFamily = DecoDisplayFontFamily,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.8.sp,
                     color = DecoPaperCream
@@ -1089,6 +1091,7 @@ private fun CollapsedBurstStackTile(
                     Text(
                         text = "连拍 ${burst.photos.size}",
                         fontSize = 12.sp,
+                        fontFamily = DecoDisplayFontFamily,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp,
                         color = DecoPaperCream
@@ -1098,6 +1101,7 @@ private fun CollapsedBurstStackTile(
                     Text(
                         text = if (allSelected) "已选整组" else "点击选整组",
                         fontSize = 12.sp,
+                        fontFamily = DecoDisplayFontFamily,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp,
                         color = DecoPaperCream
@@ -1185,6 +1189,7 @@ internal fun ExpandedBurstStackTray(
                         Text(
                             text = "快速连拍组 · ${burst.photos.size} 张",
                             style = MaterialTheme.typography.titleSmall,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.2.sp,
                             color = LocalFlipYearPalette.current.decoInkOnGround
@@ -1192,6 +1197,7 @@ internal fun ExpandedBurstStackTray(
                         Text(
                             text = headerSubtitle,
                             style = MaterialTheme.typography.labelSmall,
+                            fontFamily = DecoDisplayFontFamily,
                             fontSize = 12.sp,
                             letterSpacing = 1.sp,
                             color = LocalFlipYearPalette.current.decoInkOnGround.copy(alpha = 0.65f),
@@ -1223,6 +1229,7 @@ internal fun ExpandedBurstStackTray(
                         Text(
                             text = "收起",
                             style = MaterialTheme.typography.labelLarge,
+                            fontFamily = DecoDisplayFontFamily,
                             fontSize = 12.sp,
                             letterSpacing = 0.8.sp,
                             color = LocalFlipYearPalette.current.decoInkOnGround
@@ -1394,6 +1401,7 @@ private fun BurstFrameCard(
                     Text(
                         text = "最佳",
                         style = MaterialTheme.typography.labelSmall,
+                        fontFamily = DecoDisplayFontFamily,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp,
@@ -1461,6 +1469,7 @@ private fun BurstFrameCard(
                 Text(
                     text = if (isBest) "已选最佳" else "设为最佳",
                     style = MaterialTheme.typography.labelSmall,
+                    fontFamily = DecoDisplayFontFamily,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 0.8.sp,
@@ -1529,6 +1538,7 @@ private fun DecoMonthClusterHeader(
             Text(
                 text = "${decoGanZhi(cluster.year)}年",
                 fontSize = 12.sp,
+                fontFamily = DecoDisplayFontFamily,
                 letterSpacing = 1.2.sp,
                 color = deco.decoGold
             )
@@ -1550,6 +1560,7 @@ private fun DecoMonthClusterHeader(
             Text(
                 text = cluster.compactSummaryText,
                 fontSize = 12.sp,
+                fontFamily = DecoDisplayFontFamily,
                 fontWeight = FontWeight.Medium,
                 letterSpacing = 1.sp,
                 color = deco.decoInkOnGround.copy(alpha = 0.62f),
@@ -1567,6 +1578,7 @@ private fun DecoMonthClusterHeader(
                     Text(
                         text = if (isMonthAllSelected) "已选本月" else "选本月",
                         fontSize = 12.sp,
+                        fontFamily = DecoDisplayFontFamily,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp,
                         color = if (isMonthAllSelected) deco.decoMat else deco.decoGold,
@@ -1584,6 +1596,7 @@ private fun DecoMonthClusterHeader(
                     Text(
                         text = if (cluster.isCleaned) "重温" else "整理",
                         fontSize = 12.sp,
+                        fontFamily = DecoDisplayFontFamily,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp,
                         color = if (cluster.isCleaned) deco.decoMat else deco.decoGold,

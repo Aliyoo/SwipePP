@@ -25,18 +25,20 @@ val EditorialSerifFontFamily = FontFamily(
 )
 
 /**
- * 思源宋体 Bold（画报美术字·汉字展示专用，Noto Serif SC 700，OFL 授权）。
- * 原型展示字回退链 'ZCOOL XiaoWei' → 'Noto Serif SC' 的最终生效体：小薇在 Google
- * 管线中存在轮廓绕行缺陷（回/画/查/鱼等封闭字填成实心块，浏览器与 TTF 双端复现），
- * 故取回退链终点思源宋体 Bold —— 粗宋大字正是月份牌美术字语言，字形零缺陷。
- * 已按 App 字符集子集化（~0.3MB）；超出字集的动态内容回退系统字体。
- * 单字重(700)：Bold/Medium 请求都解析到本字面。
+ * 站酷小薇（画报美术字·汉字展示专用，原型同源字体 ZCOOL XiaoWei，OFL 授权）。
+ * 上游字体在部分封闭结构字上轮廓绕行同向（TrueType nonzero 规则下镂空被填成实心块），
+ * 本文件已做两步修复：
+ *  1) 回圃圊徊痼 —— 内轮廓反向（恢复镂空）；
+ *  2) 85 个 App 语料内缺陷字（仅例依停包呼…我收断斯版留网藏雾预题级线维缩缺等）——
+ *     以思源宋体 Bold 同形字经 Cu2Qu 转换替换（advance 不变），并剥离 fpgm/prep/cvt/gasp
+ *     提示表避免小薇削细指令作用于替换字形。检测口径：封闭镂空面积 vs 参考字体。
+ * 单字重(400)：Bold/Medium 请求都解析到本字面。
  */
 val DecoDisplayFontFamily = FontFamily(
-    Font(R.font.noto_serif_sc_display, FontWeight.Normal),
-    Font(R.font.noto_serif_sc_display, FontWeight.Medium),
-    Font(R.font.noto_serif_sc_display, FontWeight.SemiBold),
-    Font(R.font.noto_serif_sc_display, FontWeight.Bold)
+    Font(R.font.zcool_xiaowei, FontWeight.Normal),
+    Font(R.font.zcool_xiaowei, FontWeight.Medium),
+    Font(R.font.zcool_xiaowei, FontWeight.SemiBold),
+    Font(R.font.zcool_xiaowei, FontWeight.Bold)
 )
 
 val OutfitFontFamily = FontFamily(

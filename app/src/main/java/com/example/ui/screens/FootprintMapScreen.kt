@@ -594,6 +594,7 @@ fun FootprintMapScreen(
                             Text(
                                 text = "当前仅显示${uiState.mediaFilter.label}",
                                 fontSize = 13.sp,
+                                fontFamily = DecoDisplayFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 color = ink
                             )
@@ -941,7 +942,7 @@ fun FootprintMapScreen(
                             )
                             Text(
                                 text = "${unlocatedPhotos.size} 项媒体 · ${formatStorageSize(totalBytes)} · 截图/网图/未开定位拍摄",
-                                fontFamily = JetBrainsMonoFontFamily,
+                                fontFamily = DecoDisplayFontFamily,
                                 fontSize = 12.sp,
                                 color = ink.copy(alpha = 0.68f),
                                 maxLines = 1,

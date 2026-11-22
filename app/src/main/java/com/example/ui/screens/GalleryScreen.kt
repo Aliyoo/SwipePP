@@ -648,6 +648,7 @@ fun GalleryScreen(
                                                 Text(
                                                     text = if (isFilteredView) "整理当前结果" else "滑动整理",
                                                     style = MaterialTheme.typography.labelLarge,
+                                                    fontFamily = DecoDisplayFontFamily,
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = DecoGold
@@ -706,6 +707,7 @@ fun GalleryScreen(
                                             Text(
                                                 text = "全局筛选：仅显示${uiState.mediaFilter.label}",
                                                 style = MaterialTheme.typography.labelMedium,
+                                                fontFamily = DecoDisplayFontFamily,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = DecoInkOnGround
                                             )
@@ -718,6 +720,7 @@ fun GalleryScreen(
                                         ) {
                                             Text(
                                                 text = "显示全部",
+                                                fontFamily = DecoDisplayFontFamily,
                                                 color = DecoVerm,
                                                 fontWeight = FontWeight.Bold
                                             )
@@ -894,6 +897,7 @@ fun GalleryScreen(
                                 else -> "画廊暂无照片与视频"
                             },
                             style = MaterialTheme.typography.headlineMedium,
+                            fontFamily = DecoDisplayFontFamily,
                             color = DecoInkOnGround,
                             textAlign = TextAlign.Center
                         )

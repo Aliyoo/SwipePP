@@ -75,6 +75,7 @@ import com.example.ui.components.InlineVideoPlayer
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.formatEditorialPhotoTitle
 import com.example.ui.components.formatStorageSize
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoInkDeep
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoScrimInk
@@ -404,6 +405,7 @@ internal fun ModernArcSwipeCard(
                                 Text(
                                     text = "${item.photos.size} 张连拍",
                                     fontSize = 12.sp,
+                                    fontFamily = DecoDisplayFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     color = DecoPaperCream
                                 )
@@ -430,6 +432,7 @@ internal fun ModernArcSwipeCard(
                                 Text(
                                     text = "最佳 · 画质 ${item.bestPhoto.qualityScore}",
                                     fontSize = 12.sp,
+                                    fontFamily = DecoDisplayFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     color = DecoPaperCream
                                 )
@@ -500,6 +503,7 @@ internal fun ModernArcSwipeCard(
                                 Text(
                                     text = "松手移入回收站 (+${formatStorageSize(item.totalBytes)})",
                                     fontSize = 14.sp,
+                                    fontFamily = DecoDisplayFontFamily,
                                     fontWeight = FontWeight.SemiBold,
                                     color = DecoInkDeep
                                 )
@@ -541,6 +545,7 @@ internal fun ModernArcSwipeCard(
                                         "松手保留入册"
                                     },
                                     fontSize = 14.sp,
+                                    fontFamily = DecoDisplayFontFamily,
                                     fontWeight = FontWeight.SemiBold,
                                     color = DecoInkDeep
                                 )
@@ -561,6 +566,7 @@ internal fun ModernArcSwipeCard(
                     Text(
                         text = formatEditorialPhotoTitle(item.primaryPhoto),
                         fontSize = 14.sp,
+                        fontFamily = DecoDisplayFontFamily,
                         fontWeight = FontWeight.SemiBold,
                         color = DecoPaperCream,
                         maxLines = 1,
@@ -571,6 +577,7 @@ internal fun ModernArcSwipeCard(
                         Text(
                             text = "点此展开",
                             fontSize = 12.sp,
+                            fontFamily = DecoDisplayFontFamily,
                             color = decoGold,
                             fontWeight = FontWeight.Bold
                         )
@@ -578,6 +585,7 @@ internal fun ModernArcSwipeCard(
                         Text(
                             text = "内嵌播放中 · 点全屏",
                             fontSize = 12.sp,
+                            fontFamily = DecoDisplayFontFamily,
                             color = decoGold,
                             fontWeight = FontWeight.Bold
                         )

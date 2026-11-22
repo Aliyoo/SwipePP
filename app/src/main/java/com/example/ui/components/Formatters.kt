@@ -27,10 +27,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.PhotoItemEntity
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.EmeraldKeep
 import com.example.ui.theme.EmeraldSoft
-import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.OutfitFontFamily
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -215,14 +214,14 @@ fun CleanedCompletionBadge(
             Column {
                 Text(
                     text = if (showMonthPrefix) "${month}月已整理" else "已整理",
-                    fontFamily = OutfitFontFamily,
+                    fontFamily = DecoDisplayFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
                     color = EmeraldKeep
                 )
                 Text(
                     text = if (freedBytes > 0L) "释放 ${formatStorageSize(freedBytes)}" else "全部保留",
-                    fontFamily = JetBrainsMonoFontFamily,
+                    fontFamily = DecoDisplayFontFamily,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 10.sp,
                     color = EmeraldKeep.copy(alpha = 0.85f)

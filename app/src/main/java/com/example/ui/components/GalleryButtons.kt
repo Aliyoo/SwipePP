@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.CobaltDark
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CoralDanger
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoInkDeep
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.GlassLightBottom
@@ -272,6 +273,7 @@ fun GalleryActionButton(
             Text(
                 text = text,
                 style = MaterialTheme.typography.titleSmall,
+                fontFamily = DecoDisplayFontFamily,
                 fontWeight = FontWeight.SemiBold,
                 color = contentColor,
                 maxLines = 1,
@@ -465,6 +467,7 @@ fun GalleryTactileOrbButton(
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
+            fontFamily = DecoDisplayFontFamily,
             fontWeight = FontWeight.SemiBold,
             fontSize = 11.sp,
             color = InkSecondary
@@ -607,6 +610,7 @@ fun GallerySculptedHeroButton(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
+                fontFamily = DecoDisplayFontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.5.sp,
                 color = contentColor,

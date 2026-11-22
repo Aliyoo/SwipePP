@@ -406,6 +406,7 @@ internal fun ModernYearbook3DCard(
                                         text = "封",
                                         fontSize = 13.sp,
                                         lineHeight = 14.sp,
+                                        fontFamily = DecoDisplayFontFamily,
                                         fontWeight = FontWeight.SemiBold,
                                         color = gold
                                     )
@@ -413,6 +414,7 @@ internal fun ModernYearbook3DCard(
                                         text = "面",
                                         fontSize = 13.sp,
                                         lineHeight = 14.sp,
+                                        fontFamily = DecoDisplayFontFamily,
                                         fontWeight = FontWeight.SemiBold,
                                         color = gold
                                     )

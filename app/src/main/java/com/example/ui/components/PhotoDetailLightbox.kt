@@ -102,6 +102,7 @@ import com.example.data.PhotoItemEntity
 import com.example.data.PhotoStatus
 import com.example.sensor.rememberHapticEngine
 import com.example.ui.theme.CoralDanger
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoGround
 import com.example.ui.theme.DecoGroundDeep
@@ -780,6 +781,7 @@ private fun LightboxBottomHud(
                                 Text(
                                     text = photo.locationName.orEmpty(),
                                     style = MaterialTheme.typography.titleMedium,
+                                    fontFamily = DecoDisplayFontFamily,
                                     fontWeight = FontWeight.SemiBold,
                                     letterSpacing = 1.2.sp,
                                     color = Color.White,
@@ -790,7 +792,7 @@ private fun LightboxBottomHud(
                             if (photo.caption.isNotBlank()) {
                                 Text(
                                     text = photo.caption,
-                                    fontFamily = if (isMachineGeneratedFilename(photo.caption)) JetBrainsMonoFontFamily else null,
+                                    fontFamily = if (isMachineGeneratedFilename(photo.caption)) JetBrainsMonoFontFamily else DecoDisplayFontFamily,
                                     style = MaterialTheme.typography.labelSmall,
                                     letterSpacing = 1.sp,
                                     color = Color.White.copy(alpha = 0.56f),
@@ -802,6 +804,7 @@ private fun LightboxBottomHud(
                             Text(
                                 text = editorialTitle,
                                 style = MaterialTheme.typography.titleMedium,
+                                fontFamily = DecoDisplayFontFamily,
                                 fontWeight = FontWeight.SemiBold,
                                 letterSpacing = 1.2.sp,
                                 color = Color.White,

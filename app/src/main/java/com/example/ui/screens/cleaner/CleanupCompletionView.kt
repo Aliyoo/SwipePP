@@ -52,6 +52,7 @@ import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.formatStorageSize
 import com.example.ui.components.monthChineseName
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoInkOnGround
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoVermInk
@@ -132,6 +133,7 @@ internal fun DecoVermStripButton(
             Text(
                 text = title,
                 fontSize = 20.sp,
+                fontFamily = DecoDisplayFontFamily,
                 fontWeight = FontWeight.Bold,
                 color = DecoPaperCream,
                 letterSpacing = 2.sp,
@@ -147,7 +149,8 @@ internal fun DecoVermStripButton(
                 ) {
                     Text(
                         text = badgeText,
-                        fontFamily = JetBrainsMonoFontFamily,
+                        // 徽记含汉字（「34 项」）走画报美术字；纯数字体积（「1.2 GB」）保留 mono 遥测语法
+                        fontFamily = if (badgeText.any { it.code in 0x4E00..0x9FFF }) DecoDisplayFontFamily else JetBrainsMonoFontFamily,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 13.sp,
                         color = DecoPaperCream,
@@ -208,6 +211,7 @@ internal fun CleanupCompletedCelebration(
                 else -> "$title 完成"
             },
             fontSize = 22.sp,
+            fontFamily = DecoDisplayFontFamily,
             fontWeight = FontWeight.Bold,
             color = inkOnGround,
             textAlign = TextAlign.Center
@@ -377,6 +381,7 @@ private fun DecoGoldTextLink(
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge,
+            fontFamily = DecoDisplayFontFamily,
             fontSize = 13.sp,
             letterSpacing = 1.sp,
             color = gold,
@@ -402,6 +407,7 @@ private fun CompletionMetricSlot(
         Text(
             text = label,
             fontSize = 12.sp,
+            fontFamily = DecoDisplayFontFamily,
             color = inkOnGround.copy(alpha = 0.55f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -418,6 +424,7 @@ private fun CompletionMetricSlot(
         Text(
             text = subLabel,
             fontSize = 12.sp,
+            fontFamily = DecoDisplayFontFamily,
             color = inkOnGround.copy(alpha = 0.72f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis

@@ -383,6 +383,7 @@ fun FlipbookScreen(
                             Text(
                                 text = topSubtitle,
                                 fontSize = 12.sp,
+                                fontFamily = DecoDisplayFontFamily,
                                 color = DecoInkOnGround.copy(alpha = 0.66f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -638,6 +639,7 @@ fun FlipbookScreen(
                                         ) {
                                             Text(
                                                 text = monthChineseName(monthModel.month),
+                                                fontFamily = DecoDisplayFontFamily,
                                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                                                 fontSize = if (selected) 13.sp else 12.sp,
                                                 letterSpacing = 0.6.sp,
@@ -1000,6 +1002,7 @@ private fun DecoMonthPosterPage(
                         Text(
                             text = "${ganzhiOfYear(page.year)}年",
                             fontSize = 13.sp,
+                            fontFamily = DecoDisplayFontFamily,
                             letterSpacing = 1.sp,
                             fontWeight = FontWeight.Medium,
                             color = DecoPaperCream.copy(alpha = 0.95f),
@@ -1045,7 +1048,7 @@ private fun DecoMonthPosterPage(
             ) {
                 Text(
                     text = editorialMetaLine,
-                    fontFamily = JetBrainsMonoFontFamily,
+                    fontFamily = DecoDisplayFontFamily,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     color = DecoInkOnGround.copy(alpha = 0.72f),
@@ -1057,7 +1060,7 @@ private fun DecoMonthPosterPage(
                     val freedBytes = page.stamp?.freedBytes ?: 0L
                     Text(
                         text = if (freedBytes > 0L) "释放 ${formatStorageSize(freedBytes)}" else "全部保留",
-                        fontFamily = JetBrainsMonoFontFamily,
+                        fontFamily = DecoDisplayFontFamily,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = DecoGold,
@@ -1098,6 +1101,7 @@ private fun DecoMonthPosterPage(
                     Text(
                         text = "${monthChineseName(page.month)}暂无照片或视频",
                         fontSize = 15.sp,
+                        fontFamily = DecoDisplayFontFamily,
                         fontWeight = FontWeight.SemiBold,
                         color = DecoInkOnGround,
                         textAlign = TextAlign.Center
@@ -1191,7 +1195,7 @@ private fun DecoMonthPosterPage(
                         }
                         Text(
                             text = badge,
-                            fontFamily = JetBrainsMonoFontFamily,
+                            fontFamily = DecoDisplayFontFamily,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = DecoInkOnGround.copy(alpha = 0.66f),
@@ -1278,7 +1282,7 @@ private fun MonthCalendarGrid(
             weekHeaders.forEach { dayName ->
                 Text(
                     text = dayName,
-                    fontFamily = JetBrainsMonoFontFamily,
+                    fontFamily = DecoDisplayFontFamily,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = DecoInkOnGround.copy(alpha = 0.72f),
@@ -1565,6 +1569,7 @@ private fun DecoMonthArchiveSeal(
         Text(
             text = "已整理",
             fontSize = 12.sp,
+            fontFamily = DecoDisplayFontFamily,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.sp,
             color = cream
@@ -1681,6 +1686,7 @@ private fun DecoModeTab(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
+                fontFamily = DecoDisplayFontFamily,
                 fontWeight = FontWeight.SemiBold,
                 color = textColor,
                 maxLines = 1,

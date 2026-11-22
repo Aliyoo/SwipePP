@@ -547,7 +547,7 @@ private fun ExpandedFootprintScrubFlag(
                     ) {
                         Text(
                             text = "${activeStop.mediaCount} 项 · ${formatStorageSize(activeStop.totalBytes)}",
-                            fontFamily = JetBrainsMonoFontFamily,
+                            fontFamily = DecoDisplayFontFamily,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             letterSpacing = 1.sp,
@@ -573,6 +573,7 @@ private fun ExpandedFootprintScrubFlag(
                                 Text(
                                     text = "已整理",
                                     fontSize = 12.sp,
+                                    fontFamily = DecoDisplayFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 0.8.sp,
                                     color = mat
@@ -589,7 +590,7 @@ private fun ExpandedFootprintScrubFlag(
                             ) {
                                 Text(
                                     text = "${activeStop.unreviewedCount} 待理",
-                                    fontFamily = JetBrainsMonoFontFamily,
+                                    fontFamily = DecoDisplayFontFamily,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 0.8.sp,

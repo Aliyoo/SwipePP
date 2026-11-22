@@ -59,7 +59,6 @@ import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.DecoDisplayFontFamily
-import com.example.ui.theme.JetBrainsMonoFontFamily
 
 private val CURATED_ALBUM_PRESETS = listOf("精选珍藏", "旅行日记", "家庭相册", "灵感素材")
 
@@ -123,7 +122,7 @@ internal fun BulkMoveDestinationSheet(
                     )
                     Text(
                         text = "已选 $selectedCount 项媒体 · 共 ${formatStorageSize(selectedBytes)}",
-                        fontFamily = JetBrainsMonoFontFamily,
+                        fontFamily = DecoDisplayFontFamily,
                         fontSize = 12.sp,
                         color = DecoInkOnGround.copy(alpha = 0.62f)
                     )
@@ -173,6 +172,7 @@ internal fun BulkMoveDestinationSheet(
                         Text(
                             text = album,
                             fontSize = 12.sp,
+                            fontFamily = DecoDisplayFontFamily,
                             color = if (selected) DecoMat else DecoInkOnGround.copy(alpha = 0.78f)
                         )
                     }
@@ -266,7 +266,7 @@ internal fun BulkMoveDestinationSheet(
                                     ) {
                                         Text(
                                             text = "${yr}年",
-                                            fontFamily = JetBrainsMonoFontFamily,
+                                            fontFamily = DecoDisplayFontFamily,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = if (isSel) DecoMat else DecoInkOnGround.copy(alpha = 0.78f)
@@ -284,6 +284,7 @@ internal fun BulkMoveDestinationSheet(
                                         Text(
                                             text = monthChineseName(month),
                                             fontSize = 12.sp,
+                                            fontFamily = DecoDisplayFontFamily,
                                             color = if (isSel) DecoMat else DecoInkOnGround.copy(alpha = 0.78f)
                                         )
                                     }

@@ -48,6 +48,8 @@ import com.example.ui.CleanupCardItem
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.formatShortTime
 import com.example.ui.components.formatStorageSize
+import com.example.ui.components.isMachineGeneratedFilename
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LocalFlipYearPalette
@@ -96,6 +98,7 @@ internal fun BurstComparisonSheet(
                 Text(
                     text = "连拍精选对比 · 共 ${stack.photos.size} 张",
                     fontSize = 20.sp,
+                    fontFamily = DecoDisplayFontFamily,
                     fontWeight = FontWeight.Bold,
                     color = inkOnGround
                 )
@@ -135,6 +138,7 @@ internal fun BurstComparisonSheet(
                     Text(
                         text = "看大图",
                         fontSize = 12.sp,
+                        fontFamily = DecoDisplayFontFamily,
                         fontWeight = FontWeight.Bold,
                         color = decoGold
                     )
@@ -247,6 +251,7 @@ internal fun BurstComparisonSheet(
                                         Text(
                                             text = "保留",
                                             fontSize = 12.sp,
+                                            fontFamily = DecoDisplayFontFamily,
                                             fontWeight = FontWeight.Bold,
                                             color = DecoPaperCream
                                         )
@@ -275,6 +280,12 @@ internal fun BurstComparisonSheet(
                         }
                         Text(
                             text = photo.caption.ifBlank { "连拍帧 #${idx + 1}" },
+                            // 机器文件名走 mono（latin 保留），用户题注/中文兜底走画报美术字
+                            fontFamily = if (photo.caption.isNotBlank() && isMachineGeneratedFilename(photo.caption)) {
+                                JetBrainsMonoFontFamily
+                            } else {
+                                DecoDisplayFontFamily
+                            },
                             fontSize = 12.sp,
                             color = inkOnGround,
                             maxLines = 1,

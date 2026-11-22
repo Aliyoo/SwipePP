@@ -38,11 +38,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.CleanupCardItem
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoInkOnGround
 import com.example.ui.theme.DecoMat
@@ -362,7 +364,7 @@ fun ArcTimeScaleScrubber(
         // Start / Mid / End labels anchored neatly below the arc
         Text(
             text = startLabel,
-            fontFamily = JetBrainsMonoFontFamily,
+            fontFamily = tickLabelFontFamily(startLabel),
             fontSize = 12.sp,
             color = labelColor,
             modifier = Modifier
@@ -372,7 +374,7 @@ fun ArcTimeScaleScrubber(
         )
         Text(
             text = if (isDragging) currentLabel else midLabel,
-            fontFamily = JetBrainsMonoFontFamily,
+            fontFamily = tickLabelFontFamily(if (isDragging) currentLabel else midLabel),
             fontSize = 12.sp,
             fontWeight = if (isDragging) FontWeight.Bold else FontWeight.Medium,
             color = if (isDragging) activeArcColor else labelColor,
@@ -382,7 +384,7 @@ fun ArcTimeScaleScrubber(
         )
         Text(
             text = endLabel,
-            fontFamily = JetBrainsMonoFontFamily,
+            fontFamily = tickLabelFontFamily(endLabel),
             fontSize = 12.sp,
             color = labelColor,
             modifier = Modifier
@@ -408,7 +410,7 @@ fun ArcTimeScaleScrubber(
             ) {
                 Text(
                     text = currentLabel,
-                    fontFamily = JetBrainsMonoFontFamily,
+                    fontFamily = tickLabelFontFamily(currentLabel),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = DecoInkOnGround,
@@ -438,3 +440,10 @@ private fun formatArcCursorLabel(millis: Long, granularity: ArcTimeGranularity):
     }
     return SimpleDateFormat(pattern, Locale.CHINA).format(Date(millis))
 }
+
+/**
+ * 刻度标签字体：纯数字/拉丁刻度（"18:17"、"11/18"）保留 mono 遥测语法；
+ * 含汉字刻度（月粒度 "11月"）走站酷小薇画报美术字，避免汉字回退系统黑体。
+ */
+private fun tickLabelFontFamily(label: String): FontFamily =
+    if (label.any { it.code in 0x4E00..0x9FFF }) DecoDisplayFontFamily else JetBrainsMonoFontFamily

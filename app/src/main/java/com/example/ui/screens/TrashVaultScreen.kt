@@ -101,6 +101,7 @@ import com.example.ui.components.PhotoDetailLightbox
 import com.example.ui.components.daysStagedInVault
 import com.example.ui.components.formatStorageSize
 import com.example.ui.components.formatVaultStagedLabel
+import com.example.ui.components.isMachineGeneratedFilename
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoGround
 import com.example.ui.theme.DecoGroundDeep
@@ -239,6 +240,7 @@ fun TrashVaultScreen(
                         Text(
                             text = "仅看本次清理（${displayedTrashed.size} 项）",
                             fontSize = 13.sp,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.SemiBold,
                             color = DecoInkOnGround,
                             modifier = Modifier.weight(1f)
@@ -251,6 +253,7 @@ fun TrashVaultScreen(
                         ) {
                             Text(
                                 text = "查看全部 (${uiState.trashedPhotos.size})",
+                                fontFamily = DecoDisplayFontFamily,
                                 color = DecoGold,
                                 fontWeight = FontWeight.Bold
                             )
@@ -314,7 +317,6 @@ fun TrashVaultScreen(
                             "回收站很干净"
                         },
                         fontSize = 22.sp,
-                        fontFamily = FontFamily.Default,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     )
@@ -394,6 +396,7 @@ fun TrashVaultScreen(
                             ) {
                                 Text(
                                     text = if (allSelected) "取消全选" else "全选",
+                                    fontFamily = DecoDisplayFontFamily,
                                     color = DecoGold,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold
@@ -541,6 +544,7 @@ fun TrashVaultScreen(
                     } else {
                         "确认释放 ${formatStorageSize(targetBytes)}？"
                     },
+                    fontFamily = DecoDisplayFontFamily,
                     color = DecoInkOnGround
                 )
             },
@@ -571,7 +575,11 @@ fun TrashVaultScreen(
                     onClick = { showPurgeDialog = false },
                     modifier = Modifier.heightIn(min = 48.dp)
                 ) {
-                    Text("取消", color = DecoInkOnGround.copy(alpha = 0.72f))
+                    Text(
+                        text = "取消",
+                        fontFamily = DecoDisplayFontFamily,
+                        color = DecoInkOnGround.copy(alpha = 0.72f)
+                    )
                 }
             }
         )
@@ -601,6 +609,7 @@ private fun VaultCompactSummaryContent(
                 Text(
                     text = if (isPartialSelection) "已选待释放空间" else "本次待释放空间",
                     fontSize = 12.sp,
+                    fontFamily = DecoDisplayFontFamily,
                     color = DecoInkOnGround.copy(alpha = 0.62f)
                 )
                 // 美术字大数（待释放空间）
@@ -620,7 +629,7 @@ private fun VaultCompactSummaryContent(
                 ) {
                     Text(
                         text = "$targetsCount 项待确认",
-                        fontFamily = JetBrainsMonoFontFamily,
+                        fontFamily = DecoDisplayFontFamily,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = DecoPaperCream,
@@ -640,7 +649,7 @@ private fun VaultCompactSummaryContent(
 
         Text(
             text = "历史累计已释放 ${formatStorageSize(totalPurgedBytes)} · 压缩节省 ${formatStorageSize(totalCompressedSavedBytes)}",
-            fontFamily = JetBrainsMonoFontFamily,
+            fontFamily = DecoDisplayFontFamily,
             fontSize = 12.sp,
             color = DecoInkOnGround.copy(alpha = 0.66f),
             maxLines = 1,
@@ -767,6 +776,7 @@ private fun VaultDecoMediaCard(
                             text = "还\n原",
                             fontSize = 12.sp,
                             lineHeight = 14.sp,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.SemiBold,
                             color = DecoPaperCream,
                             textAlign = TextAlign.Center
@@ -789,6 +799,7 @@ private fun VaultDecoMediaCard(
                         Text(
                             text = formatVaultStagedLabel(photo.trashedAtMillis),
                             fontSize = 12.sp,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.Bold,
                             color = if (isUrgent) DecoPaperCream else DecoPaperCream.copy(alpha = 0.85f),
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -822,6 +833,12 @@ private fun VaultDecoMediaCard(
                 )
                 Text(
                     text = metaLabel,
+                    // 机器文件名走 mono（latin 保留），中文兜底/题注走画报美术字
+                    fontFamily = if (photo.caption.isNotBlank() && isMachineGeneratedFilename(photo.caption)) {
+                        JetBrainsMonoFontFamily
+                    } else {
+                        DecoDisplayFontFamily
+                    },
                     fontSize = 12.sp,
                     color = ink,
                     maxLines = 1,

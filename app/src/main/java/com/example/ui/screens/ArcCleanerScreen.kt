@@ -110,6 +110,7 @@ import com.example.ui.screens.cleaner.BurstComparisonSheet
 import com.example.ui.screens.cleaner.CleanupCompletedCelebration
 import com.example.ui.screens.cleaner.DecoVermStripButton
 import com.example.ui.screens.cleaner.ModernArcSwipeCard
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoGround
 import com.example.ui.theme.DecoGroundDeep
@@ -382,6 +383,7 @@ fun ArcCleanerScreen(
                         Text(
                             text = title,
                             fontSize = 22.sp,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.Bold,
                             color = DecoInkOnGround,
                             maxLines = 1,
@@ -395,6 +397,7 @@ fun ArcCleanerScreen(
                                 else -> "剩余 ${displayedQueue.size} 项待整理"
                             },
                             fontSize = 12.sp,
+                            fontFamily = DecoDisplayFontFamily,
                             letterSpacing = 0.5.sp,
                             color = DecoGold,
                             modifier = Modifier.semantics {
@@ -510,6 +513,7 @@ fun ArcCleanerScreen(
                         Text(
                             text = stringResource(R.string.shake_undo_toast),
                             style = MaterialTheme.typography.labelLarge,
+                            fontFamily = DecoDisplayFontFamily,
                             color = DecoPaperCream
                         )
                     }
@@ -618,7 +622,7 @@ fun ArcCleanerScreen(
                         )
                         Text(
                             text = "${activeItem.primaryPhoto.month}月${activeItem.primaryPhoto.day}日 · ${safePage + 1}/${displayedQueue.size}",
-                            fontFamily = JetBrainsMonoFontFamily,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 12.sp,
                             color = DecoInkOnGround
@@ -652,6 +656,7 @@ fun ArcCleanerScreen(
                                         "仅看 ${initialFocusDay}日 ($focusedDayCount)"
                                     },
                                     fontSize = 12.sp,
+                                    fontFamily = DecoDisplayFontFamily,
                                     fontWeight = FontWeight.SemiBold,
                                     color = if (onlyFocusedDay) onGold else DecoInkOnGround
                                 )
@@ -774,6 +779,7 @@ fun ArcCleanerScreen(
                         Text(
                             text = "${ganzhi}年",
                             fontSize = 12.sp,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 1.sp,
                             color = DecoGold
@@ -782,7 +788,7 @@ fun ArcCleanerScreen(
                     }
                     Text(
                         text = formatPhotoDateTime(activeItem.primaryPhoto.takenAtMillis),
-                        fontFamily = JetBrainsMonoFontFamily,
+                        fontFamily = DecoDisplayFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                         color = DecoInkOnGround
@@ -791,6 +797,7 @@ fun ArcCleanerScreen(
                         Text(
                             text = loc,
                             fontSize = 12.sp,
+                            fontFamily = DecoDisplayFontFamily,
                             color = DecoInkOnGround.copy(alpha = 0.72f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -799,7 +806,7 @@ fun ArcCleanerScreen(
                     if (activeItem.primaryPhoto.isVideo) {
                         Text(
                             text = "视频 ${formatVideoDuration(activeItem.primaryPhoto.durationMs)}",
-                            fontFamily = JetBrainsMonoFontFamily,
+                            fontFamily = DecoDisplayFontFamily,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = DecoGold
@@ -884,6 +891,7 @@ fun ArcCleanerScreen(
                                                 Text(
                                                     text = "仅保留最佳帧",
                                                     fontSize = 19.sp,
+                                                    fontFamily = DecoDisplayFontFamily,
                                                     fontWeight = FontWeight.Bold,
                                                     letterSpacing = 1.sp,
                                                     color = DecoPaperCream,
@@ -893,6 +901,7 @@ fun ArcCleanerScreen(
                                                 Text(
                                                     text = "画质 ${current.bestPhoto.qualityScore} · 其余 ${current.photos.size - 1} 张进回收站",
                                                     fontSize = 12.sp,
+                                                    fontFamily = DecoDisplayFontFamily,
                                                     color = DecoPaperCream.copy(alpha = 0.78f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
@@ -905,7 +914,7 @@ fun ArcCleanerScreen(
                                             ) {
                                                 Text(
                                                     text = "省 ${formatStorageSize(current.nonBestBytes)}",
-                                                    fontFamily = JetBrainsMonoFontFamily,
+                                                    fontFamily = DecoDisplayFontFamily,
                                                     fontWeight = FontWeight.SemiBold,
                                                     fontSize = 12.sp,
                                                     color = DecoPaperCream,

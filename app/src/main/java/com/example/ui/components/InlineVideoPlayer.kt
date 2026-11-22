@@ -79,6 +79,7 @@ import androidx.media3.ui.PlayerView
 import com.example.R
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoGround
 import com.example.ui.theme.DecoInkOnGround
@@ -333,6 +334,7 @@ fun InlineVideoPlayer(
                     Text(
                         text = "$playbackError · 点击重试",
                         style = MaterialTheme.typography.labelMedium,
+                        fontFamily = DecoDisplayFontFamily,
                         color = DecoPaperCream
                     )
                 }

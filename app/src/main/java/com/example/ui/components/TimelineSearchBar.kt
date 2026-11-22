@@ -90,6 +90,7 @@ import com.example.ui.DescriptiveTag
 import com.example.ui.LocationCluster
 import com.example.ui.SEARCH_UNLOCATED_TOKEN
 import com.example.ui.TimelineSearchQuery
+import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoInkOnGround
 import com.example.ui.theme.DecoMat
@@ -291,6 +292,7 @@ fun TimelineGlobalSearchBar(
                         Text(
                             text = if (filterCount > 0) "筛选 $filterCount" else "筛选",
                             style = MaterialTheme.typography.labelLarge,
+                            fontFamily = DecoDisplayFontFamily,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (filterCount > 0) DecoMat else DecoGold
@@ -322,7 +324,7 @@ fun TimelineGlobalSearchBar(
                     ) {
                         Text(
                             text = "匹配 $resultCount 项",
-                            fontFamily = JetBrainsMonoFontFamily,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp,
                             color = DecoInkOnGround,
@@ -426,6 +428,7 @@ fun TimelineGlobalSearchBar(
                             Text(
                                 text = stringResource(R.string.timeline_search_clear_all),
                                 style = MaterialTheme.typography.labelMedium,
+                                fontFamily = DecoDisplayFontFamily,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = DecoInkOnGround.copy(alpha = 0.72f)
@@ -471,6 +474,7 @@ private fun RemovableFilterPill(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
+                fontFamily = DecoDisplayFontFamily,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = DecoInkOnGround,
@@ -575,6 +579,7 @@ fun TimelineSearchFilterSheet(
                     Text(
                         text = stringResource(R.string.timeline_search_filter_title),
                         style = MaterialTheme.typography.headlineSmall,
+                        fontFamily = DecoDisplayFontFamily,
                         fontWeight = FontWeight.Bold,
                         color = DecoInkOnGround
                     )
@@ -603,6 +608,7 @@ fun TimelineSearchFilterSheet(
                     ) {
                         Text(
                             text = "重置筛选",
+                            fontFamily = DecoDisplayFontFamily,
                             color = DecoVerm,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -652,6 +658,7 @@ fun TimelineSearchFilterSheet(
                         Text(
                             text = "智能视图",
                             style = MaterialTheme.typography.titleSmall,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.Bold,
                             color = DecoInkOnGround
                         )
@@ -682,6 +689,7 @@ fun TimelineSearchFilterSheet(
                                         if (allBurstsExpanded) R.string.burst_collapse_all else R.string.burst_expand_all
                                     ),
                                     style = MaterialTheme.typography.labelMedium,
+                                    fontFamily = DecoDisplayFontFamily,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (allBurstsExpanded) DecoMat else DecoGold
@@ -711,6 +719,7 @@ fun TimelineSearchFilterSheet(
                             Text(
                                 text = textLabel,
                                 style = MaterialTheme.typography.labelLarge,
+                                fontFamily = DecoDisplayFontFamily,
                                 fontSize = 12.sp,
                                 color = decoTagContentColor(selected)
                             )
@@ -735,6 +744,7 @@ fun TimelineSearchFilterSheet(
                         Text(
                             text = "相册分类",
                             style = MaterialTheme.typography.titleSmall,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.Bold,
                             color = DecoInkOnGround
                         )
@@ -761,6 +771,7 @@ fun TimelineSearchFilterSheet(
                                 Text(
                                     text = albumName,
                                     style = MaterialTheme.typography.labelLarge,
+                                    fontFamily = DecoDisplayFontFamily,
                                     fontSize = 12.sp,
                                     color = decoTagContentColor(selected)
                                 )
@@ -790,6 +801,7 @@ fun TimelineSearchFilterSheet(
                         Text(
                             text = stringResource(R.string.timeline_search_date_range),
                             style = MaterialTheme.typography.titleSmall,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.Bold,
                             color = DecoInkOnGround
                         )
@@ -815,6 +827,7 @@ fun TimelineSearchFilterSheet(
                             Text(
                                 text = draft.dateRange?.formatDisplayLabel() ?: "自选日期区间",
                                 style = MaterialTheme.typography.labelMedium,
+                                fontFamily = DecoDisplayFontFamily,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = DecoGold
@@ -840,6 +853,7 @@ fun TimelineSearchFilterSheet(
                             Text(
                                 text = preset.formatDisplayLabel(),
                                 style = MaterialTheme.typography.labelLarge,
+                                fontFamily = DecoDisplayFontFamily,
                                 fontSize = 12.sp,
                                 color = decoTagContentColor(selected)
                             )
@@ -864,6 +878,7 @@ fun TimelineSearchFilterSheet(
                         Text(
                             text = stringResource(R.string.timeline_search_locations),
                             style = MaterialTheme.typography.titleSmall,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.Bold,
                             color = DecoInkOnGround
                         )
@@ -896,6 +911,7 @@ fun TimelineSearchFilterSheet(
                                 Text(
                                     text = "${cluster.locationName} (${cluster.photos.size})",
                                     style = MaterialTheme.typography.labelLarge,
+                                    fontFamily = DecoDisplayFontFamily,
                                     fontSize = 12.sp,
                                     color = decoTagContentColor(selected)
                                 )
@@ -926,6 +942,7 @@ fun TimelineSearchFilterSheet(
                                 Text(
                                     text = "无定位信息",
                                     style = MaterialTheme.typography.labelLarge,
+                                    fontFamily = DecoDisplayFontFamily,
                                     fontSize = 12.sp,
                                     color = decoTagContentColor(selected, DecoVerm)
                                 )
@@ -950,6 +967,7 @@ fun TimelineSearchFilterSheet(
                     Text(
                         text = stringResource(R.string.timeline_search_tags),
                         style = MaterialTheme.typography.titleSmall,
+                        fontFamily = DecoDisplayFontFamily,
                         fontWeight = FontWeight.Bold,
                         color = DecoInkOnGround
                     )
@@ -972,6 +990,7 @@ fun TimelineSearchFilterSheet(
                             Text(
                                 text = tag.label,
                                 style = MaterialTheme.typography.labelLarge,
+                                fontFamily = DecoDisplayFontFamily,
                                 fontSize = 12.sp,
                                 color = decoTagContentColor(selected)
                             )
@@ -995,6 +1014,7 @@ fun TimelineSearchFilterSheet(
                             Text(
                                 text = "#$kw",
                                 style = MaterialTheme.typography.labelLarge,
+                                fontFamily = DecoDisplayFontFamily,
                                 fontSize = 12.sp,
                                 color = decoTagContentColor(selected)
                             )
@@ -1074,7 +1094,12 @@ fun TimelineDateRangePickerDialog(
                 },
                 modifier = Modifier.testTag("date_range_confirm_button")
             ) {
-                Text("确定", fontWeight = FontWeight.Bold, color = DecoGold)
+                Text(
+                    text = "确定",
+                    fontFamily = DecoDisplayFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    color = DecoGold
+                )
             }
         },
         dismissButton = {
@@ -1084,11 +1109,19 @@ fun TimelineDateRangePickerDialog(
                         onClick = { onConfirm(null) },
                         modifier = Modifier.testTag("date_range_clear_button")
                     ) {
-                        Text("清除", color = DecoVerm)
+                        Text(
+                            text = "清除",
+                            fontFamily = DecoDisplayFontFamily,
+                            color = DecoVerm
+                        )
                     }
                 }
                 TextButton(onClick = onDismiss) {
-                    Text("取消", color = DecoInkOnGround.copy(alpha = 0.66f))
+                    Text(
+                        text = "取消",
+                        fontFamily = DecoDisplayFontFamily,
+                        color = DecoInkOnGround.copy(alpha = 0.66f)
+                    )
                 }
             }
         },
@@ -1101,6 +1134,7 @@ fun TimelineDateRangePickerDialog(
                 Text(
                     text = "选择拍摄日期范围",
                     style = MaterialTheme.typography.titleMedium,
+                    fontFamily = DecoDisplayFontFamily,
                     fontWeight = FontWeight.Bold,
                     color = DecoInkOnGround,
                     modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 24.dp)
@@ -1111,9 +1145,14 @@ fun TimelineDateRangePickerDialog(
                     pickerState.selectedStartDateMillis,
                     pickerState.selectedEndDateMillis
                 )?.formatDisplayLabel() ?: "点击起止日期"
+                // 预览可能为纯数字区间或带汉字（「全部日期」「… 起」），按内容择族
                 Text(
                     text = preview,
-                    fontFamily = JetBrainsMonoFontFamily,
+                    fontFamily = if (preview.any { it.code in 0x4E00..0x9FFF }) {
+                        DecoDisplayFontFamily
+                    } else {
+                        JetBrainsMonoFontFamily
+                    },
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 15.sp,
                     color = DecoGold,
