@@ -1010,6 +1010,9 @@ fun FlipYearApp(
                     ),
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
+                        // 画报底座：导航条区域以 DecoGroundDeep 纯色填充（不再透出滚动内容），
+                        // 与 dock 纵向渐变终点无缝衔接为一整块 footer
+                        .background(DecoGroundDeep)
                         .navigationBarsPadding()
                 ) {
                     FloatingGalleryDock(
