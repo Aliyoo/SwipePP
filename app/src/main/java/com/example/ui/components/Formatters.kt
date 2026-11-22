@@ -10,9 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Verified
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -205,11 +202,10 @@ fun CleanedCompletionBadge(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            Icon(
-                imageVector = Icons.Filled.Verified,
-                contentDescription = null,
-                tint = EmeraldKeep,
-                modifier = Modifier.size(20.dp)
+            DecoIcon(
+                kind = DecoIconKind.VERIFIED,
+                color = EmeraldKeep,
+                iconSize = 20.dp
             )
             Column {
                 Text(

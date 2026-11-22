@@ -42,15 +42,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AutoStories
-import androidx.compose.material.icons.outlined.BurstMode
-import androidx.compose.material.icons.outlined.DeleteSweep
-import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
@@ -74,7 +68,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.State
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -201,8 +194,7 @@ private fun topLevelRouteIndex(route: String?): Int = TOP_LEVEL_ROUTE_ORDER.inde
 private data class TopLevelTab(
     val route: String,
     val labelRes: Int,
-    val selectedIcon: ImageVector,
-    val unselectedIcon: ImageVector,
+    val iconKind: DecoTabIconKind,
     val testTag: String
 )
 
@@ -331,29 +323,25 @@ fun FlipYearApp(
             TopLevelTab(
                 route = FlipYearRoutes.BOOKSHELF,
                 labelRes = R.string.nav_bookshelf,
-                selectedIcon = Icons.Outlined.AutoStories,
-                unselectedIcon = Icons.Outlined.AutoStories,
+                iconKind = DecoTabIconKind.ALBUM,
                 testTag = "nav_tab_bookshelf"
             ),
             TopLevelTab(
                 route = FlipYearRoutes.GALLERY,
                 labelRes = R.string.nav_gallery,
-                selectedIcon = Icons.Outlined.BurstMode,
-                unselectedIcon = Icons.Outlined.BurstMode,
+                iconKind = DecoTabIconKind.GALLERY,
                 testTag = "nav_tab_gallery"
             ),
             TopLevelTab(
                 route = FlipYearRoutes.MAP,
                 labelRes = R.string.nav_map,
-                selectedIcon = Icons.Outlined.Explore,
-                unselectedIcon = Icons.Outlined.Explore,
+                iconKind = DecoTabIconKind.FOOTPRINT,
                 testTag = "nav_tab_map"
             ),
             TopLevelTab(
                 route = FlipYearRoutes.VAULT,
                 labelRes = R.string.nav_vault,
-                selectedIcon = Icons.Outlined.DeleteSweep,
-                unselectedIcon = Icons.Outlined.DeleteSweep,
+                iconKind = DecoTabIconKind.VAULT,
                 testTag = "nav_tab_vault"
             )
         )
@@ -432,6 +420,7 @@ fun FlipYearApp(
                                     Text(
                                         text = tabLabel,
                                         style = MaterialTheme.typography.labelSmall,
+                                        fontFamily = DecoDisplayFontFamily,
                                         letterSpacing = 1.5.sp
                                     )
                                 },
@@ -983,6 +972,7 @@ fun FlipYearApp(
                                         Text(
                                             text = snack.undoLabel ?: stringResource(R.string.action_undo),
                                             style = MaterialTheme.typography.labelLarge,
+                                            fontFamily = DecoDisplayFontFamily,
                                             fontWeight = FontWeight.Bold,
                                             color = DecoVermInk,
                                             maxLines = 1,
@@ -1277,7 +1267,7 @@ private fun FloatingGalleryDock(
 }
 
 /**
- * 宽屏 NavigationRail 图标（不属原型手机版范围，保留图标语言但统一 Outlined 细线）。
+ * 宽屏 NavigationRail 图标（不属原型手机版范围，统一画报手绘细线图标）。
  * 回收站待清理数以朱红计数徽随行。
  */
 @Composable
@@ -1288,8 +1278,21 @@ private fun TabIconWithBadge(
     tint: Color,
     decorative: Boolean = false
 ) {
-    val iconVector = if (selected) tab.selectedIcon else tab.unselectedIcon
     val iconDesc = if (decorative) null else stringResource(tab.labelRes)
+    val iconModifier = if (iconDesc != null) {
+        Modifier.semantics { contentDescription = iconDesc }
+    } else {
+        Modifier
+    }
+    val decoIcon: @Composable () -> Unit = {
+        DecoTabIcon(
+            kind = tab.iconKind,
+            color = tint,
+            selected = selected,
+            iconSize = 22.dp,
+            modifier = iconModifier
+        )
+    }
     if (tab.route == FlipYearRoutes.VAULT && trashedCount > 0) {
         BadgedBox(
             badge = {
@@ -1301,19 +1304,9 @@ private fun TabIconWithBadge(
                 }
             }
         ) {
-            Icon(
-                imageVector = iconVector,
-                contentDescription = iconDesc,
-                tint = tint,
-                modifier = Modifier.size(22.dp)
-            )
+            decoIcon()
         }
     } else {
-        Icon(
-            imageVector = iconVector,
-            contentDescription = iconDesc,
-            tint = tint,
-            modifier = Modifier.size(22.dp)
-        )
+        decoIcon()
     }
 }

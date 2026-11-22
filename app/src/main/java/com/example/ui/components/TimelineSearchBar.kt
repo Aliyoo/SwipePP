@@ -34,26 +34,11 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BurstMode
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Compress
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Label
-import androidx.compose.material.icons.filled.LocationOff
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.UnfoldLess
-import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -204,11 +189,10 @@ fun TimelineGlobalSearchBar(
                     .padding(start = 14.dp, end = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Search,
-                    contentDescription = null,
-                    tint = DecoGold,
-                    modifier = Modifier.size(20.dp)
+                DecoIcon(
+                    kind = DecoIconKind.SEARCH,
+                    color = DecoGold,
+                    iconSize = 20.dp
                 )
 
                 Spacer(modifier = Modifier.width(10.dp))
@@ -253,11 +237,11 @@ fun TimelineGlobalSearchBar(
                             .size(48.dp)
                             .testTag("timeline_search_clear_button")
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Close,
-                            contentDescription = stringResource(R.string.cd_timeline_search_clear),
-                            tint = DecoInkOnGround.copy(alpha = 0.66f),
-                            modifier = Modifier.size(18.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.CLOSE,
+                            color = DecoInkOnGround.copy(alpha = 0.66f),
+                            iconSize = 18.dp,
+                            contentDescription = stringResource(R.string.cd_timeline_search_clear)
                         )
                     }
                 }
@@ -283,11 +267,10 @@ fun TimelineGlobalSearchBar(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Tune,
-                            contentDescription = null,
-                            tint = if (filterCount > 0) DecoMat else DecoGold,
-                            modifier = Modifier.size(17.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.FILTER,
+                            color = if (filterCount > 0) DecoMat else DecoGold,
+                            iconSize = 17.dp
                         )
                         Text(
                             text = if (filterCount > 0) "筛选 $filterCount" else "筛选",
@@ -336,11 +319,11 @@ fun TimelineGlobalSearchBar(
                 if (activeSmartFilter != GallerySmartFilter.ALL) {
                     item(key = "active_smart_filter") {
                         RemovableFilterPill(
-                            icon = when (activeSmartFilter) {
-                                GallerySmartFilter.BURSTS -> Icons.Filled.BurstMode
-                                GallerySmartFilter.LARGE_PHOTOS -> Icons.Filled.Compress
-                                GallerySmartFilter.MISSING_LOCATION -> Icons.Filled.LocationOff
-                                GallerySmartFilter.ALL -> Icons.Filled.Tune
+                            iconKind = when (activeSmartFilter) {
+                                GallerySmartFilter.BURSTS -> DecoIconKind.BURST
+                                GallerySmartFilter.LARGE_PHOTOS -> DecoIconKind.COMPRESS
+                                GallerySmartFilter.MISSING_LOCATION -> DecoIconKind.LOCATION_OFF
+                                GallerySmartFilter.ALL -> DecoIconKind.FILTER
                             },
                             iconTint = DecoGold,
                             label = activeSmartFilter.label,
@@ -354,7 +337,7 @@ fun TimelineGlobalSearchBar(
                 selectedAlbum?.let { album ->
                     item(key = "active_album_filter") {
                         RemovableFilterPill(
-                            icon = Icons.Filled.Folder,
+                            iconKind = DecoIconKind.FOLDER,
                             iconTint = DecoGold,
                             label = album,
                             onClick = onOpenFilterSheet,
@@ -367,7 +350,7 @@ fun TimelineGlobalSearchBar(
                 searchQuery.dateRange?.takeIf { it.isActive }?.let { range ->
                     item(key = "active_date_range") {
                         RemovableFilterPill(
-                            icon = Icons.Filled.CalendarMonth,
+                            iconKind = DecoIconKind.CALENDAR,
                             iconTint = DecoGold,
                             label = range.formatDisplayLabel(),
                             onClick = onOpenDateRangePicker,
@@ -380,7 +363,7 @@ fun TimelineGlobalSearchBar(
                 items(searchQuery.selectedLocations.toList(), key = { "loc_$it" }) { loc ->
                     val isUnlocated = loc == SEARCH_UNLOCATED_TOKEN
                     RemovableFilterPill(
-                        icon = if (isUnlocated) Icons.Filled.LocationOff else Icons.Filled.LocationOn,
+                        iconKind = if (isUnlocated) DecoIconKind.LOCATION_OFF else DecoIconKind.LOCATION,
                         iconTint = if (isUnlocated) DecoVerm else DecoGold,
                         label = if (isUnlocated) "无定位信息" else loc,
                         onClick = onOpenFilterSheet,
@@ -391,7 +374,7 @@ fun TimelineGlobalSearchBar(
 
                 items(searchQuery.selectedTags.toList(), key = { "tag_${it.name}" }) { tag ->
                     RemovableFilterPill(
-                        icon = Icons.Filled.Label,
+                        iconKind = DecoIconKind.LABEL,
                         iconTint = DecoGold,
                         label = tag.label,
                         onClick = onOpenFilterSheet,
@@ -402,7 +385,7 @@ fun TimelineGlobalSearchBar(
 
                 items(searchQuery.selectedKeywordTags.toList(), key = { "kw_$it" }) { kw ->
                     RemovableFilterPill(
-                        icon = Icons.Filled.Label,
+                        iconKind = DecoIconKind.LABEL,
                         iconTint = DecoGold,
                         label = "#$kw",
                         onClick = onOpenFilterSheet,
@@ -443,7 +426,7 @@ fun TimelineGlobalSearchBar(
 
 @Composable
 private fun RemovableFilterPill(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconKind: DecoIconKind,
     iconTint: Color,
     label: String,
     onClick: () -> Unit,
@@ -464,11 +447,10 @@ private fun RemovableFilterPill(
                 .clickable(onClick = onClick)
                 .padding(start = 11.dp, end = 2.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(14.dp)
+            DecoIcon(
+                kind = iconKind,
+                color = iconTint,
+                iconSize = 14.dp
             )
             Spacer(modifier = Modifier.width(5.dp))
             Text(
@@ -494,11 +476,11 @@ private fun RemovableFilterPill(
                         .clip(CircleShape)
                         .background(DecoGold.copy(alpha = 0.16f))
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = "移除筛选 $label",
-                        tint = DecoInkOnGround.copy(alpha = 0.66f),
-                        modifier = Modifier.size(13.dp)
+                    DecoIcon(
+                        kind = DecoIconKind.CLOSE,
+                        color = DecoInkOnGround.copy(alpha = 0.66f),
+                        iconSize = 13.dp,
+                        contentDescription = "移除筛选 $label"
                     )
                 }
             }
@@ -649,11 +631,10 @@ fun TimelineSearchFilterSheet(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.BurstMode,
-                            contentDescription = null,
-                            tint = DecoGold,
-                            modifier = Modifier.size(18.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.BURST,
+                            color = DecoGold,
+                            iconSize = 18.dp
                         )
                         Text(
                             text = "智能视图",
@@ -678,11 +659,10 @@ fun TimelineSearchFilterSheet(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(
-                                    imageVector = if (allBurstsExpanded) Icons.Filled.UnfoldLess else Icons.Filled.UnfoldMore,
-                                    contentDescription = null,
-                                    tint = if (allBurstsExpanded) DecoMat else DecoGold,
-                                    modifier = Modifier.size(14.dp)
+                                DecoIcon(
+                                    kind = if (allBurstsExpanded) DecoIconKind.UNFOLD_LESS else DecoIconKind.UNFOLD_MORE,
+                                    color = if (allBurstsExpanded) DecoMat else DecoGold,
+                                    iconSize = 14.dp
                                 )
                                 Text(
                                     text = stringResource(
@@ -735,11 +715,10 @@ fun TimelineSearchFilterSheet(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Folder,
-                            contentDescription = null,
-                            tint = DecoGold,
-                            modifier = Modifier.size(18.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.FOLDER,
+                            color = DecoGold,
+                            iconSize = 18.dp
                         )
                         Text(
                             text = "相册分类",
@@ -762,11 +741,10 @@ fun TimelineSearchFilterSheet(
                                 },
                                 modifier = Modifier.testTag("gallery_album_chip_$albumName")
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Folder,
-                                    contentDescription = null,
-                                    tint = if (selected) DecoMat else DecoGold.copy(alpha = 0.85f),
-                                    modifier = Modifier.size(13.dp)
+                                DecoIcon(
+                                    kind = DecoIconKind.FOLDER,
+                                    color = if (selected) DecoMat else DecoGold.copy(alpha = 0.85f),
+                                    iconSize = 13.dp
                                 )
                                 Text(
                                     text = albumName,
@@ -792,11 +770,10 @@ fun TimelineSearchFilterSheet(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.DateRange,
-                            contentDescription = null,
-                            tint = DecoGold,
-                            modifier = Modifier.size(18.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.CALENDAR,
+                            color = DecoGold,
+                            iconSize = 18.dp
                         )
                         Text(
                             text = stringResource(R.string.timeline_search_date_range),
@@ -818,11 +795,10 @@ fun TimelineSearchFilterSheet(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.CalendarMonth,
-                                contentDescription = null,
-                                tint = DecoGold,
-                                modifier = Modifier.size(14.dp)
+                            DecoIcon(
+                                kind = DecoIconKind.CALENDAR,
+                                color = DecoGold,
+                                iconSize = 14.dp
                             )
                             Text(
                                 text = draft.dateRange?.formatDisplayLabel() ?: "自选日期区间",
@@ -869,11 +845,10 @@ fun TimelineSearchFilterSheet(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.LocationOn,
-                            contentDescription = null,
-                            tint = DecoGold,
-                            modifier = Modifier.size(18.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.LOCATION,
+                            color = DecoGold,
+                            iconSize = 18.dp
                         )
                         Text(
                             text = stringResource(R.string.timeline_search_locations),
@@ -902,11 +877,10 @@ fun TimelineSearchFilterSheet(
                                 },
                                 modifier = Modifier.testTag("filter_location_${cluster.locationName}")
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.LocationOn,
-                                    contentDescription = null,
-                                    tint = if (selected) DecoMat else DecoGold.copy(alpha = 0.85f),
-                                    modifier = Modifier.size(13.dp)
+                                DecoIcon(
+                                    kind = DecoIconKind.LOCATION,
+                                    color = if (selected) DecoMat else DecoGold.copy(alpha = 0.85f),
+                                    iconSize = 13.dp
                                 )
                                 Text(
                                     text = "${cluster.locationName} (${cluster.photos.size})",
@@ -933,11 +907,10 @@ fun TimelineSearchFilterSheet(
                                 unselectedAccent = DecoVerm,
                                 modifier = Modifier.testTag("filter_location_unlocated")
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.LocationOff,
-                                    contentDescription = null,
-                                    tint = if (selected) DecoPaperCream else DecoVerm,
-                                    modifier = Modifier.size(13.dp)
+                                DecoIcon(
+                                    kind = DecoIconKind.LOCATION_OFF,
+                                    color = if (selected) DecoPaperCream else DecoVerm,
+                                    iconSize = 13.dp
                                 )
                                 Text(
                                     text = "无定位信息",
@@ -958,11 +931,10 @@ fun TimelineSearchFilterSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Label,
-                        contentDescription = null,
-                        tint = DecoGold,
-                        modifier = Modifier.size(18.dp)
+                    DecoIcon(
+                        kind = DecoIconKind.LABEL,
+                        color = DecoGold,
+                        iconSize = 18.dp
                     )
                     Text(
                         text = stringResource(R.string.timeline_search_tags),
@@ -1046,7 +1018,7 @@ fun TimelineSearchFilterSheet(
                 ) {
                     GalleryActionButton(
                         text = "应用筛选 ($liveMatchCount 项)",
-                        leadingIcon = Icons.Filled.Search,
+                        leadingIconKind = DecoIconKind.SEARCH,
                         tone = if (liveMatchCount > 0) GalleryButtonTone.IMMERSIVE else GalleryButtonTone.GLASS,
                         height = 52.dp,
                         onClick = {

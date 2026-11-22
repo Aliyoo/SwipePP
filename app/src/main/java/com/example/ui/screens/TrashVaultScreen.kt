@@ -46,14 +46,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CleaningServices
-import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.Restore
-import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -73,7 +66,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -96,6 +88,8 @@ import com.example.data.PhotoItemEntity
 import com.example.sensor.rememberHapticEngine
 import com.example.ui.FlipYearUiState
 import com.example.ui.LocalFloatingDockInset
+import com.example.ui.components.DecoIcon
+import com.example.ui.components.DecoIconKind
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.PhotoDetailLightbox
 import com.example.ui.components.daysStagedInVault
@@ -302,12 +296,11 @@ fun TrashVaultScreen(
                             verticalArrangement = Arrangement.Center,
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                    Icon(
-                        imageVector = Icons.Filled.VerifiedUser,
-                        contentDescription = null,
+                    DecoIcon(
+                        kind = DecoIconKind.SHIELD,
                         // 空态徽记：主题金（画报色板；弃 Emerald 绿旧语义色）
-                        tint = DecoGold,
-                        modifier = Modifier.size(60.dp)
+                        color = DecoGold,
+                        iconSize = 60.dp
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     VaultArtText(
@@ -482,7 +475,7 @@ fun TrashVaultScreen(
                     ) {
                         VaultDecoOutlineButton(
                             text = if (isPartialSelection) "还原 (${targets.size})" else stringResource(R.string.action_restore_all),
-                            leadingIcon = Icons.Filled.Restore,
+                            leadingIconKind = DecoIconKind.RESTORE,
                             onClick = {
                                 haptics.undoPulse()
                                 onRestoreAll(targets)
@@ -496,7 +489,7 @@ fun TrashVaultScreen(
                         VaultDecoVermilionButton(
                             title = if (isPartialSelection) "清理已选" else "确认清理",
                             badgeText = "${targets.size} 项 · ${formatStorageSize(targetBytes)}",
-                            leadingIcon = Icons.Filled.DeleteForever,
+                            leadingIconKind = DecoIconKind.DELETE_FOREVER,
                             onClick = { showPurgeDialog = true },
                             modifier = Modifier
                                 .weight(1.45f)
@@ -530,11 +523,10 @@ fun TrashVaultScreen(
             titleContentColor = DecoInkOnGround,
             textContentColor = DecoInkOnGround.copy(alpha = 0.78f),
             icon = {
-                Icon(
-                    imageVector = Icons.Filled.CleaningServices,
-                    contentDescription = null,
-                    tint = DecoVerm,
-                    modifier = Modifier.size(26.dp)
+                DecoIcon(
+                    kind = DecoIconKind.CLEAN,
+                    color = DecoVerm,
+                    iconSize = 26.dp
                 )
             },
             title = {
@@ -743,11 +735,10 @@ private fun VaultDecoMediaCard(
                             )
                     ) {
                         if (isSelected) {
-                            Icon(
-                                imageVector = Icons.Filled.Check,
-                                contentDescription = null,
-                                tint = VaultOnGold,
-                                modifier = Modifier.size(15.dp)
+                            DecoIcon(
+                                kind = DecoIconKind.CHECK,
+                                color = VaultOnGold,
+                                iconSize = 15.dp
                             )
                         }
                     }
@@ -1021,7 +1012,7 @@ private fun VaultDecoOutlineButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    leadingIcon: ImageVector? = null
+    leadingIconKind: DecoIconKind? = null
 ) {
     val gold = DecoGold
     Box(
@@ -1038,17 +1029,17 @@ private fun VaultDecoOutlineButton(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            if (leadingIcon != null) {
-                Icon(
-                    imageVector = leadingIcon,
-                    contentDescription = null,
-                    tint = gold,
-                    modifier = Modifier.size(16.dp)
+            if (leadingIconKind != null) {
+                DecoIcon(
+                    kind = leadingIconKind,
+                    color = gold,
+                    iconSize = 16.dp
                 )
                 Spacer(modifier = Modifier.width(6.dp))
             }
             Text(
                 text = text,
+                fontFamily = DecoDisplayFontFamily,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.2.sp,
@@ -1067,7 +1058,7 @@ private fun VaultDecoVermilionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     badgeText: String? = null,
-    leadingIcon: ImageVector? = null
+    leadingIconKind: DecoIconKind? = null
 ) {
     val verm = DecoVerm
     val cream = DecoPaperCream
@@ -1099,17 +1090,17 @@ private fun VaultDecoVermilionButton(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            if (leadingIcon != null) {
-                Icon(
-                    imageVector = leadingIcon,
-                    contentDescription = null,
-                    tint = cream,
-                    modifier = Modifier.size(16.dp)
+            if (leadingIconKind != null) {
+                DecoIcon(
+                    kind = leadingIconKind,
+                    color = cream,
+                    iconSize = 16.dp
                 )
                 Spacer(modifier = Modifier.width(6.dp))
             }
             Text(
                 text = title,
+                fontFamily = DecoDisplayFontFamily,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.2.sp,

@@ -21,19 +21,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Compress
-import androidx.compose.material.icons.filled.EditLocationAlt
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -141,11 +130,10 @@ fun BatchCompressBottomSheet(
                     modifier = Modifier.size(42.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Filled.Compress,
-                            contentDescription = null,
-                            tint = DecoGold,
-                            modifier = Modifier.size(21.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.COMPRESS,
+                            color = DecoGold,
+                            iconSize = 21.dp
                         )
                     }
                 }
@@ -220,11 +208,10 @@ fun BatchCompressBottomSheet(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Icon(
-                                imageVector = if (isSelected) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
-                                contentDescription = null,
-                                tint = if (isSelected) DecoGold else InkTertiary,
-                                modifier = Modifier.size(20.dp)
+                            DecoIcon(
+                                kind = if (isSelected) DecoIconKind.CHECK_CIRCLE else DecoIconKind.RADIO_UNCHECKED,
+                                color = if (isSelected) DecoGold else InkTertiary,
+                                iconSize = 20.dp
                             )
                             Column(modifier = Modifier.weight(1f)) {
                                 Row(
@@ -247,6 +234,7 @@ fun BatchCompressBottomSheet(
                                             Text(
                                                 text = "推荐",
                                                 style = MaterialTheme.typography.labelSmall,
+                                                fontFamily = DecoDisplayFontFamily,
                                                 fontSize = 11.sp,
                                                 color = DecoPaperCream,
                                                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
@@ -282,11 +270,10 @@ fun BatchCompressBottomSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Filled.VerifiedUser,
-                    contentDescription = null,
-                    tint = DecoGold,
-                    modifier = Modifier.size(16.dp)
+                DecoIcon(
+                    kind = DecoIconKind.SHIELD,
+                    color = DecoGold,
+                    iconSize = 16.dp
                 )
                 Text(
                     text = stringResource(R.string.batch_compress_safety_note),
@@ -301,7 +288,7 @@ fun BatchCompressBottomSheet(
                 } else {
                     "所选项目中暂无可压缩照片"
                 },
-                leadingIcon = Icons.Filled.Compress,
+                leadingIconKind = DecoIconKind.COMPRESS,
                 tone = GalleryButtonTone.IMMERSIVE,
                 enabled = imageTargets.isNotEmpty(),
                 onClick = { onConfirmCompress(selectedPreset) },
@@ -395,11 +382,10 @@ fun BatchLocationEditorSheet(
                     modifier = Modifier.size(42.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Filled.EditLocationAlt,
-                            contentDescription = null,
-                            tint = DecoGold,
-                            modifier = Modifier.size(21.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.EDIT_LOCATION,
+                            color = DecoGold,
+                            iconSize = 21.dp
                         )
                     }
                 }
@@ -423,16 +409,16 @@ fun BatchLocationEditorSheet(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.AutoAwesome,
-                                contentDescription = null,
-                                tint = DecoGold,
-                                modifier = Modifier.size(18.dp)
+                            DecoIcon(
+                                kind = DecoIconKind.SPARKLE,
+                                color = DecoGold,
+                                iconSize = 18.dp
                             )
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "智能按同日照片推断定位",
                                     style = MaterialTheme.typography.titleSmall,
+                                    fontFamily = DecoDisplayFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     color = InkPrimary
                                 )
@@ -451,7 +437,7 @@ fun BatchLocationEditorSheet(
 
                         GalleryActionButton(
                             text = "一键智能补全 ${sameDayMatches.size} 项定位",
-                            leadingIcon = Icons.Filled.MyLocation,
+                            leadingIconKind = DecoIconKind.GPS,
                             tone = GalleryButtonTone.IMMERSIVE,
                             height = 44.dp,
                             shape = RoundedCornerShape(3.dp),
@@ -468,6 +454,7 @@ fun BatchLocationEditorSheet(
             Text(
                 text = "快速选择地点（已有足迹与常用城市）",
                 style = MaterialTheme.typography.labelLarge,
+                fontFamily = DecoDisplayFontFamily,
                 color = InkSecondary
             )
 
@@ -504,13 +491,17 @@ fun BatchLocationEditorSheet(
                         geocodeHint = null
                     },
                     singleLine = true,
-                    label = { Text("自定义地点或城市") },
+                    label = {
+                        Text(
+                            text = "自定义地点或城市",
+                            fontFamily = DecoDisplayFontFamily
+                        )
+                    },
                     placeholder = { Text("如：大理洱海、京都清水寺") },
                     leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Filled.LocationOn,
-                            contentDescription = null,
-                            tint = DecoGold
+                        DecoIcon(
+                            kind = DecoIconKind.LOCATION,
+                            color = DecoGold
                         )
                     },
                     shape = RoundedCornerShape(3.dp),
@@ -564,15 +555,16 @@ fun BatchLocationEditorSheet(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Search,
-                                    contentDescription = "解析坐标",
-                                    tint = DecoGold,
-                                    modifier = Modifier.size(16.dp)
+                                DecoIcon(
+                                    kind = DecoIconKind.SEARCH,
+                                    color = DecoGold,
+                                    iconSize = 16.dp,
+                                    contentDescription = "解析坐标"
                                 )
                                 Text(
                                     text = "定位",
                                     style = MaterialTheme.typography.labelLarge,
+                                    fontFamily = DecoDisplayFontFamily,
                                     color = DecoGold
                                 )
                             }
@@ -624,6 +616,7 @@ fun BatchLocationEditorSheet(
                             Text(
                                 text = "同步写入照片 EXIF 定位信息",
                                 style = MaterialTheme.typography.labelLarge,
+                                fontFamily = DecoDisplayFontFamily,
                                 color = InkPrimary
                             )
                             Text(
@@ -648,7 +641,7 @@ fun BatchLocationEditorSheet(
 
             GalleryActionButton(
                 text = "应用至 ${targetPhotos.size} 项媒体 (${locationInput.trim().ifBlank { "请选择地点" }})",
-                leadingIcon = Icons.Filled.EditLocationAlt,
+                leadingIconKind = DecoIconKind.EDIT_LOCATION,
                 tone = GalleryButtonTone.IMMERSIVE,
                 enabled = locationInput.isNotBlank() && targetPhotos.isNotEmpty(),
                 onClick = {
@@ -689,14 +682,14 @@ private fun DecoLocationPresetChip(
             horizontalArrangement = Arrangement.spacedBy(5.dp),
             modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp)
         ) {
-            Icon(
-                imageVector = Icons.Filled.LocationOn,
-                contentDescription = null,
-                tint = DecoGold,
-                modifier = Modifier.size(14.dp)
+            DecoIcon(
+                kind = DecoIconKind.LOCATION,
+                color = DecoGold,
+                iconSize = 14.dp
             )
             Text(
                 text = label,
+                fontFamily = DecoDisplayFontFamily,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = if (selected) InkPrimary else InkPrimary.copy(alpha = 0.85f),

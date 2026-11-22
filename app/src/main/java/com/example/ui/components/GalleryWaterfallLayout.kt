@@ -35,16 +35,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.Apps
-import androidx.compose.material.icons.outlined.BurstMode
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Dashboard
-import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.GridView
-import androidx.compose.material.icons.outlined.ViewAgenda
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -700,11 +690,11 @@ private fun JustifiedWaterfallRow(
                                         .background(DecoGold),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.CheckCircle,
-                                        contentDescription = "已保留",
-                                        tint = DecoMat,
-                                        modifier = Modifier.size(14.dp)
+                                    DecoIcon(
+                                        kind = DecoIconKind.CHECK_CIRCLE,
+                                        color = DecoMat,
+                                        iconSize = 14.dp,
+                                        contentDescription = "已保留"
                                     )
                                 }
                             }
@@ -720,11 +710,12 @@ private fun JustifiedWaterfallRow(
                                         .background(DecoVerm),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Star,
-                                        contentDescription = "收藏",
-                                        tint = DecoPaperCream,
-                                        modifier = Modifier.size(13.dp)
+                                    DecoIcon(
+                                        kind = DecoIconKind.STAR,
+                                        color = DecoPaperCream,
+                                        selected = true,
+                                        iconSize = 13.dp,
+                                        contentDescription = "收藏"
                                     )
                                 }
                             }
@@ -820,11 +811,10 @@ private fun JustifiedWaterfallRow(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(3.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.BurstMode,
-                                    contentDescription = null,
-                                    tint = DecoPaperCream,
-                                    modifier = Modifier.size(11.dp)
+                                DecoIcon(
+                                    kind = DecoIconKind.BURST,
+                                    color = DecoPaperCream,
+                                    iconSize = 11.dp
                                 )
                                 Text(
                                     text = "${entry.photos.size} 连拍",
@@ -868,11 +858,11 @@ private fun JustifiedWaterfallRow(
                                     color = DecoPaperCream
                                 )
                                 if (!isSelectionMode) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.ExpandMore,
-                                        contentDescription = stringResource(R.string.burst_expand),
-                                        tint = DecoPaperCream,
-                                        modifier = Modifier.size(15.dp)
+                                    DecoIcon(
+                                        kind = DecoIconKind.CHEVRON_DOWN,
+                                        color = DecoPaperCream,
+                                        iconSize = 15.dp,
+                                        contentDescription = stringResource(R.string.burst_expand)
                                     )
                                 }
                             }
@@ -924,17 +914,17 @@ fun GalleryZoomTierIconButton(
                 },
                 label = "gallery_zoom_tier_icon"
             ) { tier ->
-                val icon = when (tier) {
-                    GalleryZoomTier.COMPACT_4 -> Icons.Outlined.Apps
-                    GalleryZoomTier.STANDARD_3 -> Icons.Outlined.GridView
-                    GalleryZoomTier.WATERFALL_2 -> Icons.Outlined.Dashboard
-                    GalleryZoomTier.WATERFALL_1 -> Icons.Outlined.ViewAgenda
+                val kind = when (tier) {
+                    GalleryZoomTier.COMPACT_4 -> DecoIconKind.APPS
+                    GalleryZoomTier.STANDARD_3 -> DecoIconKind.GRID
+                    GalleryZoomTier.WATERFALL_2 -> DecoIconKind.DASHBOARD
+                    GalleryZoomTier.WATERFALL_1 -> DecoIconKind.VIEW_AGENDA
                 }
-                Icon(
-                    imageVector = icon,
-                    contentDescription = "当前视图：${tier.label}，点按切换布局",
-                    tint = iconTint,
-                    modifier = Modifier.size(18.dp)
+                DecoIcon(
+                    kind = kind,
+                    color = iconTint,
+                    iconSize = 18.dp,
+                    contentDescription = "当前视图：${tier.label}，点按切换布局"
                 )
             }
         }

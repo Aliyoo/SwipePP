@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
@@ -37,7 +36,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -92,7 +90,7 @@ fun GalleryActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     tone: GalleryButtonTone = GalleryButtonTone.OBSIDIAN,
-    leadingIcon: ImageVector? = null,
+    leadingIconKind: DecoIconKind? = null,
     iconTint: Color? = null,
     height: Dp = 50.dp,
     shape: Shape? = null,
@@ -261,12 +259,12 @@ fun GalleryActionButton(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            if (leadingIcon != null) {
-                Icon(
-                    imageVector = leadingIcon,
-                    contentDescription = null,
-                    tint = resolvedIconTint,
-                    modifier = Modifier.size(18.dp)
+            if (leadingIconKind != null) {
+                DecoIcon(
+                    kind = leadingIconKind,
+                    color = resolvedIconTint,
+                    modifier = Modifier.size(18.dp),
+                    iconSize = 18.dp
                 )
                 Spacer(modifier = Modifier.width(8.dp))
             }
@@ -379,12 +377,12 @@ fun GallerySelectableChip(
  */
 @Composable
 fun GalleryTactileOrbButton(
-    icon: ImageVector,
     label: String,
     accentColor: Color,
     tintSurface: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    iconKind: DecoIconKind? = null,
     orbSize: Dp = 62.dp,
     iconSize: Dp = 26.dp
 ) {
@@ -457,12 +455,15 @@ fun GalleryTactileOrbButton(
                     onClick = onClick
                 )
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = accentColor,
-                modifier = Modifier.size(iconSize)
-            )
+            if (iconKind != null) {
+                DecoIcon(
+                    kind = iconKind,
+                    color = accentColor,
+                    modifier = Modifier.size(iconSize),
+                    iconSize = iconSize,
+                    contentDescription = label
+                )
+            }
         }
         Text(
             text = label,
@@ -484,7 +485,7 @@ fun GallerySculptedHeroButton(
     title: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    leadingIcon: ImageVector? = null,
+    leadingIconKind: DecoIconKind? = null,
     badgeText: String? = null,
     tone: GalleryButtonTone = GalleryButtonTone.OBSIDIAN,
     height: Dp = 54.dp,
@@ -599,12 +600,12 @@ fun GallerySculptedHeroButton(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            if (leadingIcon != null) {
-                Icon(
-                    imageVector = leadingIcon,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(18.dp)
+            if (leadingIconKind != null) {
+                DecoIcon(
+                    kind = leadingIconKind,
+                    color = iconTint,
+                    modifier = Modifier.size(18.dp),
+                    iconSize = 18.dp
                 )
             }
             Text(

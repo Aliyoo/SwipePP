@@ -18,19 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.DriveFileMove
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Compress
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.EditLocationAlt
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -46,7 +34,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +41,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.ui.components.DecoIcon
+import com.example.ui.components.DecoIconKind
 import com.example.ui.components.formatStorageSize
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoInkOnGround
@@ -103,7 +92,7 @@ internal fun GalleryMoreBatchActionsSheet(
             )
 
             BatchActionSheetRow(
-                icon = Icons.Filled.Compress,
+                iconKind = DecoIconKind.COMPRESS,
                 accentColor = DecoGold,
                 title = if (compressibleCount > 0) {
                     "${stringResource(R.string.action_batch_compress)}（$compressibleCount 张照片）"
@@ -117,7 +106,7 @@ internal fun GalleryMoreBatchActionsSheet(
             )
 
             BatchActionSheetRow(
-                icon = Icons.Filled.EditLocationAlt,
+                iconKind = DecoIconKind.EDIT_LOCATION,
                 accentColor = DecoGold,
                 title = if (missingLocationCount > 0) {
                     "${stringResource(R.string.action_batch_location)}（含 $missingLocationCount 项缺定位）"
@@ -131,7 +120,7 @@ internal fun GalleryMoreBatchActionsSheet(
             )
 
             BatchActionSheetRow(
-                icon = Icons.AutoMirrored.Filled.DriveFileMove,
+                iconKind = DecoIconKind.FOLDER_MOVE,
                 accentColor = DecoGold,
                 title = "移动至相册 / 归档年月",
                 subtitle = "归类到自定义相册或重新指定年度月份",
@@ -145,7 +134,7 @@ internal fun GalleryMoreBatchActionsSheet(
 
 @Composable
 private fun BatchActionSheetRow(
-    icon: ImageVector,
+    iconKind: DecoIconKind,
     accentColor: Color,
     title: String,
     subtitle: String,
@@ -175,11 +164,10 @@ private fun BatchActionSheetRow(
                 modifier = Modifier.size(40.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = if (enabled) accentColor else DecoInkOnGround.copy(alpha = 0.4f),
-                        modifier = Modifier.size(20.dp)
+                    DecoIcon(
+                        kind = iconKind,
+                        color = if (enabled) accentColor else DecoInkOnGround.copy(alpha = 0.4f),
+                        iconSize = 20.dp
                     )
                 }
             }
@@ -187,6 +175,7 @@ private fun BatchActionSheetRow(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleSmall,
+                    fontFamily = DecoDisplayFontFamily,
                     fontWeight = FontWeight.SemiBold,
                     color = if (enabled) DecoInkOnGround else DecoInkOnGround.copy(alpha = 0.5f),
                     maxLines = 1,
@@ -201,11 +190,10 @@ private fun BatchActionSheetRow(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = DecoInkOnGround.copy(alpha = if (enabled) 0.72f else 0.3f),
-                modifier = Modifier.size(20.dp)
+            DecoIcon(
+                kind = DecoIconKind.CHEVRON_RIGHT,
+                color = DecoInkOnGround.copy(alpha = if (enabled) 0.72f else 0.3f),
+                iconSize = 20.dp
             )
         }
     }
@@ -263,11 +251,11 @@ internal fun GallerySelectionTopBar(
                         .clip(SelectionBarShape)
                         .border(1.5.dp, DecoGold.copy(alpha = 0.85f), SelectionBarShape)
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = stringResource(R.string.cd_exit_selection),
-                        tint = DecoGold,
-                        modifier = Modifier.size(17.dp)
+                    DecoIcon(
+                        kind = DecoIconKind.CLOSE,
+                        color = DecoGold,
+                        iconSize = 17.dp,
+                        contentDescription = stringResource(R.string.cd_exit_selection)
                     )
                 }
             }
@@ -307,11 +295,10 @@ internal fun GallerySelectionTopBar(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.SelectAll,
-                        contentDescription = null,
-                        tint = if (allSelected) DecoMat else DecoGold,
-                        modifier = Modifier.size(15.dp)
+                    DecoIcon(
+                        kind = DecoIconKind.SELECT_ALL,
+                        color = if (allSelected) DecoMat else DecoGold,
+                        iconSize = 15.dp
                     )
                     Text(
                         text = stringResource(
@@ -363,7 +350,7 @@ internal fun FloatingBulkActionBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             BulkActionPillItem(
-                icon = Icons.Filled.CheckCircle,
+                iconKind = DecoIconKind.CHECK_CIRCLE,
                 label = stringResource(R.string.action_bulk_keep),
                 enabled = actionsEnabled,
                 onClick = onKeep,
@@ -375,7 +362,8 @@ internal fun FloatingBulkActionBar(
             VermStripDivider()
 
             BulkActionPillItem(
-                icon = Icons.Filled.Favorite,
+                iconKind = DecoIconKind.FAVORITE,
+                favoriteSelected = true,
                 label = stringResource(R.string.action_bulk_favorite),
                 enabled = actionsEnabled,
                 onClick = onFavorite,
@@ -387,7 +375,7 @@ internal fun FloatingBulkActionBar(
             VermStripDivider()
 
             BulkActionPillItem(
-                icon = Icons.Filled.DeleteOutline,
+                iconKind = DecoIconKind.DELETE,
                 label = if (selectedCount > 0) "回收站($selectedCount)" else stringResource(R.string.action_bulk_delete),
                 containerHighlight = DecoPaperCream.copy(alpha = 0.14f),
                 enabled = actionsEnabled,
@@ -400,7 +388,7 @@ internal fun FloatingBulkActionBar(
             VermStripDivider()
 
             BulkActionPillItem(
-                icon = Icons.Filled.MoreHoriz,
+                iconKind = DecoIconKind.MORE_HORIZ,
                 label = "更多",
                 enabled = actionsEnabled,
                 onClick = onMore,
@@ -434,11 +422,12 @@ private fun VermStripDivider() {
 
 @Composable
 private fun BulkActionPillItem(
-    icon: ImageVector,
+    iconKind: DecoIconKind,
     label: String,
     enabled: Boolean,
     onClick: () -> Unit,
     containerHighlight: Color = Color.Transparent,
+    favoriteSelected: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -451,16 +440,17 @@ private fun BulkActionPillItem(
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 6.dp, vertical = 6.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = DecoPaperCream,
-            modifier = Modifier.size(21.dp)
+        DecoIcon(
+            kind = iconKind,
+            color = DecoPaperCream,
+            selected = favoriteSelected,
+            iconSize = 21.dp
         )
         Spacer(modifier = Modifier.height(3.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
+            fontFamily = DecoDisplayFontFamily,
             fontSize = 12.sp,
             letterSpacing = 0.6.sp,
             fontWeight = FontWeight.SemiBold,

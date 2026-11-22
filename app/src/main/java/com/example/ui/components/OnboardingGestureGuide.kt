@@ -21,14 +21,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowDownward
-import androidx.compose.material.icons.outlined.ArrowUpward
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.SwipeVertical
-import androidx.compose.material.icons.outlined.TouchApp
-import androidx.compose.material.icons.outlined.Vibration
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,7 +33,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -62,7 +53,7 @@ import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.LocalIsDarkTheme
 
 private data class GestureGuideRow(
-    val icon: ImageVector,
+    val iconKind: DecoIconKind,
     /** 小方章描边/印色：回收站动作用朱红，其余为金。 */
     val sealColor: Color,
     val title: String,
@@ -89,31 +80,31 @@ fun OnboardingGestureGuideOverlay(
     val items = remember(vermSeal, goldSeal) {
         listOf(
             GestureGuideRow(
-                icon = Icons.Outlined.ArrowUpward,
+                iconKind = DecoIconKind.ARROW_UP,
                 sealColor = vermSeal,
                 title = "上滑 · 移入回收站",
                 detail = "在弧形清理中向上滑动，将不需要的照片或视频先暂存到回收站，不会立刻删除。"
             ),
             GestureGuideRow(
-                icon = Icons.Outlined.ArrowDownward,
+                iconKind = DecoIconKind.ARROW_DOWN,
                 sealColor = goldSeal,
                 title = "下滑 · 保留（连拍全部保留）",
                 detail = "向下滑动直接保留当前照片或整组连拍；如需仅留最佳帧，可点底部“仅留最佳”。"
             ),
             GestureGuideRow(
-                icon = Icons.Outlined.Vibration,
+                iconKind = DecoIconKind.VIBRATE,
                 sealColor = goldSeal,
                 title = "摇一摇 · 撤销清理",
                 detail = "在清理页面误操作时轻摇手机，即可撤销本次清理会话内的上一步决定。"
             ),
             GestureGuideRow(
-                icon = Icons.Outlined.TouchApp,
+                iconKind = DecoIconKind.TOUCH,
                 sealColor = goldSeal,
                 title = "长按 · 多选批量整理",
                 detail = "在画廊中长按任意照片进入多选模式，可批量保留、收藏、移入回收站或压缩。"
             ),
             GestureGuideRow(
-                icon = Icons.Outlined.SwipeVertical,
+                iconKind = DecoIconKind.SWIPE_VERTICAL,
                 sealColor = goldSeal,
                 title = "右侧快速滚动条 · 飞跃月份",
                 detail = "拖动画廊右侧的时间滑块，快速跨年跨月定位照片。"
@@ -196,11 +187,11 @@ fun OnboardingGestureGuideOverlay(
                                 )
                                 .testTag("onboarding_skip_icon_button")
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Close,
-                                contentDescription = "跳过引导",
-                                tint = DecoGold,
-                                modifier = Modifier.size(20.dp)
+                            DecoIcon(
+                                kind = DecoIconKind.CLOSE,
+                                color = DecoGold,
+                                iconSize = 20.dp,
+                                contentDescription = "跳过引导"
                             )
                         }
                     }
@@ -229,11 +220,10 @@ fun OnboardingGestureGuideOverlay(
                                             .background(row.sealColor.copy(alpha = 0.10f))
                                             .border(1.dp, row.sealColor.copy(alpha = 0.55f), RoundedCornerShape(3.dp))
                                     ) {
-                                        Icon(
-                                            imageVector = row.icon,
-                                            contentDescription = null,
-                                            tint = row.sealColor,
-                                            modifier = Modifier.size(19.dp)
+                                        DecoIcon(
+                                            kind = row.iconKind,
+                                            color = row.sealColor,
+                                            iconSize = 19.dp
                                         )
                                     }
                                     Column(

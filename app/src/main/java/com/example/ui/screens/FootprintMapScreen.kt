@@ -40,20 +40,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CenterFocusStrong
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.EditLocationAlt
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.GpsFixed
-import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -102,6 +88,8 @@ import com.example.ui.LocalFloatingDockInset
 import com.example.ui.MediaFilter
 import com.example.ui.UNLOCATED_LOCATION_KEY
 import com.example.ui.components.BatchLocationEditorSheet
+import com.example.ui.components.DecoIcon
+import com.example.ui.components.DecoIconKind
 import com.example.ui.components.DecoPosterPanel
 import com.example.ui.components.DecoSunburst
 import com.example.ui.components.DecoVermStrip
@@ -426,11 +414,11 @@ fun FootprintMapScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.Explore,
-                                contentDescription = stringResource(R.string.cd_map_fit_all),
-                                tint = gold,
-                                modifier = Modifier.size(16.dp)
+                            DecoIcon(
+                                kind = DecoIconKind.COMPASS,
+                                color = gold,
+                                iconSize = 16.dp,
+                                contentDescription = stringResource(R.string.cd_map_fit_all)
                             )
                             val statsLabel = when {
                                 uiState.isIndexingGps && uiState.gpsTotalCount > 0 ->
@@ -460,11 +448,11 @@ fun FootprintMapScreen(
                                         .clickable { onTriggerGpsBackfill(true) }
                                         .testTag("map_rescan_gps_button")
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Refresh,
-                                        contentDescription = "重新解析全量照片定位",
-                                        tint = ink.copy(alpha = 0.72f),
-                                        modifier = Modifier.size(16.dp)
+                                    DecoIcon(
+                                        kind = DecoIconKind.REFRESH,
+                                        color = ink.copy(alpha = 0.72f),
+                                        iconSize = 16.dp,
+                                        contentDescription = "重新解析全量照片定位"
                                     )
                                 }
                             }
@@ -506,11 +494,11 @@ fun FootprintMapScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Layers,
-                            contentDescription = stringResource(R.string.cd_map_layer),
-                            tint = gold,
-                            modifier = Modifier.size(16.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.LAYERS,
+                            color = gold,
+                            iconSize = 16.dp,
+                            contentDescription = stringResource(R.string.cd_map_layer)
                         )
                         Text(
                             text = mapStyle.label,
@@ -540,15 +528,15 @@ fun FootprintMapScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.GpsFixed,
-                            contentDescription = null,
-                            tint = verm,
-                            modifier = Modifier.size(20.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.GPS,
+                            color = verm,
+                            iconSize = 20.dp
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "未开启媒体位置权限，系统已隐藏照片 GPS",
+                                fontFamily = DecoDisplayFontFamily,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = ink
@@ -596,11 +584,10 @@ fun FootprintMapScreen(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.FilterList,
-                                contentDescription = null,
-                                tint = gold,
-                                modifier = Modifier.size(15.dp)
+                            DecoIcon(
+                                kind = DecoIconKind.FILTER,
+                                color = gold,
+                                iconSize = 15.dp
                             )
                             Text(
                                 text = "当前仅显示${uiState.mediaFilter.label}",
@@ -637,14 +624,15 @@ fun FootprintMapScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Refresh,
-                            contentDescription = stringResource(R.string.action_retry_map_tiles),
-                            tint = verm,
-                            modifier = Modifier.size(16.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.REFRESH,
+                            color = verm,
+                            iconSize = 16.dp,
+                            contentDescription = stringResource(R.string.action_retry_map_tiles)
                         )
                         Text(
                             text = stringResource(R.string.action_retry_map_tiles),
+                            fontFamily = DecoDisplayFontFamily,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = ink
@@ -729,11 +717,11 @@ fun FootprintMapScreen(
                                 .size(48.dp)
                                 .testTag("map_fit_all_button")
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.CenterFocusStrong,
-                                contentDescription = stringResource(R.string.cd_map_fit_all),
-                                tint = gold,
-                                modifier = Modifier.size(19.dp)
+                            DecoIcon(
+                                kind = DecoIconKind.CENTER_FOCUS,
+                                color = gold,
+                                iconSize = 19.dp,
+                                contentDescription = stringResource(R.string.cd_map_fit_all)
                             )
                         }
                         Box(
@@ -749,11 +737,11 @@ fun FootprintMapScreen(
                             .size(48.dp)
                             .testTag("map_zoom_out_button")
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Remove,
-                            contentDescription = stringResource(R.string.cd_map_zoom_out),
-                            tint = ink,
-                            modifier = Modifier.size(19.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.MINUS,
+                            color = ink,
+                            iconSize = 19.dp,
+                            contentDescription = stringResource(R.string.cd_map_zoom_out)
                         )
                     }
                     Box(
@@ -768,11 +756,11 @@ fun FootprintMapScreen(
                             .size(48.dp)
                             .testTag("map_zoom_in_button")
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Add,
-                            contentDescription = stringResource(R.string.cd_map_zoom_in),
-                            tint = ink,
-                            modifier = Modifier.size(19.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.ADD,
+                            color = ink,
+                            iconSize = 19.dp,
+                            contentDescription = stringResource(R.string.cd_map_zoom_in)
                         )
                     }
                 }
@@ -804,11 +792,10 @@ fun FootprintMapScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.LocationOn,
-                            contentDescription = null,
-                            tint = gold,
-                            modifier = Modifier.size(38.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.LOCATION,
+                            color = gold,
+                            iconSize = 38.dp
                         )
                         Text(
                             text = if (unlocatedPhotos.isNotEmpty()) {
@@ -839,7 +826,7 @@ fun FootprintMapScreen(
                             ) {
                                 GalleryActionButton(
                                     text = "批量补全定位",
-                                    leadingIcon = Icons.Filled.EditLocationAlt,
+                                    leadingIconKind = DecoIconKind.EDIT_LOCATION,
                                     onClick = { showBatchLocationSheet = true },
                                     tone = GalleryButtonTone.IMMERSIVE,
                                     height = 46.dp,

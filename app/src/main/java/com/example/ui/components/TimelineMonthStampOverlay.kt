@@ -36,13 +36,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.BurstMode
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.PhotoLibrary
-import androidx.compose.material.icons.outlined.Videocam
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -383,11 +376,11 @@ fun MonthlyClusterHeaderStamp(
                     )
                 }
             } else if (cluster.isCleaned) {
-                Icon(
-                    imageVector = Icons.Outlined.CheckCircle,
-                    contentDescription = stringResource(R.string.timeline_month_cleaned_tag),
-                    tint = deco.decoGold,
-                    modifier = Modifier.size(13.dp)
+                DecoIcon(
+                    kind = DecoIconKind.CHECK_CIRCLE,
+                    color = deco.decoGold,
+                    iconSize = 13.dp,
+                    contentDescription = stringResource(R.string.timeline_month_cleaned_tag)
                 )
             }
         }
@@ -591,11 +584,10 @@ private fun TimelineMonthStampOverlayCore(
                                     .background(verm)
                                     .border(1.dp, VermTagCreamRim, RoundedCornerShape(3.dp))
                             ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.CalendarMonth,
-                                    contentDescription = null,
-                                    tint = cream,
-                                    modifier = Modifier.size(15.dp)
+                                DecoIcon(
+                                    kind = DecoIconKind.CALENDAR,
+                                    color = cream,
+                                    iconSize = 15.dp
                                 )
                             }
 
@@ -630,11 +622,10 @@ private fun TimelineMonthStampOverlayCore(
                                                 .border(1.dp, gold.copy(alpha = 0.45f), JumpChipShape)
                                                 .padding(horizontal = 7.dp, vertical = 2.dp)
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.Outlined.CheckCircle,
-                                                contentDescription = null,
-                                                tint = gold,
-                                                modifier = Modifier.size(12.dp)
+                                            DecoIcon(
+                                                kind = DecoIconKind.CHECK_CIRCLE,
+                                                color = gold,
+                                                iconSize = 12.dp
                                             )
                                             Text(
                                                 text = stringResource(R.string.timeline_month_cleaned_tag),
@@ -655,19 +646,19 @@ private fun TimelineMonthStampOverlayCore(
                                 ) {
                                     if (cluster.photoCount > 0) {
                                         StampMetricTag(
-                                            icon = Icons.Outlined.PhotoLibrary,
+                                            iconKind = DecoIconKind.PHOTO_LIBRARY,
                                             text = "${cluster.photoCount}"
                                         )
                                     }
                                     if (cluster.videoCount > 0) {
                                         StampMetricTag(
-                                            icon = Icons.Outlined.Videocam,
+                                            iconKind = DecoIconKind.VIDEOCAM,
                                             text = "${cluster.videoCount}"
                                         )
                                     }
                                     if (cluster.burstGroupCount > 0) {
                                         StampMetricTag(
-                                            icon = Icons.Outlined.BurstMode,
+                                            iconKind = DecoIconKind.BURST,
                                             text = "${cluster.burstGroupCount}组"
                                         )
                                     }
@@ -814,7 +805,7 @@ private fun TimelineMonthStampOverlayCore(
 
 @Composable
 private fun StampMetricTag(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconKind: DecoIconKind,
     text: String,
     tintOverride: Color? = null
 ) {
@@ -824,11 +815,10 @@ private fun StampMetricTag(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = tintOverride ?: gold,
-            modifier = Modifier.size(13.dp)
+        DecoIcon(
+            kind = iconKind,
+            color = tintOverride ?: gold,
+            iconSize = 13.dp
         )
         Text(
             text = text,

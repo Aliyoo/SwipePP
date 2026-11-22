@@ -26,14 +26,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FilterNone
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -71,6 +63,8 @@ import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
 import com.example.sensor.HapticPatternEngine
 import com.example.ui.CleanupCardItem
+import com.example.ui.components.DecoIcon
+import com.example.ui.components.DecoIconKind
 import com.example.ui.components.InlineVideoPlayer
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.formatEditorialPhotoTitle
@@ -358,11 +352,11 @@ internal fun ModernArcSwipeCard(
                                 .background(DecoPhotoChipBase.copy(alpha = 0.72f))
                                 .border(2.dp, decoGold, CircleShape)
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.PlayArrow,
-                                contentDescription = stringResource(R.string.cd_play_video),
-                                tint = DecoPaperCream,
-                                modifier = Modifier.size(34.dp)
+                            DecoIcon(
+                                kind = DecoIconKind.PLAY,
+                                color = DecoPaperCream,
+                                iconSize = 34.dp,
+                                contentDescription = stringResource(R.string.cd_play_video)
                             )
                         }
                     }
@@ -396,11 +390,10 @@ internal fun ModernArcSwipeCard(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.FilterNone,
-                                    contentDescription = null,
-                                    tint = DecoPaperCream,
-                                    modifier = Modifier.size(12.dp)
+                                DecoIcon(
+                                    kind = DecoIconKind.BURST,
+                                    color = DecoPaperCream,
+                                    iconSize = 12.dp
                                 )
                                 Text(
                                     text = "${item.photos.size} 张连拍",
@@ -423,11 +416,11 @@ internal fun ModernArcSwipeCard(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(3.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Star,
-                                    contentDescription = null,
-                                    tint = DecoPaperCream,
-                                    modifier = Modifier.size(12.dp)
+                                DecoIcon(
+                                    kind = DecoIconKind.STAR,
+                                    color = DecoPaperCream,
+                                    selected = true,
+                                    iconSize = 12.dp
                                 )
                                 Text(
                                     text = "最佳 · 画质 ${item.bestPhoto.qualityScore}",
@@ -464,11 +457,12 @@ internal fun ModernArcSwipeCard(
                         modifier = Modifier.size(72.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Filled.Favorite,
-                                contentDescription = "收藏保留",
-                                tint = DecoPaperCream,
-                                modifier = Modifier.size(38.dp)
+                            DecoIcon(
+                                kind = DecoIconKind.FAVORITE,
+                                color = DecoPaperCream,
+                                selected = true,
+                                iconSize = 38.dp,
+                                contentDescription = "收藏保留"
                             )
                         }
                     }
@@ -495,10 +489,10 @@ internal fun ModernArcSwipeCard(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.DeleteOutline,
-                                    contentDescription = null,
-                                    tint = decoVerm
+                                DecoIcon(
+                                    kind = DecoIconKind.DELETE,
+                                    color = decoVerm,
+                                    iconSize = 24.dp
                                 )
                                 Text(
                                     text = "松手移入回收站 (+${formatStorageSize(item.totalBytes)})",
@@ -533,10 +527,10 @@ internal fun ModernArcSwipeCard(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Check,
-                                    contentDescription = null,
-                                    tint = decoGold
+                                DecoIcon(
+                                    kind = DecoIconKind.CHECK,
+                                    color = decoGold,
+                                    iconSize = 24.dp
                                 )
                                 Text(
                                     text = if (item is CleanupCardItem.BurstStack) {

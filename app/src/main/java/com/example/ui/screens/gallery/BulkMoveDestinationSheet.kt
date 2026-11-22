@@ -18,12 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.DriveFileMove
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -48,6 +43,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.ui.components.DecoIcon
+import com.example.ui.components.DecoIconKind
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.formatStorageSize
@@ -135,11 +132,10 @@ internal fun BulkMoveDestinationSheet(
                     modifier = Modifier.size(40.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.DriveFileMove,
-                            contentDescription = null,
-                            tint = DecoGold,
-                            modifier = Modifier.size(20.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.FOLDER_MOVE,
+                            color = DecoGold,
+                            iconSize = 20.dp
                         )
                     }
                 }
@@ -147,6 +143,7 @@ internal fun BulkMoveDestinationSheet(
 
             Text(
                 text = "快速选择目标相册",
+                fontFamily = DecoDisplayFontFamily,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 color = DecoInkOnGround.copy(alpha = 0.72f)
@@ -163,11 +160,10 @@ internal fun BulkMoveDestinationSheet(
                         onClick = { albumInput = album },
                         modifier = Modifier.testTag("bulk_move_preset_$album")
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Folder,
-                            contentDescription = null,
-                            tint = if (selected) DecoMat else DecoGold.copy(alpha = 0.85f),
-                            modifier = Modifier.size(14.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.FOLDER,
+                            color = if (selected) DecoMat else DecoGold.copy(alpha = 0.85f),
+                            iconSize = 14.dp
                         )
                         Text(
                             text = album,
@@ -186,10 +182,9 @@ internal fun BulkMoveDestinationSheet(
                 label = { Text(stringResource(R.string.bulk_move_album_label)) },
                 placeholder = { Text(stringResource(R.string.bulk_move_album_placeholder)) },
                 leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.Folder,
-                        contentDescription = null,
-                        tint = DecoGold
+                    DecoIcon(
+                        kind = DecoIconKind.FOLDER,
+                        color = DecoGold
                     )
                 },
                 shape = RoundedCornerShape(4.dp),
@@ -231,11 +226,10 @@ internal fun BulkMoveDestinationSheet(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.CalendarMonth,
-                                contentDescription = null,
-                                tint = DecoGold,
-                                modifier = Modifier.size(18.dp)
+                            DecoIcon(
+                                kind = DecoIconKind.CALENDAR,
+                                color = DecoGold,
+                                iconSize = 18.dp
                             )
                             Text(
                                 text = stringResource(R.string.bulk_move_date_toggle),
@@ -309,7 +303,7 @@ internal fun BulkMoveDestinationSheet(
                 )
                 GalleryActionButton(
                     text = "确认移动 ($selectedCount)",
-                    leadingIcon = Icons.AutoMirrored.Filled.DriveFileMove,
+                    leadingIconKind = DecoIconKind.FOLDER_MOVE,
                     tone = GalleryButtonTone.IMMERSIVE,
                     enabled = canConfirm,
                     onClick = {

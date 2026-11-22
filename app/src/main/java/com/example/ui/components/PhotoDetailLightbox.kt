@@ -45,17 +45,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material.icons.outlined.Restore
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -622,7 +612,7 @@ private fun PhotoDetailLightboxContent(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 ObsidianIconOrb(
-                    icon = Icons.Outlined.Close,
+                    iconKind = DecoIconKind.CLOSE,
                     contentDescription = "关闭预览",
                     onClick = { requestAnimatedDismiss() },
                     color = ObsidianOverlayGlass,
@@ -681,11 +671,10 @@ private fun PhotoDetailLightboxContent(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Star,
-                            contentDescription = null,
-                            tint = DecoPaperCream,
-                            modifier = Modifier.size(13.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.STAR,
+                            color = DecoPaperCream,
+                            iconSize = 13.dp
                         )
                         Text(
                             text = "画质 ${currentPhoto.qualityScore}",
@@ -772,11 +761,10 @@ private fun LightboxBottomHud(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.LocationOn,
-                                    contentDescription = null,
-                                    tint = Color(0xFF8FB0FF),
-                                    modifier = Modifier.size(14.dp)
+                                DecoIcon(
+                                    kind = DecoIconKind.LOCATION,
+                                    color = Color(0xFF8FB0FF),
+                                    iconSize = 14.dp
                                 )
                                 Text(
                                     text = photo.locationName.orEmpty(),

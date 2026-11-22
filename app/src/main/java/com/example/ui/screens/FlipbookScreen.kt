@@ -46,12 +46,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -110,6 +104,8 @@ import com.example.ui.MonthPageModel
 import com.example.ui.components.BatchCompressBottomSheet
 import com.example.ui.components.BatchLocationEditorSheet
 import com.example.ui.components.BurstGalleryGrid
+import com.example.ui.components.DecoIcon
+import com.example.ui.components.DecoIconKind
 import com.example.ui.components.DecoPaperGround
 import com.example.ui.components.DecoSealButton
 import com.example.ui.components.DecoVermStrip
@@ -1091,11 +1087,10 @@ private fun DecoMonthPosterPage(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.CalendarMonth,
-                        contentDescription = null,
-                        tint = DecoGold.copy(alpha = 0.55f),
-                        modifier = Modifier.size(42.dp)
+                    DecoIcon(
+                        kind = DecoIconKind.CALENDAR,
+                        color = DecoGold.copy(alpha = 0.55f),
+                        iconSize = 42.dp
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
@@ -1394,14 +1389,13 @@ private fun CalendarDaySlot(
         )
 
         if (hasVideo && !isCleanedStar) {
-            Icon(
-                imageVector = Icons.Filled.PlayArrow,
-                contentDescription = null,
-                tint = DecoPaperCream,
+            DecoIcon(
+                kind = DecoIconKind.PLAY,
+                color = DecoPaperCream,
+                iconSize = 12.dp,
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(3.dp)
-                    .size(12.dp)
             )
         }
 
@@ -1417,11 +1411,12 @@ private fun CalendarDaySlot(
                     .border(0.8.dp, DecoGold.copy(alpha = 0.85f), RoundedCornerShape(1.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Star,
-                    contentDescription = "已整理星标",
-                    tint = DecoPaperCream,
-                    modifier = Modifier.size(9.dp)
+                DecoIcon(
+                    kind = DecoIconKind.STAR,
+                    color = DecoPaperCream,
+                    selected = true,
+                    iconSize = 9.dp,
+                    contentDescription = "已整理星标"
                 )
             }
         } else if (itemsCount > 1) {
@@ -1560,11 +1555,11 @@ private fun DecoMonthArchiveSeal(
             .border(1.dp, gold.copy(alpha = 0.65f), RoundedCornerShape(2.dp))
             .padding(horizontal = 7.dp, vertical = 5.dp)
     ) {
-        Icon(
-            imageVector = Icons.Filled.Star,
-            contentDescription = null,
-            tint = cream,
-            modifier = Modifier.size(11.dp)
+        DecoIcon(
+            kind = DecoIconKind.STAR,
+            color = cream,
+            selected = true,
+            iconSize = 11.dp
         )
         Text(
             text = "已整理",
@@ -1617,7 +1612,7 @@ private fun FlipbookViewModeSwitch(
             desc = "月历视图",
             isSelected = !showGalleryMode,
             label = "月历",
-            icon = Icons.Filled.CalendarMonth,
+            iconKind = DecoIconKind.CALENDAR,
             iconTint = calendarIconColor,
             textColor = calendarTextColor,
             onClick = { onSelectMode(false) }
@@ -1627,7 +1622,7 @@ private fun FlipbookViewModeSwitch(
             desc = "连拍画廊视图",
             isSelected = showGalleryMode,
             label = "画廊",
-            icon = Icons.Filled.GridView,
+            iconKind = DecoIconKind.GRID,
             iconTint = galleryIconColor,
             textColor = galleryTextColor,
             onClick = { onSelectMode(true) }
@@ -1641,7 +1636,7 @@ private fun DecoModeTab(
     desc: String,
     isSelected: Boolean,
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconKind: DecoIconKind,
     iconTint: Color,
     textColor: Color,
     onClick: () -> Unit
@@ -1677,11 +1672,10 @@ private fun DecoModeTab(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(13.5.dp)
+            DecoIcon(
+                kind = iconKind,
+                color = iconTint,
+                iconSize = 13.5.dp
             )
             Text(
                 text = label,

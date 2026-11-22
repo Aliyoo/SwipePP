@@ -29,16 +29,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -57,7 +48,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -325,11 +315,11 @@ fun InlineVideoPlayer(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Refresh,
-                        contentDescription = "重试播放",
-                        tint = DecoPaperCream,
-                        modifier = Modifier.size(16.dp)
+                    DecoIcon(
+                        kind = DecoIconKind.REFRESH,
+                        color = DecoPaperCream,
+                        iconSize = 16.dp,
+                        contentDescription = "重试播放"
                     )
                     Text(
                         text = "$playbackError · 点击重试",
@@ -348,7 +338,7 @@ fun InlineVideoPlayer(
             exit = fadeOut()
         ) {
             DecoVideoInkOrb(
-                icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                iconKind = if (isPlaying) DecoIconKind.PAUSE else DecoIconKind.PLAY,
                 contentDescription = if (isPlaying) "暂停视频" else "播放视频",
                 onClick = togglePlayPause,
                 size = if (showFullControls) 64.dp else 54.dp,
@@ -374,7 +364,7 @@ fun InlineVideoPlayer(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         DecoSealChipButton(
-                            icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            iconKind = if (isPlaying) DecoIconKind.PAUSE else DecoIconKind.PLAY,
                             contentDescription = if (isPlaying) "暂停视频" else "播放视频",
                             onClick = togglePlayPause,
                             modifier = Modifier.testTag("inline_video_dock_play_pause")
@@ -419,7 +409,7 @@ fun InlineVideoPlayer(
                         )
 
                         DecoSealChipButton(
-                            icon = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                            iconKind = if (isMuted) DecoIconKind.VOLUME_OFF else DecoIconKind.VOLUME,
                             contentDescription = if (isMuted) "取消静音" else "静音",
                             onClick = { isMuted = !isMuted },
                             modifier = Modifier.testTag("inline_video_mute_toggle")
@@ -484,7 +474,7 @@ fun InlineVideoPlayer(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     DecoVideoInkOrb(
-                        icon = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                        iconKind = if (isMuted) DecoIconKind.VOLUME_OFF else DecoIconKind.VOLUME,
                         contentDescription = if (isMuted) "取消静音" else "静音",
                         onClick = { isMuted = !isMuted },
                         size = 44.dp,
@@ -494,7 +484,7 @@ fun InlineVideoPlayer(
 
                     if (onOpenFullscreen != null) {
                         DecoVideoInkOrb(
-                            icon = Icons.Filled.Fullscreen,
+                            iconKind = DecoIconKind.FULLSCREEN,
                             contentDescription = "全屏播放",
                             onClick = onOpenFullscreen,
                             size = 44.dp,
@@ -587,7 +577,7 @@ private fun SampleVideoInlinePreview(
             exit = fadeOut()
         ) {
             DecoVideoInkOrb(
-                icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                iconKind = if (isPlaying) DecoIconKind.PAUSE else DecoIconKind.PLAY,
                 contentDescription = if (isPlaying) "暂停预览" else "播放预览",
                 onClick = { isPlaying = !isPlaying },
                 size = if (showFullControls) 64.dp else 54.dp,
@@ -607,11 +597,10 @@ private fun SampleVideoInlinePreview(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Videocam,
-                            contentDescription = null,
-                            tint = DecoGold,
-                            modifier = Modifier.size(13.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.VIDEOCAM,
+                            color = DecoGold,
+                            iconSize = 13.dp
                         )
                         Text(
                             text = "示例视频动效预览 · 扫描本机视频后支持真实音画播放",
@@ -625,7 +614,7 @@ private fun SampleVideoInlinePreview(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         DecoSealChipButton(
-                            icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            iconKind = if (isPlaying) DecoIconKind.PAUSE else DecoIconKind.PLAY,
                             contentDescription = if (isPlaying) "暂停预览" else "播放预览",
                             onClick = { isPlaying = !isPlaying }
                         )
@@ -711,7 +700,7 @@ private fun SampleVideoInlinePreview(
                 }
                 if (onOpenFullscreen != null) {
                     DecoVideoInkOrb(
-                        icon = Icons.Filled.Fullscreen,
+                        iconKind = DecoIconKind.FULLSCREEN,
                         contentDescription = "全屏播放",
                         onClick = onOpenFullscreen,
                         size = 44.dp,
@@ -733,7 +722,7 @@ private fun SampleVideoInlinePreview(
 /** 深墨印钮：圆形印章钮，暗 scrim 底 + 金环 + 纸黄图标，压视频时保证可读。 */
 @Composable
 private fun DecoVideoInkOrb(
-    icon: ImageVector,
+    iconKind: DecoIconKind,
     contentDescription: String?,
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
@@ -742,11 +731,11 @@ private fun DecoVideoInkOrb(
 ) {
     val orbContent: @Composable () -> Unit = {
         Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = DecoPaperCream,
-                modifier = Modifier.size(iconSize)
+            DecoIcon(
+                kind = iconKind,
+                color = DecoPaperCream,
+                iconSize = iconSize,
+                contentDescription = contentDescription
             )
         }
     }
@@ -774,7 +763,7 @@ private fun DecoVideoInkOrb(
 /** 方章控制钮：纸地底 + 1.2dp 金描边小方章（3dp 圆角），压画报纸面控制托盘。 */
 @Composable
 private fun DecoSealChipButton(
-    icon: ImageVector,
+    iconKind: DecoIconKind,
     contentDescription: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -790,11 +779,11 @@ private fun DecoSealChipButton(
         modifier = modifier.size(size)
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = gold,
-                modifier = Modifier.size(iconSize)
+            DecoIcon(
+                kind = iconKind,
+                color = gold,
+                iconSize = iconSize,
+                contentDescription = contentDescription
             )
         }
     }

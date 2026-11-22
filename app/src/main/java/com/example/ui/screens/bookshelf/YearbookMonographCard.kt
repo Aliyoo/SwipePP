@@ -27,11 +27,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -63,6 +58,8 @@ import com.example.R
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
 import com.example.ui.YearbookSummary
+import com.example.ui.components.DecoIcon
+import com.example.ui.components.DecoIconKind
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoGround
@@ -357,11 +354,11 @@ internal fun ModernYearbook3DCard(
                                     .background(ground.copy(alpha = 0.66f))
                                     .border(1.dp, gold.copy(alpha = 0.75f), RoundedCornerShape(4.dp))
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Check,
-                                    contentDescription = "年度已整理",
-                                    tint = gold,
-                                    modifier = Modifier.size(14.dp)
+                                DecoIcon(
+                                    kind = DecoIconKind.CHECK,
+                                    color = gold,
+                                    iconSize = 14.dp,
+                                    contentDescription = "年度已整理"
                                 )
                             }
                         } else {
@@ -522,11 +519,10 @@ internal fun ModernYearbook3DCard(
                                     .border(0.75.dp, gold.copy(alpha = 0.45f), RoundedCornerShape(3.dp))
                                     .padding(horizontal = 7.dp, vertical = 3.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Videocam,
-                                    contentDescription = null,
-                                    tint = gold,
-                                    modifier = Modifier.size(11.dp)
+                                DecoIcon(
+                                    kind = DecoIconKind.VIDEOCAM,
+                                    color = gold,
+                                    iconSize = 11.dp
                                 )
                                 Text(
                                     text = "${summary.videoCount}",
@@ -537,11 +533,10 @@ internal fun ModernYearbook3DCard(
                                 )
                             }
                         }
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = DecoPaperCream.copy(alpha = 0.78f),
-                            modifier = Modifier.size(16.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.CHEVRON_RIGHT,
+                            color = DecoPaperCream.copy(alpha = 0.78f),
+                            iconSize = 16.dp
                         )
                     }
 

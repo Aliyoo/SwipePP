@@ -30,16 +30,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Collections
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -58,7 +49,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -239,7 +229,7 @@ fun YearbookCoverStudioSheet(
                     ) {
                         CoverModeSegment(
                             mode = YearbookCoverMode.SMART_CAROUSEL,
-                            icon = Icons.Filled.AutoAwesome,
+                            iconKind = DecoIconKind.SPARKLE,
                             selected = selectedMode == YearbookCoverMode.SMART_CAROUSEL,
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -251,7 +241,7 @@ fun YearbookCoverStudioSheet(
                         )
                         CoverModeSegment(
                             mode = YearbookCoverMode.SINGLE_CUSTOM,
-                            icon = Icons.Filled.Image,
+                            iconKind = DecoIconKind.PHOTO,
                             selected = selectedMode == YearbookCoverMode.SINGLE_CUSTOM,
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -268,7 +258,7 @@ fun YearbookCoverStudioSheet(
                         )
                         CoverModeSegment(
                             mode = YearbookCoverMode.CUSTOM_CAROUSEL,
-                            icon = Icons.Filled.Collections,
+                            iconKind = DecoIconKind.PHOTO_LIBRARY,
                             selected = selectedMode == YearbookCoverMode.CUSTOM_CAROUSEL,
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -328,11 +318,10 @@ fun YearbookCoverStudioSheet(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
-                            Icon(
-                                imageVector = if (previewSlides.size > 1) Icons.Filled.PlayArrow else Icons.Filled.Image,
-                                contentDescription = null,
-                                tint = DecoGold,
-                                modifier = Modifier.size(13.dp)
+                            DecoIcon(
+                                kind = if (previewSlides.size > 1) DecoIconKind.PLAY else DecoIconKind.PHOTO,
+                                color = DecoGold,
+                                iconSize = 13.dp
                             )
                             Text(
                                 text = when (selectedMode) {
@@ -407,6 +396,7 @@ fun YearbookCoverStudioSheet(
                         Text(
                             text = "本年度智能精选序列 (${smartCuratedSlides.size} 张)",
                             style = MaterialTheme.typography.titleSmall,
+                            fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.Bold,
                             color = DecoInkOnGround
                         )
@@ -542,7 +532,7 @@ fun YearbookCoverStudioSheet(
                 if (summary.coverMode != YearbookCoverMode.SMART_CAROUSEL || selectedMode != YearbookCoverMode.SMART_CAROUSEL) {
                     GalleryActionButton(
                         text = stringResource(R.string.cover_studio_reset_smart),
-                        leadingIcon = Icons.Filled.RestartAlt,
+                        leadingIconKind = DecoIconKind.RESTART,
                         tone = GalleryButtonTone.GLASS,
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -557,7 +547,7 @@ fun YearbookCoverStudioSheet(
 
                 GalleryActionButton(
                     text = stringResource(R.string.cover_studio_save),
-                    leadingIcon = Icons.Filled.Check,
+                    leadingIconKind = DecoIconKind.CHECK,
                     tone = GalleryButtonTone.IMMERSIVE,
                     enabled = canSave,
                     onClick = {
@@ -587,7 +577,7 @@ fun YearbookCoverStudioSheet(
 @Composable
 private fun CoverModeSegment(
     mode: YearbookCoverMode,
-    icon: ImageVector,
+    iconKind: DecoIconKind,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -605,16 +595,16 @@ private fun CoverModeSegment(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (selected) DecoGold else DecoInkOnGround.copy(alpha = 0.55f),
-                modifier = Modifier.size(15.dp)
+            DecoIcon(
+                kind = iconKind,
+                color = if (selected) DecoGold else DecoInkOnGround.copy(alpha = 0.55f),
+                iconSize = 15.dp
             )
             Spacer(modifier = Modifier.width(5.dp))
             Text(
                 text = mode.label,
                 style = MaterialTheme.typography.labelLarge,
+                fontFamily = DecoDisplayFontFamily,
                 fontSize = 12.5.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                 color = if (selected) DecoInkOnGround else DecoInkOnGround.copy(alpha = 0.62f),
@@ -834,20 +824,21 @@ private fun SmartSlideCard(
                 }
             }
             if (photo.isFavorite) {
-                Icon(
-                    imageVector = Icons.Filled.Favorite,
-                    contentDescription = null,
-                    tint = DecoGold,
+                DecoIcon(
+                    kind = DecoIconKind.FAVORITE,
+                    color = DecoGold,
+                    selected = true,
+                    iconSize = 14.dp,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(5.dp)
-                        .size(14.dp)
                 )
             }
         }
         Text(
             text = "${photo.month}月 · $reasonTag",
             style = MaterialTheme.typography.labelSmall,
+            fontFamily = DecoDisplayFontFamily,
             fontSize = 11.sp,
             fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.SemiBold,
             color = if (isHighlighted) DecoInkOnGround else DecoInkOnGround.copy(alpha = 0.78f),
@@ -915,11 +906,10 @@ private fun CoverPickerGridTile(
                         color = DecoPaperCream
                     )
                 } else {
-                    Icon(
-                        imageVector = Icons.Filled.Check,
-                        contentDescription = null,
-                        tint = DecoPaperCream,
-                        modifier = Modifier.size(14.dp)
+                    DecoIcon(
+                        kind = DecoIconKind.CHECK,
+                        color = DecoPaperCream,
+                        iconSize = 14.dp
                     )
                 }
             }
@@ -947,18 +937,17 @@ private fun CoverPickerGridTile(
                 maxLines = 1
             )
             if (photo.isFavorite) {
-                Icon(
-                    imageVector = Icons.Filled.Favorite,
-                    contentDescription = null,
-                    tint = DecoGold,
-                    modifier = Modifier.size(11.dp)
+                DecoIcon(
+                    kind = DecoIconKind.FAVORITE,
+                    color = DecoGold,
+                    selected = true,
+                    iconSize = 11.dp
                 )
             } else if (photo.photoStatus == PhotoStatus.KEPT) {
-                Icon(
-                    imageVector = Icons.Filled.Check,
-                    contentDescription = null,
-                    tint = DecoGold,
-                    modifier = Modifier.size(11.dp)
+                DecoIcon(
+                    kind = DecoIconKind.CHECK,
+                    color = DecoGold,
+                    iconSize = 11.dp
                 )
             }
         }

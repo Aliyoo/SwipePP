@@ -15,10 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CleaningServices
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -36,7 +32,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -48,6 +43,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.CleanerEntrySource
 import com.example.ui.components.CleanedCompletionBadge
+import com.example.ui.components.DecoIcon
+import com.example.ui.components.DecoIconKind
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.formatStorageSize
@@ -75,7 +72,7 @@ internal fun DecoVermStripButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     badgeText: String? = null,
-    leadingIcon: ImageVector? = null,
+    leadingIconKind: DecoIconKind? = null,
     height: Dp = 52.dp,
     enabled: Boolean = true
 ) {
@@ -123,11 +120,11 @@ internal fun DecoVermStripButton(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            if (leadingIcon != null) {
-                Icon(
-                    imageVector = leadingIcon,
-                    contentDescription = null,
-                    tint = DecoPaperCream
+            if (leadingIconKind != null) {
+                DecoIcon(
+                    kind = leadingIconKind,
+                    color = DecoPaperCream,
+                    iconSize = 24.dp
                 )
             }
             Text(
@@ -290,7 +287,7 @@ internal fun CleanupCompletedCelebration(
             DecoVermStripButton(
                 title = "继续清理本月剩余",
                 badgeText = "$remainingInFullQueue 项",
-                leadingIcon = Icons.Filled.CleaningServices,
+                leadingIconKind = DecoIconKind.CLEAN,
                 onClick = onContinueFullMonth,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -300,7 +297,7 @@ internal fun CleanupCompletedCelebration(
             if (sessionTrashedCount > 0) {
                 GalleryActionButton(
                     text = "去回收站释放空间 (${formatStorageSize(sessionTrashedBytes)})",
-                    leadingIcon = Icons.Filled.DeleteOutline,
+                    leadingIconKind = DecoIconKind.DELETE,
                     iconTint = vermInk,
                     onClick = onOpenVault,
                     tone = GalleryButtonTone.IMMERSIVE,
@@ -336,7 +333,7 @@ internal fun CleanupCompletedCelebration(
                 DecoVermStripButton(
                     title = "去回收站释放空间",
                     badgeText = formatStorageSize(sessionTrashedBytes),
-                    leadingIcon = Icons.Filled.DeleteOutline,
+                    leadingIconKind = DecoIconKind.DELETE,
                     onClick = onOpenVault,
                     modifier = Modifier
                         .fillMaxWidth()

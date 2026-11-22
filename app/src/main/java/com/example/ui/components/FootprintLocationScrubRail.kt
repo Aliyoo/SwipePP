@@ -30,11 +30,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.LocationOff
-import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -440,11 +435,10 @@ private fun CompactIdleFootprintFlag(
             .border(1.dp, gold.copy(alpha = 0.8f), FootprintFlagIdleShape)
             .padding(horizontal = 9.dp, vertical = 6.dp)
     ) {
-        Icon(
-            imageVector = if (stop.isUnlocated) Icons.Outlined.LocationOff else Icons.Outlined.LocationOn,
-            contentDescription = null,
-            tint = iconTint,
-            modifier = Modifier.size(13.dp)
+        DecoIcon(
+            kind = if (stop.isUnlocated) DecoIconKind.LOCATION_OFF else DecoIconKind.LOCATION,
+            color = iconTint,
+            iconSize = 13.dp
         )
         Text(
             text = stop.shortIdleLabel,
@@ -507,11 +501,10 @@ private fun ExpandedFootprintScrubFlag(
                         .background(gold.copy(alpha = 0.14f))
                         .border(1.dp, gold.copy(alpha = 0.6f), RoundedCornerShape(3.dp))
                 ) {
-                    Icon(
-                        imageVector = if (activeStop.isUnlocated) Icons.Outlined.LocationOff else Icons.Outlined.LocationOn,
-                        contentDescription = null,
-                        tint = if (activeStop.isUnlocated) verm else gold,
-                        modifier = Modifier.size(16.dp)
+                    DecoIcon(
+                        kind = if (activeStop.isUnlocated) DecoIconKind.LOCATION_OFF else DecoIconKind.LOCATION,
+                        color = if (activeStop.isUnlocated) verm else gold,
+                        iconSize = 16.dp
                     )
                 }
 
@@ -564,11 +557,10 @@ private fun ExpandedFootprintScrubFlag(
                                     .background(gold)
                                     .padding(horizontal = 5.dp, vertical = 1.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.CheckCircle,
-                                    contentDescription = null,
-                                    tint = mat,
-                                    modifier = Modifier.size(11.dp)
+                                DecoIcon(
+                                    kind = DecoIconKind.CHECK_CIRCLE,
+                                    color = mat,
+                                    iconSize = 11.dp
                                 )
                                 Text(
                                     text = "已整理",

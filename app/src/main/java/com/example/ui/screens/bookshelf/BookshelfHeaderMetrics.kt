@@ -13,14 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
@@ -41,6 +35,8 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.MediaAccessLevel
 import com.example.ui.MediaFilter
+import com.example.ui.components.DecoIcon
+import com.example.ui.components.DecoIconKind
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.formatStorageSize
@@ -201,6 +197,7 @@ private fun DecoVermButton(
     ) {
         Text(
             text = text,
+            fontFamily = DecoDisplayFontFamily,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 0.3.sp,
@@ -313,11 +310,10 @@ internal fun EmptyLibraryPermissionCard(
                             modifier = Modifier.size(28.dp)
                         )
                     } else {
-                        Icon(
-                            imageVector = if (activeFilter == MediaFilter.VIDEOS) Icons.Filled.Videocam else Icons.Outlined.PhotoLibrary,
-                            contentDescription = null,
-                            tint = if (activeFilter == MediaFilter.VIDEOS) DecoVerm else DecoGold,
-                            modifier = Modifier.size(30.dp)
+                        DecoIcon(
+                            kind = if (activeFilter == MediaFilter.VIDEOS) DecoIconKind.VIDEOCAM else DecoIconKind.PHOTO_LIBRARY,
+                            color = if (activeFilter == MediaFilter.VIDEOS) DecoVerm else DecoGold,
+                            iconSize = 30.dp
                         )
                     }
                 }
@@ -367,7 +363,7 @@ internal fun EmptyLibraryPermissionCard(
                     accessLevel == MediaAccessLevel.NONE -> {
                         GalleryActionButton(
                             text = stringResource(R.string.action_grant_media),
-                            leadingIcon = Icons.Filled.FolderOpen,
+                            leadingIconKind = DecoIconKind.FOLDER_OPEN,
                             tone = GalleryButtonTone.IMMERSIVE,
                             onClick = onRequestPermission,
                             modifier = Modifier
@@ -386,7 +382,7 @@ internal fun EmptyLibraryPermissionCard(
                     else -> {
                         GalleryActionButton(
                             text = "重新扫描本地相册",
-                            leadingIcon = Icons.Filled.Refresh,
+                            leadingIconKind = DecoIconKind.REFRESH,
                             tone = GalleryButtonTone.IMMERSIVE,
                             onClick = onRescan,
                             modifier = Modifier.fillMaxWidth()

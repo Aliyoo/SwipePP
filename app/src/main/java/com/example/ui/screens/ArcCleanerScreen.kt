@@ -40,18 +40,7 @@ import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Compare
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.SwipeUp
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -95,6 +84,8 @@ import com.example.sensor.rememberHapticEngine
 import com.example.ui.CleanerEntrySource
 import com.example.ui.CleanupCardItem
 import com.example.ui.components.ArcTimeScaleScrubber
+import com.example.ui.components.DecoIcon
+import com.example.ui.components.DecoIconKind
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.DecoOrbTone
@@ -504,11 +495,10 @@ fun ArcCleanerScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.PhoneAndroid,
-                            contentDescription = null,
-                            tint = DecoPaperCream,
-                            modifier = Modifier.size(15.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.PHONE,
+                            color = DecoPaperCream,
+                            iconSize = 15.dp
                         )
                         Text(
                             text = stringResource(R.string.shake_undo_toast),
@@ -614,11 +604,10 @@ fun ArcCleanerScreen(
                             .semantics(mergeDescendants = true) {}
                             .testTag("cleaner_active_date_pill")
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.CalendarToday,
-                            contentDescription = null,
-                            tint = DecoGold,
-                            modifier = Modifier.size(12.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.CALENDAR,
+                            color = DecoGold,
+                            iconSize = 12.dp
                         )
                         Text(
                             text = "${activeItem.primaryPhoto.month}月${activeItem.primaryPhoto.day}日 · ${safePage + 1}/${displayedQueue.size}",
@@ -643,11 +632,10 @@ fun ArcCleanerScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.FilterList,
-                                    contentDescription = null,
-                                    tint = if (onlyFocusedDay) onGold else DecoGold,
-                                    modifier = Modifier.size(12.dp)
+                                DecoIcon(
+                                    kind = DecoIconKind.FILTER,
+                                    color = if (onlyFocusedDay) onGold else DecoGold,
+                                    iconSize = 12.dp
                                 )
                                 Text(
                                     text = if (onlyFocusedDay) {
@@ -955,7 +943,7 @@ fun ArcCleanerScreen(
                                         )
                                         DecoVermStripButton(
                                             title = "整组回收",
-                                            leadingIcon = Icons.Filled.DeleteOutline,
+                                            leadingIconKind = DecoIconKind.DELETE,
                                             height = 48.dp,
                                             onClick = {
                                                 haptics.swipeDeleteConfirm()
@@ -1029,11 +1017,10 @@ fun ArcCleanerScreen(
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                         modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.SwipeUp,
-                            contentDescription = null,
-                            tint = DecoGold,
-                            modifier = Modifier.size(13.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.SWIPE_UP,
+                            color = DecoGold,
+                            iconSize = 13.dp
                         )
                         DecoHintSpan(text = "上滑回收", color = vermInk)
                         Text(text = "·", fontSize = 12.5.sp, color = DecoInkOnGround.copy(alpha = 0.5f))

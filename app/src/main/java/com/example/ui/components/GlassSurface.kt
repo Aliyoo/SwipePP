@@ -25,7 +25,6 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ripple
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,7 +46,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -404,7 +402,7 @@ fun ObsidianGlassPill(
  */
 @Composable
 fun ObsidianIconOrb(
-    icon: ImageVector,
+    iconKind: DecoIconKind,
     contentDescription: String?,
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
@@ -416,11 +414,11 @@ fun ObsidianIconOrb(
 ) {
     val orbContent: @Composable () -> Unit = {
         Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = tint,
-                modifier = Modifier.size(iconSize)
+            DecoIcon(
+                kind = iconKind,
+                color = tint,
+                iconSize = iconSize,
+                contentDescription = contentDescription
             )
         }
     }

@@ -30,15 +30,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Contrast
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
@@ -80,6 +73,8 @@ import com.example.ui.LocalFloatingDockInset
 import com.example.ui.MediaFilter
 import com.example.ui.components.Adaptive3DBookshelfCarousel
 import com.example.ui.components.AppSettingsSheet
+import com.example.ui.components.DecoIcon
+import com.example.ui.components.DecoIconKind
 import com.example.ui.components.ThemeAppearanceSheet
 import com.example.ui.components.YearbookCoverStudioSheet
 import com.example.ui.components.formatStorageSize
@@ -263,11 +258,10 @@ fun BookshelfScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                    contentDescription = null,
-                                    tint = gold,
-                                    modifier = Modifier.size(13.dp)
+                                DecoIcon(
+                                    kind = DecoIconKind.CHEVRON_RIGHT,
+                                    color = gold,
+                                    iconSize = 13.dp
                                 )
                             }
                         }
@@ -294,15 +288,15 @@ fun BookshelfScreen(
                         onClick = { showThemeSheet = true },
                         modifier = Modifier.testTag("bookshelf_theme_button")
                     ) {
-                        Icon(
-                            imageVector = when (themeMode) {
-                                AppThemeMode.SYSTEM -> Icons.Filled.Contrast
-                                AppThemeMode.LIGHT -> Icons.Filled.LightMode
-                                AppThemeMode.DARK -> Icons.Filled.DarkMode
+                        DecoIcon(
+                            kind = when (themeMode) {
+                                AppThemeMode.SYSTEM -> DecoIconKind.CONTRAST
+                                AppThemeMode.LIGHT -> DecoIconKind.SUN
+                                AppThemeMode.DARK -> DecoIconKind.MOON
                             },
-                            contentDescription = stringResource(R.string.cd_theme_switcher),
-                            tint = gold,
-                            modifier = Modifier.size(19.dp)
+                            color = gold,
+                            iconSize = 19.dp,
+                            contentDescription = stringResource(R.string.cd_theme_switcher)
                         )
                     }
 
@@ -310,11 +304,11 @@ fun BookshelfScreen(
                         onClick = { showSettingsSheet = true },
                         modifier = Modifier.testTag("bookshelf_settings_button")
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = stringResource(R.string.cd_open_settings),
-                            tint = groundInk,
-                            modifier = Modifier.size(19.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.SETTINGS,
+                            color = groundInk,
+                            iconSize = 19.dp,
+                            contentDescription = stringResource(R.string.cd_open_settings)
                         )
                     }
                 }

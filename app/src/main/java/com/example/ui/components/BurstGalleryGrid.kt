@@ -40,17 +40,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.BurstMode
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.UnfoldLess
-import androidx.compose.material.icons.outlined.Videocam
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -678,11 +667,10 @@ private fun SingleGalleryTile(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Videocam,
-                    contentDescription = null,
-                    tint = DecoPaperCream,
-                    modifier = Modifier.size(11.dp)
+                DecoIcon(
+                    kind = DecoIconKind.VIDEOCAM,
+                    color = DecoPaperCream,
+                    iconSize = 11.dp
                 )
                 Text(
                     text = "视频",
@@ -721,11 +709,11 @@ private fun SingleGalleryTile(
                     .background(LocalFlipYearPalette.current.decoGold),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.CheckCircle,
-                    contentDescription = "已保留",
-                    tint = LocalFlipYearPalette.current.decoMat,
-                    modifier = Modifier.size(13.dp)
+                DecoIcon(
+                    kind = DecoIconKind.CHECK_CIRCLE,
+                    color = LocalFlipYearPalette.current.decoMat,
+                    iconSize = 13.dp,
+                    contentDescription = "已保留"
                 )
             }
         }
@@ -741,11 +729,12 @@ private fun SingleGalleryTile(
                     .background(LocalFlipYearPalette.current.decoVerm),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Star,
-                    contentDescription = "收藏",
-                    tint = DecoPaperCream,
-                    modifier = Modifier.size(12.dp)
+                DecoIcon(
+                    kind = DecoIconKind.STAR,
+                    color = DecoPaperCream,
+                    selected = true,
+                    iconSize = 12.dp,
+                    contentDescription = "收藏"
                 )
             }
         }
@@ -768,11 +757,11 @@ internal fun SelectionCheckIndicator(
                     .border(1.8.dp, UnselectedCheckBorder, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Check,
-                    contentDescription = "已选中",
-                    tint = DecoPaperCream,
-                    modifier = Modifier.size(14.dp)
+                DecoIcon(
+                    kind = DecoIconKind.CHECK,
+                    color = DecoPaperCream,
+                    iconSize = 14.dp,
+                    contentDescription = "已选中"
                 )
             }
         }
@@ -1055,11 +1044,12 @@ private fun CollapsedBurstStackTile(
                         .background(deco.decoGold),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Star,
-                        contentDescription = "最佳连拍",
-                        tint = deco.decoMat,
-                        modifier = Modifier.size(12.dp)
+                    DecoIcon(
+                        kind = DecoIconKind.STAR,
+                        color = deco.decoMat,
+                        selected = true,
+                        iconSize = 12.dp,
+                        contentDescription = "最佳连拍"
                     )
                 }
             }
@@ -1082,11 +1072,10 @@ private fun CollapsedBurstStackTile(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.BurstMode,
-                        contentDescription = null,
-                        tint = DecoPaperCream,
-                        modifier = Modifier.size(11.dp)
+                    DecoIcon(
+                        kind = DecoIconKind.BURST,
+                        color = DecoPaperCream,
+                        iconSize = 11.dp
                     )
                     Text(
                         text = "连拍 ${burst.photos.size}",
@@ -1107,11 +1096,11 @@ private fun CollapsedBurstStackTile(
                         color = DecoPaperCream
                     )
                 } else {
-                    Icon(
-                        imageVector = Icons.Outlined.ExpandMore,
-                        contentDescription = stringResource(R.string.burst_expand),
-                        tint = DecoPaperCream,
-                        modifier = Modifier.size(14.dp)
+                    DecoIcon(
+                        kind = DecoIconKind.CHEVRON_DOWN,
+                        color = DecoPaperCream,
+                        iconSize = 14.dp,
+                        contentDescription = stringResource(R.string.burst_expand)
                     )
                 }
             }
@@ -1178,11 +1167,10 @@ internal fun ExpandedBurstStackTray(
                             .padding(7.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.BurstMode,
-                            contentDescription = null,
-                            tint = LocalFlipYearPalette.current.decoGold,
-                            modifier = Modifier.size(18.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.BURST,
+                            color = LocalFlipYearPalette.current.decoGold,
+                            iconSize = 18.dp
                         )
                     }
                     Column {
@@ -1220,11 +1208,11 @@ internal fun ExpandedBurstStackTray(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.UnfoldLess,
-                            contentDescription = stringResource(R.string.burst_collapse),
-                            tint = LocalFlipYearPalette.current.decoInkOnGround,
-                            modifier = Modifier.size(15.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.UNFOLD_LESS,
+                            color = LocalFlipYearPalette.current.decoInkOnGround,
+                            iconSize = 15.dp,
+                            contentDescription = stringResource(R.string.burst_collapse)
                         )
                         Text(
                             text = "收起",
@@ -1277,7 +1265,7 @@ internal fun ExpandedBurstStackTray(
             ) {
                 GalleryActionButton(
                     text = keepBestLabel,
-                    leadingIcon = Icons.Outlined.AutoAwesome,
+                    leadingIconKind = DecoIconKind.SPARKLE,
                     tone = GalleryButtonTone.IMMERSIVE,
                     height = 44.dp,
                     shape = TileShape,
@@ -1392,11 +1380,11 @@ private fun BurstFrameCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Star,
-                        contentDescription = null,
-                        tint = DecoPaperCream,
-                        modifier = Modifier.size(11.dp)
+                    DecoIcon(
+                        kind = DecoIconKind.STAR,
+                        color = DecoPaperCream,
+                        selected = true,
+                        iconSize = 11.dp
                     )
                     Text(
                         text = "最佳",
@@ -1486,11 +1474,11 @@ private fun BurstFrameCard(
                     modifier = Modifier.size(48.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Outlined.DeleteOutline,
-                            contentDescription = "移入回收站",
-                            tint = deco.decoVerm,
-                            modifier = Modifier.size(18.dp)
+                        DecoIcon(
+                            kind = DecoIconKind.DELETE,
+                            color = deco.decoVerm,
+                            iconSize = 18.dp,
+                            contentDescription = "移入回收站"
                         )
                     }
                 }
@@ -1604,11 +1592,11 @@ private fun DecoMonthClusterHeader(
                     )
                 }
             } else if (cluster.isCleaned) {
-                Icon(
-                    imageVector = Icons.Outlined.CheckCircle,
-                    contentDescription = stringResource(R.string.timeline_month_cleaned_tag),
-                    tint = deco.decoGold,
-                    modifier = Modifier.size(13.dp)
+                DecoIcon(
+                    kind = DecoIconKind.CHECK_CIRCLE,
+                    color = deco.decoGold,
+                    iconSize = 13.dp,
+                    contentDescription = stringResource(R.string.timeline_month_cleaned_tag)
                 )
             }
         }

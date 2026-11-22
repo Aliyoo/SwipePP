@@ -21,10 +21,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.OpenInFull
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +41,8 @@ import androidx.compose.ui.unit.sp
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
 import com.example.ui.CleanupCardItem
+import com.example.ui.components.DecoIcon
+import com.example.ui.components.DecoIconKind
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.formatShortTime
 import com.example.ui.components.formatStorageSize
@@ -129,11 +127,11 @@ internal fun BurstComparisonSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.OpenInFull,
-                        contentDescription = "查看原图详情",
-                        tint = decoGold,
-                        modifier = Modifier.size(13.dp)
+                    DecoIcon(
+                        kind = DecoIconKind.EXPAND,
+                        color = decoGold,
+                        iconSize = 13.dp,
+                        contentDescription = "查看原图详情"
                     )
                     Text(
                         text = "看大图",
@@ -218,11 +216,11 @@ internal fun BurstComparisonSheet(
                                         .background(DecoInspectOrbBg)
                                         .border(0.8.dp, DecoInspectOrbBorder, CircleShape)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.OpenInFull,
-                                        contentDescription = "查看第 ${idx + 1} 张详情",
-                                        tint = DecoPaperCream,
-                                        modifier = Modifier.size(13.dp)
+                                    DecoIcon(
+                                        kind = DecoIconKind.EXPAND,
+                                        color = DecoPaperCream,
+                                        iconSize = 13.dp,
+                                        contentDescription = "查看第 ${idx + 1} 张详情"
                                     )
                                 }
                             }
@@ -242,11 +240,10 @@ internal fun BurstComparisonSheet(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(3.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.CheckCircle,
-                                            contentDescription = null,
-                                            tint = DecoPaperCream,
-                                            modifier = Modifier.size(12.dp)
+                                        DecoIcon(
+                                            kind = DecoIconKind.CHECK_CIRCLE,
+                                            color = DecoPaperCream,
+                                            iconSize = 12.dp
                                         )
                                         Text(
                                             text = "保留",
@@ -301,7 +298,7 @@ internal fun BurstComparisonSheet(
         DecoVermStripButton(
             title = "确认仅保留此张",
             badgeText = "移走 ${stack.photos.size - 1} 张 · ${formatStorageSize(freedIfConfirmed)}",
-            leadingIcon = Icons.Filled.CheckCircle,
+            leadingIconKind = DecoIconKind.CHECK_CIRCLE,
             onClick = { onConfirmKeepBest(selectedPhoto) },
             modifier = Modifier
                 .fillMaxWidth()

@@ -19,13 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Contrast
-import androidx.compose.material.icons.outlined.DarkMode
-import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -40,7 +34,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
@@ -140,7 +133,7 @@ internal fun ThemePreviewCardsRow(
     ) {
         ThemePreviewCard(
             mode = AppThemeMode.SYSTEM,
-            icon = Icons.Outlined.Contrast,
+            iconKind = DecoIconKind.CONTRAST,
             selected = currentMode == AppThemeMode.SYSTEM,
             onClick = { onSelectMode(AppThemeMode.SYSTEM) },
             modifier = Modifier
@@ -149,7 +142,7 @@ internal fun ThemePreviewCardsRow(
         )
         ThemePreviewCard(
             mode = AppThemeMode.LIGHT,
-            icon = Icons.Outlined.LightMode,
+            iconKind = DecoIconKind.SUN,
             selected = currentMode == AppThemeMode.LIGHT,
             onClick = { onSelectMode(AppThemeMode.LIGHT) },
             modifier = Modifier
@@ -158,7 +151,7 @@ internal fun ThemePreviewCardsRow(
         )
         ThemePreviewCard(
             mode = AppThemeMode.DARK,
-            icon = Icons.Outlined.DarkMode,
+            iconKind = DecoIconKind.MOON,
             selected = currentMode == AppThemeMode.DARK,
             onClick = { onSelectMode(AppThemeMode.DARK) },
             modifier = Modifier
@@ -175,7 +168,7 @@ internal fun ThemePreviewCardsRow(
 @Composable
 private fun ThemePreviewCard(
     mode: AppThemeMode,
-    icon: ImageVector,
+    iconKind: DecoIconKind,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -380,11 +373,10 @@ private fun ThemePreviewCard(
                         .background(DecoVerm),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Check,
-                        contentDescription = null,
-                        tint = DecoPaperCream,
-                        modifier = Modifier.size(11.dp)
+                    DecoIcon(
+                        kind = DecoIconKind.CHECK,
+                        color = DecoPaperCream,
+                        iconSize = 11.dp
                     )
                 }
             }
@@ -395,11 +387,10 @@ private fun ThemePreviewCard(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.padding(bottom = 2.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (selected) DecoGold else InkSecondary,
-                modifier = Modifier.size(14.dp)
+            DecoIcon(
+                kind = iconKind,
+                color = if (selected) DecoGold else InkSecondary,
+                iconSize = 14.dp
             )
             Text(
                 text = mode.label,

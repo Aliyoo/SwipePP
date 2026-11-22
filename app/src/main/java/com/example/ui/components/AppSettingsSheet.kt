@@ -29,16 +29,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.ArrowDownward
-import androidx.compose.material.icons.outlined.ArrowUpward
-import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -52,7 +44,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
@@ -67,6 +58,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.MediaAccessLevel
+import com.example.ui.components.DecoIcon
+import com.example.ui.components.DecoIconKind
 import com.example.ui.theme.AppThemeMode
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoInkOnGround
@@ -82,7 +75,6 @@ import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.InkTertiary
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LocalFlipYearPalette
-import com.example.ui.theme.OutfitFontFamily
 import com.example.ui.theme.TimelineSortOrder
 import com.example.ui.theme.UserPreferences
 
@@ -177,7 +169,7 @@ fun AppSettingsSheet(
                     ) {
                         Text(
                             text = "全局时间顺序",
-                            fontFamily = OutfitFontFamily,
+                            fontFamily = DecoDisplayFontFamily,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 0.8.sp,
@@ -197,13 +189,13 @@ fun AppSettingsSheet(
                             SegmentedOption(
                                 value = TimelineSortOrder.NEWEST_FIRST,
                                 label = "最新优先（倒序）",
-                                icon = Icons.Outlined.ArrowDownward,
+                                iconKind = DecoIconKind.ARROW_DOWN,
                                 testTag = "settings_sort_newest"
                             ),
                             SegmentedOption(
                                 value = TimelineSortOrder.OLDEST_FIRST,
                                 label = "最早优先（正序）",
-                                icon = Icons.Outlined.ArrowUpward,
+                                iconKind = DecoIconKind.ARROW_UP,
                                 testTag = "settings_sort_oldest"
                             )
                         ),
@@ -262,7 +254,7 @@ fun AppSettingsSheet(
                     ) {
                         Text(
                             text = "月历显示空白月份",
-                            fontFamily = OutfitFontFamily,
+                            fontFamily = DecoDisplayFontFamily,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 0.8.sp,
@@ -306,7 +298,7 @@ fun AppSettingsSheet(
                 ) {
                     Text(
                         text = "月历默认视图",
-                        fontFamily = OutfitFontFamily,
+                        fontFamily = DecoDisplayFontFamily,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 0.8.sp,
@@ -352,7 +344,7 @@ fun AppSettingsSheet(
                     ) {
                         Text(
                             text = "App 默认启动页",
-                            fontFamily = OutfitFontFamily,
+                            fontFamily = DecoDisplayFontFamily,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 0.8.sp,
@@ -406,7 +398,7 @@ fun AppSettingsSheet(
                 ) {
                     Text(
                         text = "画廊网格密度",
-                        fontFamily = OutfitFontFamily,
+                        fontFamily = DecoDisplayFontFamily,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 0.8.sp,
@@ -456,7 +448,7 @@ fun AppSettingsSheet(
                     else -> "扫描设备相册以构建年度影集"
                 }
                 SettingsActionRow(
-                    icon = Icons.Outlined.Refresh,
+                    iconKind = DecoIconKind.REFRESH,
                     iconTint = DecoGold,
                     title = stringResource(R.string.action_scan_media),
                     subtitle = scanSubtitle,
@@ -484,7 +476,7 @@ fun AppSettingsSheet(
                     MediaAccessLevel.NONE -> "尚未授予相册访问权限"
                 }
                 SettingsActionRow(
-                    icon = Icons.Outlined.FolderOpen,
+                    iconKind = DecoIconKind.FOLDER_OPEN,
                     iconTint = DecoGold,
                     title = "管理相册访问权限",
                     subtitle = permissionStatus,
@@ -503,7 +495,7 @@ fun AppSettingsSheet(
                         modifier = Modifier.padding(horizontal = 14.dp)
                     )
                     SettingsActionRow(
-                        icon = Icons.Outlined.RestartAlt,
+                        iconKind = DecoIconKind.RESTART,
                         iconTint = DecoVermInk,
                         sealTint = DecoVerm,
                         titleColor = DecoVermInk,
@@ -575,7 +567,7 @@ private fun SettingsSectionGroup(
 private data class SegmentedOption<T>(
     val value: T,
     val label: String,
-    val icon: ImageVector? = null,
+    val iconKind: DecoIconKind? = null,
     val testTag: String
 )
 
@@ -650,17 +642,16 @@ private fun <T> SettingsSegmentedCapsule(
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                         modifier = Modifier.padding(horizontal = 6.dp)
                     ) {
-                        if (option.icon != null) {
-                            Icon(
-                                imageVector = option.icon,
-                                contentDescription = null,
-                                tint = iconColor,
-                                modifier = Modifier.size(14.dp)
+                        if (option.iconKind != null) {
+                            DecoIcon(
+                                kind = option.iconKind,
+                                color = iconColor,
+                                iconSize = 14.dp
                             )
                         }
                         Text(
                             text = option.label,
-                            fontFamily = if (isSelected) DecoDisplayFontFamily else OutfitFontFamily,
+                            fontFamily = DecoDisplayFontFamily,
                             fontSize = 12.5.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             letterSpacing = 0.8.sp,
@@ -680,7 +671,7 @@ private fun <T> SettingsSegmentedCapsule(
  */
 @Composable
 private fun SettingsActionRow(
-    icon: ImageVector,
+    iconKind: DecoIconKind,
     iconTint: Color,
     title: String,
     subtitle: String,
@@ -707,11 +698,10 @@ private fun SettingsActionRow(
                 .background(sealTint.copy(alpha = 0.10f))
                 .border(1.dp, sealTint.copy(alpha = 0.55f), RoundedCornerShape(3.dp))
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(18.dp)
+            DecoIcon(
+                kind = iconKind,
+                color = iconTint,
+                iconSize = 18.dp
             )
         }
         Column(
@@ -720,7 +710,7 @@ private fun SettingsActionRow(
         ) {
             Text(
                 text = title,
-                fontFamily = OutfitFontFamily,
+                fontFamily = DecoDisplayFontFamily,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 0.8.sp,
@@ -736,11 +726,10 @@ private fun SettingsActionRow(
                 overflow = TextOverflow.Ellipsis
             )
         }
-        Icon(
-            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-            contentDescription = null,
-            tint = InkTertiary,
-            modifier = Modifier.size(18.dp)
+        DecoIcon(
+            kind = DecoIconKind.CHEVRON_RIGHT,
+            color = InkTertiary,
+            iconSize = 18.dp
         )
     }
 }

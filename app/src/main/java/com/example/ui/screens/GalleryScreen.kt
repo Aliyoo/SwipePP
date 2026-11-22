@@ -39,15 +39,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BurstMode
-import androidx.compose.material.icons.filled.CleaningServices
-import androidx.compose.material.icons.filled.Compress
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.LocationOff
-import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -97,6 +88,8 @@ import com.example.ui.TimelineSearchQuery
 import com.example.ui.components.BatchCompressBottomSheet
 import com.example.ui.components.BatchLocationEditorSheet
 import com.example.ui.components.BurstGalleryGrid
+import com.example.ui.components.DecoIcon
+import com.example.ui.components.DecoIconKind
 import com.example.ui.components.DecoPaperGround
 import com.example.ui.components.DecoSealButton
 import com.example.ui.components.GalleryActionButton
@@ -640,11 +633,10 @@ fun GalleryScreen(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(5.dp)
                                             ) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.CleaningServices,
-                                                    contentDescription = null,
-                                                    tint = DecoGold,
-                                                    modifier = Modifier.size(14.dp)
+                                                DecoIcon(
+                                                    kind = DecoIconKind.CLEAN,
+                                                    color = DecoGold,
+                                                    iconSize = 14.dp
                                                 )
                                                 Text(
                                                     text = if (isFilteredView) "整理当前结果" else "滑动整理",
@@ -699,11 +691,10 @@ fun GalleryScreen(
                                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                                             modifier = Modifier.weight(1f)
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.Filled.FilterList,
-                                                contentDescription = null,
-                                                tint = DecoVerm,
-                                                modifier = Modifier.size(15.dp)
+                                            DecoIcon(
+                                                kind = DecoIconKind.FILTER,
+                                                color = DecoVerm,
+                                                iconSize = 15.dp
                                             )
                                             Text(
                                                 text = "全局筛选：仅显示${uiState.mediaFilter.label}",
@@ -809,6 +800,7 @@ fun GalleryScreen(
                                                     Text(
                                                         text = label,
                                                         style = MaterialTheme.typography.labelMedium,
+                                                        fontFamily = DecoDisplayFontFamily,
                                                         fontSize = 12.sp,
                                                         letterSpacing = 0.5.sp,
                                                         fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
@@ -873,17 +865,16 @@ fun GalleryScreen(
                             modifier = Modifier.size(64.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = when {
-                                        searchQuery.isActive -> Icons.Filled.Search
-                                        smartFilter == GallerySmartFilter.BURSTS -> Icons.Filled.BurstMode
-                                        smartFilter == GallerySmartFilter.LARGE_PHOTOS -> Icons.Filled.Compress
-                                        smartFilter == GallerySmartFilter.MISSING_LOCATION -> Icons.Filled.LocationOff
-                                        else -> Icons.Filled.PhotoLibrary
+                                DecoIcon(
+                                    kind = when {
+                                        searchQuery.isActive -> DecoIconKind.SEARCH
+                                        smartFilter == GallerySmartFilter.BURSTS -> DecoIconKind.BURST
+                                        smartFilter == GallerySmartFilter.LARGE_PHOTOS -> DecoIconKind.COMPRESS
+                                        smartFilter == GallerySmartFilter.MISSING_LOCATION -> DecoIconKind.LOCATION_OFF
+                                        else -> DecoIconKind.PHOTO_LIBRARY
                                     },
-                                    contentDescription = null,
-                                    tint = DecoGold,
-                                    modifier = Modifier.size(30.dp)
+                                    color = DecoGold,
+                                    iconSize = 30.dp
                                 )
                             }
                         }
