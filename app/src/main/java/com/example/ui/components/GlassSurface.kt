@@ -8,10 +8,12 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -801,6 +803,90 @@ fun DecoSealButton(
                     lineHeight = fontSize * 1.08f,
                     letterSpacing = 0.5.sp,
                     color = gold.copy(alpha = textAlpha)
+                )
+            }
+        }
+    }
+}
+
+/** 印钮三态：金环印钮 / 金环印钮带余辉 / 朱红实印（原型 decOrb 语法，弧形清理与灯箱共用）。 */
+enum class DecoOrbTone { GOLD_RING, GOLD_RING_HALO, VERM_SOLID }
+
+/**
+ * 决断印钮（原型 SealOrb）：圆形印章钮，图标 + 12sp SemiBold 标签居中。
+ * 保留=金环印钮（外圈余辉）/ 收藏=金环小章 / 入站(回收)=朱红实印。
+ * 按压 0.9 缩放 + 内容色涟漪；取色一律读主题 deco 令牌。
+ */
+@Composable
+fun DecoSealOrb(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    orbSize: Dp = 64.dp,
+    iconSize: Dp = 26.dp,
+    tone: DecoOrbTone,
+    testTag: String? = null
+) {
+    val gold = DecoGold
+    val verm = DecoVerm
+    val cream = DecoPaperCream
+    val ground = DecoGround
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.9f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "deco_orb_scale"
+    )
+    val hasHalo = tone == DecoOrbTone.GOLD_RING_HALO
+    val totalSize = orbSize + if (hasHalo) 10.dp else 0.dp
+    val ringColor = if (tone == DecoOrbTone.VERM_SOLID) cream.copy(alpha = 0.35f) else gold
+    val fillColor = if (tone == DecoOrbTone.VERM_SOLID) verm else ground.copy(alpha = 0.42f)
+    val contentColor = if (tone == DecoOrbTone.VERM_SOLID) cream else gold
+
+    // 外层承载：金环印钮的外圈余辉（原型 0 0 0 5px goldDim(0.12)）画在按钮外沿
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(totalSize)
+            .drawBehind {
+                if (hasHalo) {
+                    drawCircle(color = gold.copy(alpha = 0.12f), radius = size.minDimension / 2f)
+                }
+            }
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(orbSize)
+                .graphicsLayer {
+                    scaleX = pressScale
+                    scaleY = pressScale
+                }
+                .clip(CircleShape)
+                .background(fillColor)
+                .border(2.dp, ringColor, CircleShape)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = ripple(color = contentColor),
+                    onClick = onClick
+                )
+                .then(testTag?.let { Modifier.testTag(it) } ?: Modifier)
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(iconSize)
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = label,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = contentColor
                 )
             }
         }

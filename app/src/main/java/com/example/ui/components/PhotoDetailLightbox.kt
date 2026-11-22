@@ -15,27 +15,26 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -96,15 +95,13 @@ import com.example.data.PhotoStatus
 import com.example.sensor.rememberHapticEngine
 import com.example.ui.theme.CoralDanger
 import com.example.ui.theme.DecoGold
-import com.example.ui.theme.DecoInkOnGround
-import com.example.ui.theme.DecoMat
+import com.example.ui.theme.DecoGround
+import com.example.ui.theme.DecoGroundDeep
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.EmeraldKeep
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.ObsidianOverlayGlass
-import com.example.ui.theme.ObsidianSatinBottom
-import com.example.ui.theme.ObsidianSatinTop
 import com.example.ui.theme.SolarAmber
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -754,102 +751,85 @@ private fun LightboxBottomHud(
                 }
 
                 if (videoScrubber != null || hasActions) {
-                    ObsidianGlassCard(
-                        shape = RoundedCornerShape(22.dp),
-                        topColor = ObsidianSatinTop.copy(alpha = 0.94f),
-                        bottomColor = ObsidianSatinBottom.copy(alpha = 0.94f),
+                    // 摩登画报：底栏托盘与停靠栏同语法——纸地渐变面板 + 1dp 金细线，3dp 小圆角
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("lightbox_bottom_dock")
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(
+                                Brush.verticalGradient(listOf(DecoGround, DecoGroundDeep))
+                            )
+                            .border(1.dp, DecoGold.copy(alpha = 0.5f), RoundedCornerShape(3.dp))
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            if (videoScrubber != null) {
-                                videoScrubber()
-                                if (hasActions) {
-                                    HorizontalDivider(
-                                        thickness = 0.8.dp,
-                                        color = Color.White.copy(alpha = 0.10f)
-                                    )
-                                }
-                            }
-
+                        if (videoScrubber != null) {
+                            videoScrubber()
                             if (hasActions) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    if (onRestore != null) {
-                                        // 摩登画报：回收站流内还原动作为金描边画报钮
-                                        // （onRestore 仅在 photoStatus==TRASHED 时出现，即回收站入口）
-                                        LightboxActionPill(
-                                            icon = Icons.Filled.Restore,
-                                            label = "还原至影集",
-                                            containerColor = DecoGold.copy(alpha = 0.20f),
-                                            iconTint = DecoGold,
-                                            labelColor = DecoPaperCream,
-                                            borderColor = DecoGold.copy(alpha = 0.55f),
-                                            onClick = onRestore,
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .testTag("lightbox_restore_button")
+                                HorizontalDivider(
+                                    thickness = 0.8.dp,
+                                    color = DecoGold.copy(alpha = 0.35f)
+                                )
+                            }
+                        }
+
+                        if (hasActions) {
+                            // 决断印钮行：与弧形清理同语法（朱红实印/金环小章/金环印钮）
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (onRestore != null) {
+                                    // 回收站流内还原：金环印钮（onRestore 仅在 photoStatus==TRASHED 时出现）
+                                    DecoSealOrb(
+                                        label = "还原",
+                                        icon = Icons.Filled.Restore,
+                                        orbSize = 64.dp,
+                                        iconSize = 26.dp,
+                                        tone = DecoOrbTone.GOLD_RING_HALO,
+                                        onClick = onRestore,
+                                        testTag = "lightbox_restore_button"
+                                    )
+                                } else {
+                                    if (onTrash != null) {
+                                        // 入站：朱红实印
+                                        DecoSealOrb(
+                                            label = "回收",
+                                            icon = Icons.Filled.DeleteOutline,
+                                            orbSize = 64.dp,
+                                            iconSize = 26.dp,
+                                            tone = DecoOrbTone.VERM_SOLID,
+                                            onClick = onTrash,
+                                            testTag = "lightbox_trash_button"
                                         )
-                                    } else {
-                                        if (onTrash != null) {
-                                            LightboxActionPill(
-                                                icon = Icons.Filled.DeleteOutline,
-                                                label = "移入回收站",
-                                                containerColor = DecoVerm,
-                                                iconTint = DecoPaperCream,
-                                                labelColor = DecoPaperCream,
-                                                borderColor = DecoVerm,
-                                                onClick = onTrash,
-                                                modifier = Modifier
-                                                    .weight(1.15f)
-                                                    .testTag("lightbox_trash_button")
-                                            )
-                                        }
-                                        if (onFavorite != null) {
-                                            LightboxActionPill(
-                                                icon = if (photo.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                                label = if (photo.isFavorite) "已收藏" else "收藏",
-                                                containerColor = if (photo.isFavorite) {
-                                                    DecoGold.copy(alpha = 0.28f)
-                                                } else {
-                                                    DecoGold.copy(alpha = 0.12f)
-                                                },
-                                                iconTint = if (photo.isFavorite) DecoGold else DecoGold.copy(alpha = 0.8f),
-                                                labelColor = DecoPaperCream,
-                                                borderColor = if (photo.isFavorite) {
-                                                    DecoGold
-                                                } else {
-                                                    DecoGold.copy(alpha = 0.5f)
-                                                },
-                                                onClick = onFavorite,
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .testTag("lightbox_favorite_button")
-                                            )
-                                        }
-                                        if (onKeep != null) {
-                                            LightboxActionPill(
-                                                icon = Icons.Filled.Check,
-                                                label = "保留",
-                                                containerColor = DecoMat,
-                                                iconTint = DecoInkOnGround,
-                                                labelColor = DecoInkOnGround,
-                                                borderColor = DecoGold.copy(alpha = 0.45f),
-                                                onClick = onKeep,
-                                                modifier = Modifier
-                                                    .weight(0.95f)
-                                                    .testTag("lightbox_keep_button")
-                                            )
-                                        }
+                                    }
+                                    if (onFavorite != null) {
+                                        // 收藏：金环小章；已收藏加外圈余辉 + 实心心
+                                        DecoSealOrb(
+                                            label = if (photo.isFavorite) "已藏" else "收藏",
+                                            icon = if (photo.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                            orbSize = 54.dp,
+                                            iconSize = 22.dp,
+                                            tone = if (photo.isFavorite) DecoOrbTone.GOLD_RING_HALO else DecoOrbTone.GOLD_RING,
+                                            onClick = onFavorite,
+                                            testTag = "lightbox_favorite_button"
+                                        )
+                                    }
+                                    if (onKeep != null) {
+                                        // 保留：金环印钮（外圈余辉）
+                                        DecoSealOrb(
+                                            label = "保留",
+                                            icon = Icons.Filled.Check,
+                                            orbSize = 64.dp,
+                                            iconSize = 26.dp,
+                                            tone = DecoOrbTone.GOLD_RING_HALO,
+                                            onClick = onKeep,
+                                            testTag = "lightbox_keep_button"
+                                        )
                                     }
                                 }
                             }
@@ -857,51 +837,6 @@ private fun LightboxBottomHud(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun LightboxActionPill(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    containerColor: Color,
-    iconTint: Color,
-    labelColor: Color,
-    borderColor: Color = Color.Transparent,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
-        color = containerColor,
-        border = if (borderColor != Color.Transparent) BorderStroke(0.85.dp, borderColor) else null,
-        modifier = modifier.height(48.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(5.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = labelColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
         }
     }
 }

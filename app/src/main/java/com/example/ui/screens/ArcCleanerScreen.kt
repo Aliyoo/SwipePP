@@ -97,8 +97,10 @@ import com.example.ui.CleanupCardItem
 import com.example.ui.components.ArcTimeScaleScrubber
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
+import com.example.ui.components.DecoOrbTone
 import com.example.ui.components.DecoPaperGround
 import com.example.ui.components.DecoSealButton
+import com.example.ui.components.DecoSealOrb
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.PhotoDetailLightbox
 import com.example.ui.components.formatPhotoDateTime
@@ -153,85 +155,9 @@ private fun ganzhiOfYear(year: Int): String {
     return "${stems[i]}${branches[j]}"
 }
 
-// 纸地与方章收敛到共享组件 com.example.ui.components.DecoPaperGround / DecoSealButton
-// （纸纹 alpha 统一 0.016；方章衬线金墨字 + 48dp 命中区）
-
-/** 决断印钮：保留=金环印钮 / 收藏=金环小章 / 入站(回收)=朱红实印 */
-@Composable
-private fun DecoSealOrb(
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    orbSize: androidx.compose.ui.unit.Dp,
-    iconSize: androidx.compose.ui.unit.Dp,
-    tone: DecoOrbTone
-) {
-    val gold = DecoGold
-    val verm = DecoVerm
-    val cream = DecoPaperCream
-    val ground = DecoGround
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(
-        targetValue = if (pressed) 0.9f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "deco_orb_scale"
-    )
-    val hasHalo = tone == DecoOrbTone.GOLD_RING_HALO
-    val totalSize = orbSize + if (hasHalo) 10.dp else 0.dp
-    val ringColor = if (tone == DecoOrbTone.VERM_SOLID) cream.copy(alpha = 0.35f) else gold
-    val fillColor = if (tone == DecoOrbTone.VERM_SOLID) verm else ground.copy(alpha = 0.42f)
-    val contentColor = if (tone == DecoOrbTone.VERM_SOLID) cream else gold
-
-    // 外层承载：金环印钮的外圈余辉（原型 0 0 0 5px goldDim(0.12)）画在按钮外沿
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .size(totalSize)
-            .drawBehind {
-                if (hasHalo) {
-                    drawCircle(color = gold.copy(alpha = 0.12f), radius = size.minDimension / 2f)
-                }
-            }
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(orbSize)
-                .graphicsLayer {
-                    scaleX = pressScale
-                    scaleY = pressScale
-                }
-                .clip(CircleShape)
-                .background(fillColor)
-                .border(2.dp, ringColor, CircleShape)
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = ripple(color = contentColor),
-                    onClick = onClick
-                )
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = contentColor,
-                    modifier = Modifier.size(iconSize)
-                )
-                Spacer(modifier = Modifier.height(3.dp))
-                Text(
-                    text = label,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = contentColor
-                )
-            }
-        }
-    }
-}
-
-private enum class DecoOrbTone { GOLD_RING, GOLD_RING_HALO, VERM_SOLID }
+// 纸地、方章与决断印钮收敛到共享组件 com.example.ui.components.DecoPaperGround /
+// DecoSealButton / DecoSealOrb（纸纹 alpha 统一 0.016；方章衬线金墨字 + 48dp 命中区；
+// 印钮金环/朱红实印三态，弧形清理与灯箱共用）
 
 /** 手势提示短句：色条下划线（回收=朱红警示字 / 保留=金） */
 @Composable
