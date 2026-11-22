@@ -325,9 +325,10 @@ fun FootprintMapScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(bottom = floatingDockInset + 10.dp)
+                // 上下外扩：顶线贴状态栏下缘；底线落进「卡片-底座」10dp 缝隙正中（避开卡片投影）
+                .padding(bottom = (floatingDockInset - 2.dp).coerceAtLeast(4.dp))
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(top = 8.dp)
+                .padding(top = 2.dp)
         ) {
             val frameInset = 7.dp.toPx()
             val frameRadius = 2.dp.toPx()
