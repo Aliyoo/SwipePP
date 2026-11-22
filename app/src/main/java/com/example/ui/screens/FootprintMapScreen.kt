@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -324,12 +325,15 @@ fun FootprintMapScreen(
 
         // 金双线画框：外 1.5dp 金 + mat 内衬带 + 1dp 弱金（deco-app.html GoldFrame 语法）
         // 纯描边 Canvas，不注册 pointerInput，手势完全穿透到地图。
-        // 画框顶线在状态栏下方（遥测卡下移入框内），底线停在停靠栏上方
+        // 画框顶线在状态栏下方（遥测卡下移入框内）；底线停在停靠栏上方——
+        // floatingDockInset 只含 dock 高度，须再叠加系统导航条 inset，否则底线被 dock 吞掉
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(top = 8.dp, bottom = floatingDockInset + 10.dp)
+                .padding(bottom = floatingDockInset + 10.dp)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(top = 8.dp)
         ) {
             val frameInset = 7.dp.toPx()
             val frameRadius = 2.dp.toPx()
@@ -372,10 +376,11 @@ fun FootprintMapScreen(
             ),
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                // 题签上抬：先避开全宽画报停靠栏，再避开底部地点卡（与滑轨同源 clearance）
+                // 题签上抬：避开导航条 + 停靠栏 + 底部地点卡（与画框底线同源 clearance）
+                .navigationBarsPadding()
                 .padding(
                     start = 24.dp,
-                    bottom = 24.dp + floatingDockInset + if (selectedCluster != null || showingUnlocated) 132.dp else 0.dp
+                    bottom = 14.dp + floatingDockInset + if (selectedCluster != null || showingUnlocated) 132.dp else 0.dp
                 )
         )
 
