@@ -63,6 +63,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -96,6 +97,7 @@ import com.example.data.SameDayLocationMatch
 import com.example.data.inferSameDayLocations
 import com.example.sensor.rememberHapticEngine
 import com.example.ui.FlipYearUiState
+import com.example.ui.LocalDockTopYPx
 import com.example.ui.LocalFloatingDockInset
 import com.example.ui.MediaFilter
 import com.example.ui.UNLOCATED_LOCATION_KEY

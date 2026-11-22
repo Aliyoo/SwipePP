@@ -81,6 +81,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
@@ -143,6 +145,9 @@ import com.example.ui.theme.ThemePreferences
 import kotlin.math.roundToInt
 
 val LocalFloatingDockInset = compositionLocalOf { 0.dp }
+
+/** 停靠栏顶缘在窗口坐标系下的实测绝对 Y（px）；未测量时为 NaN。画框等元素以此为锚。 */
+val LocalDockTopYPx = compositionLocalOf { Float.NaN }
 
 object FlipYearRoutes {
     const val BOOKSHELF = "bookshelf"
@@ -382,9 +387,12 @@ fun FlipYearApp(
         val useNavigationRail = maxWidth >= 640.dp
         val floatingDockInset = if (showTopLevelNav && !useNavigationRail) 82.dp else 0.dp
         val fullScreenOverlayHost = remember { FullScreenOverlayHost() }
+        // 停靠栏顶缘实测 Y（px，窗口坐标系）；由 dock 自身 onGloballyPositioned 回写
+        val dockTopYPx = remember { mutableStateOf(Float.NaN) }
 
         CompositionLocalProvider(
             LocalFloatingDockInset provides floatingDockInset,
+            LocalDockTopYPx provides dockTopYPx.value,
             LocalFullScreenOverlayHost provides fullScreenOverlayHost
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -1019,7 +1027,8 @@ fun FlipYearApp(
                         tabs = tabs,
                         currentRoute = currentRoute,
                         trashedCount = uiState.trashedPhotos.size,
-                        onSelectTab = navigateToTab
+                        onSelectTab = navigateToTab,
+                        onTopEdgeMeasured = { dockTopYPx.value = it }
                     )
                 }
 
@@ -1049,7 +1058,8 @@ private fun FloatingGalleryDock(
     tabs: List<TopLevelTab>,
     currentRoute: String?,
     trashedCount: Int,
-    onSelectTab: (String) -> Unit
+    onSelectTab: (String) -> Unit,
+    onTopEdgeMeasured: (Float) -> Unit = {}
 ) {
     if (tabs.isEmpty()) return
     val gold = DecoGold
@@ -1082,6 +1092,7 @@ private fun FloatingGalleryDock(
             )
             .border(1.dp, DecoGold.copy(alpha = 0.5f))
             .padding(horizontal = 10.dp, vertical = 8.dp)
+            .onGloballyPositioned { onTopEdgeMeasured(it.positionInRoot().y) }
             .testTag("floating_gallery_dock"),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
