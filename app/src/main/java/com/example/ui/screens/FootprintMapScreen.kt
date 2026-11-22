@@ -363,7 +363,11 @@ fun FootprintMapScreen(
             ),
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 24.dp, bottom = 24.dp)
+                // 题签上抬：先避开全宽画报停靠栏，再避开底部地点卡（与滑轨同源 clearance）
+                .padding(
+                    start = 24.dp,
+                    bottom = 24.dp + floatingDockInset + if (selectedCluster != null || showingUnlocated) 132.dp else 0.dp
+                )
         )
 
         // Top Compact Telemetry Pill + Map Layer Switcher

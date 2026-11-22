@@ -1,6 +1,5 @@
 package com.example.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,9 +26,7 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -42,6 +39,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -53,17 +51,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ui.theme.AppThemeMode
-import com.example.ui.theme.CobaltPrimary
-import com.example.ui.theme.CobaltSoft
 import com.example.ui.theme.DarkFlipYearPalette
-import com.example.ui.theme.HairlineBorder
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoInkDeep
+import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoVerm
+import com.example.ui.theme.EditorialSerifFontFamily
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
-import com.example.ui.theme.InkTertiary
+import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LightFlipYearPalette
-import com.example.ui.theme.SolarAmber
-import com.example.ui.theme.StudioCanvas
-import com.example.ui.theme.SurfacePure
+import com.example.ui.theme.LocalFlipYearPalette
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,7 +77,8 @@ fun ThemeAppearanceSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = StudioCanvas,
+        containerColor = LocalFlipYearPalette.current.decoGround,
+        shape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp),
         dragHandle = {
             Box(
                 modifier = Modifier
@@ -86,7 +86,7 @@ fun ThemeAppearanceSheet(
                     .width(40.dp)
                     .height(4.dp)
                     .clip(CircleShape)
-                    .background(InkTertiary.copy(alpha = 0.42f))
+                    .background(DecoInkOnGround.copy(alpha = 0.40f))
             )
         }
     ) {
@@ -102,13 +102,15 @@ fun ThemeAppearanceSheet(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = stringResource(R.string.theme_appearance_title),
-                    style = MaterialTheme.typography.titleLarge,
+                    fontFamily = EditorialSerifFontFamily,
                     fontWeight = FontWeight.Bold,
+                    fontSize = 24.sp,
                     color = InkPrimary
                 )
                 Text(
                     text = stringResource(R.string.theme_appearance_subtitle),
-                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = JetBrainsMonoFontFamily,
+                    fontSize = 12.sp,
                     color = InkSecondary
                 )
             }
@@ -164,6 +166,10 @@ internal fun ThemePreviewCardsRow(
     }
 }
 
+/**
+ * 摩登画报主题选择卡：金双线画框（外 1.5dp 金 + 3dp 纸底内衬 + 1dp 弱金），
+ * 选中态加金底微染 + 朱点印；不用蓝色 Border。
+ */
 @Composable
 private fun ThemePreviewCard(
     mode: AppThemeMode,
@@ -172,152 +178,211 @@ private fun ThemePreviewCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val gold = DecoGold
+    val mat = LocalFlipYearPalette.current.decoMat
+
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(SurfacePure)
+            .clip(RoundedCornerShape(3.dp))
+            .background(if (selected) gold.copy(alpha = 0.10f) else mat.copy(alpha = 0.55f))
             .border(
-                width = if (selected) 2.dp else 1.dp,
-                color = if (selected) CobaltPrimary else HairlineBorder,
-                shape = RoundedCornerShape(18.dp)
+                width = if (selected) 1.5.dp else 1.dp,
+                color = if (selected) gold else gold.copy(alpha = 0.45f),
+                shape = RoundedCornerShape(3.dp)
             )
             .clickable(onClick = onClick)
-            .padding(8.dp),
+            .padding(3.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
-        // Miniature architectural preview artwork of each gallery atmosphere
+        // 金双线画框：外 1.5dp 金线由卡片描边承担，内衬 1dp 弱金框住微型画片
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(0.92f)
-                .clip(RoundedCornerShape(12.dp))
-                .border(0.8.dp, HairlineBorder.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(2.dp))
+                .border(
+                    1.dp,
+                    gold.copy(alpha = if (selected) 0.42f else 0.28f),
+                    RoundedCornerShape(2.dp)
+                )
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
+                val light = LightFlipYearPalette
+                val dark = DarkFlipYearPalette
 
                 when (mode) {
                     AppThemeMode.LIGHT -> {
+                        // 日光画廊纸地：decoGround → decoGroundDeep
                         drawRect(
                             brush = Brush.verticalGradient(
-                                listOf(LightFlipYearPalette.studioCanvasTop, LightFlipYearPalette.studioCanvasBottom)
+                                listOf(light.decoGround, light.decoGroundDeep)
                             )
                         )
-                        // Mini gallery header card
+                        // Mini 画报题头卡（纸黄内衬 + 金发丝底线）
                         drawRoundRect(
-                            color = LightFlipYearPalette.surfacePure,
+                            color = light.decoMat,
                             topLeft = Offset(w * 0.12f, h * 0.14f),
                             size = Size(w * 0.76f, h * 0.22f),
-                            cornerRadius = CornerRadius(6.dp.toPx())
+                            cornerRadius = CornerRadius(2.dp.toPx())
                         )
-                        // Mini monograph book card
+                        drawLine(
+                            color = light.decoGold,
+                            start = Offset(w * 0.12f, h * 0.38f),
+                            end = Offset(w * 0.88f, h * 0.38f),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                        // Mini 画报书封（深墨封 + 金描边 + 朱印块）
                         drawRoundRect(
-                            color = Color(0xFF1B2E5C),
+                            color = DecoInkDeep,
                             topLeft = Offset(w * 0.24f, h * 0.44f),
                             size = Size(w * 0.52f, h * 0.36f),
-                            cornerRadius = CornerRadius(6.dp.toPx())
+                            cornerRadius = CornerRadius(2.dp.toPx())
                         )
-                        // Mini dock
                         drawRoundRect(
-                            color = Color(0xEBFFFFFF),
+                            color = light.decoGold,
+                            topLeft = Offset(w * 0.30f, h * 0.50f),
+                            size = Size(w * 0.40f, h * 0.01f)
+                        )
+                        drawRoundRect(
+                            color = light.decoVerm,
+                            topLeft = Offset(w * 0.30f, h * 0.56f),
+                            size = Size(w * 0.18f, h * 0.09f),
+                            cornerRadius = CornerRadius(1.dp.toPx())
+                        )
+                        // Mini 底栏（纸黄 + 金描边顶缘）
+                        drawRoundRect(
+                            color = light.decoMat,
                             topLeft = Offset(w * 0.14f, h * 0.85f),
                             size = Size(w * 0.72f, h * 0.09f),
-                            cornerRadius = CornerRadius(8.dp.toPx())
+                            cornerRadius = CornerRadius(2.dp.toPx())
+                        )
+                        drawLine(
+                            color = light.decoGold,
+                            start = Offset(w * 0.14f, h * 0.85f),
+                            end = Offset(w * 0.86f, h * 0.85f),
+                            strokeWidth = 1.dp.toPx()
                         )
                     }
 
                     AppThemeMode.DARK -> {
+                        // 暗夜暗房纸地：decoGround → decoGroundDeep
                         drawRect(
                             brush = Brush.verticalGradient(
-                                listOf(DarkFlipYearPalette.studioCanvasTop, DarkFlipYearPalette.studioCanvasBottom)
+                                listOf(dark.decoGround, dark.decoGroundDeep)
                             )
                         )
-                        // Subtle golden darkroom skylight
+                        // 金色暗房天窗余辉
                         drawCircle(
                             brush = Brush.radialGradient(
-                                listOf(DarkFlipYearPalette.skylightChampagneGlow.copy(alpha = 0.45f), Color.Transparent),
+                                listOf(dark.decoGold.copy(alpha = 0.22f), Color.Transparent),
                                 center = Offset(w * 0.75f, h * 0.22f),
                                 radius = w * 0.65f
                             ),
                             radius = w * 0.65f,
                             center = Offset(w * 0.75f, h * 0.22f)
                         )
-                        // Mini smoked glass header
+                        // Mini 题头卡（金染纸面）
                         drawRoundRect(
-                            color = DarkFlipYearPalette.surfaceMuted,
+                            color = dark.decoGold.copy(alpha = 0.14f),
                             topLeft = Offset(w * 0.12f, h * 0.14f),
                             size = Size(w * 0.76f, h * 0.22f),
-                            cornerRadius = CornerRadius(6.dp.toPx())
+                            cornerRadius = CornerRadius(2.dp.toPx())
                         )
-                        // Mini monograph book card with golden accent line
+                        drawLine(
+                            color = dark.decoGold,
+                            start = Offset(w * 0.12f, h * 0.38f),
+                            end = Offset(w * 0.88f, h * 0.38f),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                        // Mini 画报书封（深墨封 + 金描边 + 朱印块）
                         drawRoundRect(
-                            color = Color(0xFF283A6B),
+                            color = DecoInkDeep,
                             topLeft = Offset(w * 0.24f, h * 0.44f),
                             size = Size(w * 0.52f, h * 0.36f),
-                            cornerRadius = CornerRadius(6.dp.toPx())
+                            cornerRadius = CornerRadius(2.dp.toPx())
                         )
                         drawRoundRect(
-                            color = DarkFlipYearPalette.solarAmber,
-                            topLeft = Offset(w * 0.32f, h * 0.70f),
-                            size = Size(w * 0.24f, h * 0.04f),
-                            cornerRadius = CornerRadius(3.dp.toPx())
+                            color = dark.decoGold,
+                            topLeft = Offset(w * 0.27f, h * 0.47f),
+                            size = Size(w * 0.46f, h * 0.30f),
+                            cornerRadius = CornerRadius(1.dp.toPx()),
+                            style = Stroke(width = 1.dp.toPx())
                         )
-                        // Mini dark dock
                         drawRoundRect(
-                            color = Color(0xEB1E2536),
+                            color = dark.decoVerm,
+                            topLeft = Offset(w * 0.30f, h * 0.56f),
+                            size = Size(w * 0.18f, h * 0.09f),
+                            cornerRadius = CornerRadius(1.dp.toPx())
+                        )
+                        // Mini 底栏（深地 + 金描边顶缘）
+                        drawRoundRect(
+                            color = dark.decoGroundDeep,
                             topLeft = Offset(w * 0.14f, h * 0.85f),
                             size = Size(w * 0.72f, h * 0.09f),
-                            cornerRadius = CornerRadius(8.dp.toPx())
+                            cornerRadius = CornerRadius(2.dp.toPx())
+                        )
+                        drawLine(
+                            color = dark.decoGold,
+                            start = Offset(w * 0.14f, h * 0.85f),
+                            end = Offset(w * 0.86f, h * 0.85f),
+                            strokeWidth = 1.dp.toPx()
                         )
                     }
 
                     AppThemeMode.SYSTEM -> {
-                        // Top-left Alabaster Daylight half
-                        drawRect(color = LightFlipYearPalette.studioCanvas)
-                        // Bottom-right Nocturnal Darkroom diagonal half
+                        // 左上日光画廊纸地 / 右下暗夜暗房纸地对角切分
+                        drawRect(color = light.decoGround)
                         val darkHalf = Path().apply {
                             moveTo(w, 0f)
                             lineTo(w, h)
                             lineTo(0f, h)
                             close()
                         }
-                        drawPath(path = darkHalf, color = DarkFlipYearPalette.studioCanvas)
+                        drawPath(path = darkHalf, color = dark.decoGround)
 
-                        // Centered mini book straddling daylight & darkroom
+                        // 骑缝画报书封（深墨封 + 金描边 + 朱印块）
                         drawRoundRect(
-                            color = Color(0xFF202B47),
+                            color = DecoInkDeep,
                             topLeft = Offset(w * 0.24f, h * 0.30f),
                             size = Size(w * 0.52f, h * 0.44f),
-                            cornerRadius = CornerRadius(7.dp.toPx())
+                            cornerRadius = CornerRadius(2.dp.toPx())
                         )
                         drawRoundRect(
-                            color = DarkFlipYearPalette.solarAmber,
-                            topLeft = Offset(w * 0.34f, h * 0.60f),
-                            size = Size(w * 0.32f, h * 0.05f),
-                            cornerRadius = CornerRadius(3.dp.toPx())
+                            color = dark.decoGold,
+                            topLeft = Offset(w * 0.28f, h * 0.34f),
+                            size = Size(w * 0.44f, h * 0.36f),
+                            cornerRadius = CornerRadius(1.dp.toPx()),
+                            style = Stroke(width = 1.dp.toPx())
+                        )
+                        drawRoundRect(
+                            color = dark.decoVerm,
+                            topLeft = Offset(w * 0.34f, h * 0.52f),
+                            size = Size(w * 0.24f, h * 0.10f),
+                            cornerRadius = CornerRadius(1.dp.toPx())
                         )
                     }
                 }
             }
 
-            // Selection checkmark orb
+            // 选中朱点印（纸黄对勾压朱红底 —— 可读性红线允许的组合）
             if (selected) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .size(20.dp)
+                        .padding(5.dp)
+                        .size(18.dp)
                         .clip(CircleShape)
-                        .background(CobaltPrimary),
+                        .background(DecoVerm),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Check,
                         contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(13.dp)
+                        tint = DecoPaperCream,
+                        modifier = Modifier.size(11.dp)
                     )
                 }
             }
@@ -325,23 +390,26 @@ private fun ThemePreviewCard(
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(bottom = 2.dp)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (selected) CobaltPrimary else InkSecondary,
+                tint = if (selected) DecoGold else InkSecondary,
                 modifier = Modifier.size(14.dp)
             )
             Text(
                 text = mode.label,
-                style = MaterialTheme.typography.labelLarge,
-                fontSize = 12.sp,
+                fontFamily = EditorialSerifFontFamily,
+                fontSize = 13.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-                color = if (selected) CobaltPrimary else InkPrimary,
+                letterSpacing = 1.sp,
+                color = if (selected) DecoGold else InkPrimary,
                 textAlign = TextAlign.Center,
                 maxLines = 1
             )
         }
+        Spacer(modifier = Modifier.height(2.dp))
     }
 }

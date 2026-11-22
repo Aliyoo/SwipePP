@@ -41,7 +41,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoStories
@@ -112,10 +111,10 @@ import androidx.navigation.navArgument
 import com.example.R
 import com.example.data.MediaAccessLevel
 import com.example.data.PhotoItemEntity
+import com.example.ui.components.DecoPosterPanel
 import com.example.ui.components.FullScreenOverlayHost
 import com.example.ui.components.FullScreenOverlayLayer
 import com.example.ui.components.LocalFullScreenOverlayHost
-import com.example.ui.components.ObsidianGlassCard
 import com.example.ui.components.OnboardingGestureGuideOverlay
 import com.example.ui.components.monthChineseName
 import com.example.ui.screens.ArcCleanerScreen
@@ -130,22 +129,18 @@ import com.example.ui.theme.FlipbookDefaultView
 import com.example.ui.theme.GalleryGridDensity
 import com.example.ui.theme.TimelineSortOrder
 import com.example.ui.theme.UserPreferences
-import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoVerm
+import com.example.ui.theme.DecoVermInk
 import com.example.ui.theme.EditorialSerifFontFamily
-import com.example.ui.theme.CobaltSoft
 import com.example.ui.theme.DecoGround
 import com.example.ui.theme.DecoGroundDeep
 import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Brush
-import com.example.ui.theme.CoralDanger
-import com.example.ui.theme.InkSecondary
-import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.StudioCanvas
-import com.example.ui.theme.SurfacePure
 import com.example.ui.theme.ThemePreferences
 import kotlin.math.roundToInt
 
@@ -399,13 +394,14 @@ fun FlipYearApp(
                 Row(modifier = Modifier.fillMaxSize()) {
                     if (showTopLevelNav && useNavigationRail) {
                         NavigationRail(
-                            containerColor = SurfacePure,
+                            containerColor = DecoGround,
                             modifier = Modifier
                                 .fillMaxHeight()
                                 .statusBarsPadding()
                         ) {
                         tabs.forEach { tab ->
                             val selected = currentRoute == tab.route
+                            val railGold = DecoGold
                             val tabLabel = stringResource(tab.labelRes)
                             val railDesc = if (tab.route == FlipYearRoutes.VAULT && uiState.trashedPhotos.isNotEmpty()) {
                                 "$tabLabel，${uiState.trashedPhotos.size} 项待清理"
@@ -420,7 +416,7 @@ fun FlipYearApp(
                                         tab = tab,
                                         selected = selected,
                                         trashedCount = uiState.trashedPhotos.size,
-                                        tint = if (selected) CobaltPrimary else InkSecondary,
+                                        tint = if (selected) DecoGold else DecoInkOnGround.copy(alpha = 0.72f),
                                         decorative = true
                                     )
                                 },
@@ -431,13 +427,25 @@ fun FlipYearApp(
                                     )
                                 },
                                 colors = NavigationRailItemDefaults.colors(
-                                    selectedIconColor = CobaltPrimary,
-                                    selectedTextColor = CobaltPrimary,
-                                    indicatorColor = CobaltSoft,
-                                    unselectedIconColor = InkSecondary,
-                                    unselectedTextColor = InkSecondary
+                                    selectedIconColor = DecoGold,
+                                    selectedTextColor = DecoGold,
+                                    indicatorColor = Color.Transparent,
+                                    unselectedIconColor = DecoInkOnGround.copy(alpha = 0.72f),
+                                    unselectedTextColor = DecoInkOnGround.copy(alpha = 0.72f)
                                 ),
                                 modifier = Modifier
+                                    .drawBehind {
+                                        // 画报选中态：底边 1dp 金下划线（弃 M3 填充胶囊指示器，同 FloatingGalleryDock 语法）
+                                        if (selected) {
+                                            val y = size.height - 1.dp.toPx()
+                                            drawLine(
+                                                color = railGold,
+                                                start = Offset(0f, y),
+                                                end = Offset(size.width, y),
+                                                strokeWidth = 1.dp.toPx()
+                                            )
+                                        }
+                                    }
                                     .semantics {
                                         contentDescription = railDesc
                                         role = Role.Tab
@@ -884,9 +892,9 @@ fun FlipYearApp(
                             .testTag("batch_task_progress_pill")
                     ) {
                         uiState.batchTaskMessage?.let { taskMsg ->
-                            ObsidianGlassCard(
-                                shape = RoundedCornerShape(22.dp),
-                                shadowElevation = 14.dp,
+                            DecoPosterPanel(
+                                radius = 3.dp,
+                                shadowElevation = 12.dp,
                                 modifier = Modifier.widthIn(min = 220.dp, max = 340.dp)
                             ) {
                                 Column(
@@ -899,13 +907,13 @@ fun FlipYearApp(
                                     ) {
                                         CircularProgressIndicator(
                                             strokeWidth = 2.dp,
-                                            color = CobaltPrimary,
+                                            color = DecoGold,
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Text(
                                             text = taskMsg,
                                             style = MaterialTheme.typography.labelLarge,
-                                            color = Color.White,
+                                            color = DecoInkOnGround,
                                             maxLines = 1
                                         )
                                     }
@@ -914,12 +922,12 @@ fun FlipYearApp(
                                             .coerceIn(0f, 1f)
                                         LinearProgressIndicator(
                                             progress = { fraction },
-                                            color = CobaltPrimary,
-                                            trackColor = Color.White.copy(alpha = 0.16f),
+                                            color = DecoGold,
+                                            trackColor = DecoGold.copy(alpha = 0.16f),
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .height(3.dp)
-                                                .clip(CircleShape)
+                                                .clip(RoundedCornerShape(2.dp))
                                         )
                                     }
                                 }
@@ -949,12 +957,11 @@ fun FlipYearApp(
                         .testTag("bottom_feedback_snackbar")
                 ) {
                     uiState.snackbarMessage?.let { snack ->
-                        val isDark = LocalIsDarkTheme.current
                         Snackbar(
-                            shape = RoundedCornerShape(18.dp),
-                            containerColor = if (isDark) Color(0xFF1F2636) else Color(0xFF1A1F2C),
-                            contentColor = Color.White,
-                            actionContentColor = Color(0xFF7CA7FF),
+                            shape = RoundedCornerShape(3.dp),
+                            containerColor = DecoMat,
+                            contentColor = DecoInkOnGround,
+                            actionContentColor = DecoVermInk,
                             action = snack.undoSnapshot?.let { boundSnapshot ->
                                 {
                                     TextButton(
@@ -968,7 +975,7 @@ fun FlipYearApp(
                                             text = snack.undoLabel ?: stringResource(R.string.action_undo),
                                             style = MaterialTheme.typography.labelLarge,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF8AB4FF),
+                                            color = DecoVermInk,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -980,7 +987,7 @@ fun FlipYearApp(
                             Text(
                                 text = snack.text,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White,
+                                color = DecoInkOnGround,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -1334,8 +1341,8 @@ private fun TabIconWithBadge(
         BadgedBox(
             badge = {
                 Badge(
-                    containerColor = CoralDanger,
-                    contentColor = Color.White
+                    containerColor = DecoVerm,
+                    contentColor = DecoPaperCream
                 ) {
                     Text(trashedCount.toString())
                 }

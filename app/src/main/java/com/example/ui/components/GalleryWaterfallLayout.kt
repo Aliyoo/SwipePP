@@ -76,19 +76,15 @@ import com.example.data.PhotoItemEntity
 import com.example.data.PhotoStatus
 import com.example.data.PhotoRepository
 import com.example.ui.GalleryEntry
-import com.example.ui.theme.CobaltPrimary
-import com.example.ui.theme.EmeraldKeep
-import com.example.ui.theme.HairlineBorder
-import com.example.ui.theme.InkPrimary
-import com.example.ui.theme.InkSecondary
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoGroundDeep
+import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoMat
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoScrimInk
+import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.LocalIsDarkTheme
-import com.example.ui.theme.ObsidianOverlayBorder
-import com.example.ui.theme.ObsidianOverlayGlass
 import com.example.ui.theme.OutfitFontFamily
-import com.example.ui.theme.SolarAmber
-import com.example.ui.theme.SurfaceMuted
-import com.example.ui.theme.SurfacePure
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -448,11 +444,13 @@ internal fun Modifier.galleryPinchZoomGesture(
     }
 }
 
-private val WaterfallSingleShape = RoundedCornerShape(14.dp)
-private val WaterfallMultiShape = RoundedCornerShape(10.dp)
-private val WaterfallPillShape = RoundedCornerShape(50)
+// 摩登画报造型语法：画片圆角 2~4dp（弃 10~14dp 大圆角），徽签 2dp 小圆角
+private val WaterfallSingleShape = RoundedCornerShape(4.dp)
+private val WaterfallMultiShape = RoundedCornerShape(3.dp)
+private val WaterfallTagShape = RoundedCornerShape(2.dp)
+// 压照片暗 scrim 画刷（DecoScrimInk #0D1814，同 BurstGalleryGrid 底部渐晕语法）
 private val WaterfallBurstScrim = Brush.verticalGradient(
-    colors = listOf(Color.Transparent, Color(0xAD000000))
+    colors = listOf(Color.Transparent, DecoScrimInk.copy(alpha = 0.68f))
 )
 
 @Composable
@@ -530,13 +528,13 @@ internal fun GalleryJustifiedWaterfallList(
                             fontFamily = OutfitFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp,
-                            color = InkPrimary
+                            color = DecoInkOnGround
                         )
                         Text(
                             text = "${row.itemCount} 项",
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 11.sp,
-                            color = InkSecondary
+                            fontSize = 12.sp,
+                            color = DecoInkOnGround.copy(alpha = 0.62f)
                         )
                     }
                 }
@@ -609,7 +607,6 @@ private fun JustifiedWaterfallRow(
     val isSingle = cells.size == 1
     val shape = if (isSingle) WaterfallSingleShape else WaterfallMultiShape
     val totalAr = cells.sumOf { it.aspectRatio.toDouble() }.toFloat().coerceAtLeast(0.45f)
-    val isDark = LocalIsDarkTheme.current
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val totalSpacing = spacing * (cells.size - 1)
@@ -646,10 +643,10 @@ private fun JustifiedWaterfallRow(
                                 .fillMaxHeight()
                                 .then(scaleMod)
                                 .clip(shape)
-                                .background(SurfaceMuted)
+                                .background(DecoMat)
                                 .border(
-                                    width = if (isSelected) 2.5.dp else 0.85.dp,
-                                    color = if (isSelected) CobaltPrimary else HairlineBorder,
+                                    width = if (isSelected) 2.5.dp else 1.dp,
+                                    color = if (isSelected) DecoVerm else DecoGold.copy(alpha = 0.45f),
                                     shape = shape
                                 )
                                 .combinedClickable(
@@ -680,7 +677,7 @@ private fun JustifiedWaterfallRow(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(CobaltPrimary.copy(alpha = 0.16f))
+                                        .background(DecoVerm.copy(alpha = 0.16f))
                                 )
                             }
 
@@ -692,38 +689,40 @@ private fun JustifiedWaterfallRow(
                                         .padding(7.dp)
                                 )
                             } else if (photo.photoStatus == PhotoStatus.KEPT) {
+                                // 已保留 = 金印章（金底 + 内衬字，同 BurstGalleryGrid 语法）
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
                                         .padding(7.dp)
                                         .size(20.dp)
                                         .clip(CircleShape)
-                                        .background(EmeraldKeep),
+                                        .background(DecoGold),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.CheckCircle,
                                         contentDescription = "已保留",
-                                        tint = Color.White,
+                                        tint = DecoMat,
                                         modifier = Modifier.size(14.dp)
                                     )
                                 }
                             }
 
                             if (photo.isFavorite) {
+                                // 收藏 = 朱红小签章（朱底 + 纸黄星，压照片暗部）
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.TopStart)
                                         .padding(7.dp)
                                         .size(20.dp)
                                         .clip(CircleShape)
-                                        .background(SolarAmber),
+                                        .background(DecoVerm),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Star,
                                         contentDescription = "收藏",
-                                        tint = Color.White,
+                                        tint = DecoPaperCream,
                                         modifier = Modifier.size(13.dp)
                                     )
                                 }
@@ -735,7 +734,8 @@ private fun JustifiedWaterfallRow(
                         val selectedCount = if (!isSelectionMode) 0 else entry.photos.count { it.id in selectedPhotoIds }
                         val allSelected = isSelectionMode && selectedCount == entry.photos.size && entry.photos.isNotEmpty()
                         val anySelected = selectedCount > 0
-                        val stackBackColor = if (isDark) Color(0xFF283146) else Color(0xFFE3E7F0)
+                        // 画报纸叠：纸面层色取地面系深纸（主题自适应，同 BurstGalleryGrid 纸叠语法）
+                        val stackBackColor = DecoGroundDeep
                         val scaleMod = if (anySelected) {
                             Modifier.graphicsLayer { scaleX = 0.96f; scaleY = 0.96f }
                         } else {
@@ -749,7 +749,7 @@ private fun JustifiedWaterfallRow(
                                 .drawBehind {
                                     // Subtle top stacked deck rim signaling burst group in waterfall
                                     val insetX = 6.dp.toPx()
-                                    val corner = CornerRadius(10.dp.toPx(), 10.dp.toPx())
+                                    val corner = CornerRadius(4.dp.toPx(), 4.dp.toPx())
                                     drawRoundRect(
                                         color = stackBackColor,
                                         topLeft = Offset(insetX, 0f),
@@ -759,10 +759,10 @@ private fun JustifiedWaterfallRow(
                                 }
                                 .padding(top = 5.dp)
                                 .clip(shape)
-                                .background(SurfacePure)
+                                .background(DecoMat)
                                 .border(
-                                    width = if (anySelected) 2.5.dp else 1.2.dp,
-                                    color = if (anySelected) CobaltPrimary else HairlineBorder,
+                                    width = if (anySelected) 2.5.dp else 1.dp,
+                                    color = if (anySelected) DecoVerm else DecoGold.copy(alpha = 0.45f),
                                     shape = shape
                                 )
                                 .combinedClickable(
@@ -795,7 +795,7 @@ private fun JustifiedWaterfallRow(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(CobaltPrimary.copy(alpha = 0.16f))
+                                        .background(DecoVerm.copy(alpha = 0.16f))
                                 )
                             }
 
@@ -807,29 +807,30 @@ private fun JustifiedWaterfallRow(
                                     .background(WaterfallBurstScrim)
                             )
 
+                            // 朱红小签（连拍 N，压照片暗部，同 BurstGalleryGrid 语法）
                             Row(
                                 modifier = Modifier
                                     .align(Alignment.TopStart)
                                     .padding(7.dp)
-                                    .clip(WaterfallPillShape)
-                                    .background(ObsidianOverlayGlass)
-                                    .border(0.85.dp, ObsidianOverlayBorder, WaterfallPillShape)
-                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                                    .clip(WaterfallTagShape)
+                                    .background(DecoVerm)
+                                    .border(0.75.dp, DecoPaperCream.copy(alpha = 0.25f), WaterfallTagShape)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(3.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.BurstMode,
                                     contentDescription = null,
-                                    tint = SolarAmber,
-                                    modifier = Modifier.size(12.dp)
+                                    tint = DecoPaperCream,
+                                    modifier = Modifier.size(11.dp)
                                 )
                                 Text(
                                     text = "${entry.photos.size} 连拍",
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 10.sp,
-                                    color = Color.White
+                                    fontSize = 12.sp,
+                                    color = DecoPaperCream
                                 )
                             }
 
@@ -858,15 +859,15 @@ private fun JustifiedWaterfallRow(
                                         "点击展开对比"
                                     },
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 10.5.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = DecoPaperCream
                                 )
                                 if (!isSelectionMode) {
                                     Icon(
                                         imageVector = Icons.Filled.ExpandMore,
                                         contentDescription = stringResource(R.string.burst_expand),
-                                        tint = Color.White,
+                                        tint = DecoPaperCream,
                                         modifier = Modifier.size(15.dp)
                                     )
                                 }
@@ -890,20 +891,11 @@ fun GalleryZoomTierIconButton(
     modifier: Modifier = Modifier,
     visualSize: Dp = 36.dp
 ) {
-    val isDark = LocalIsDarkTheme.current
     val isWaterfall = currentTier.isWaterfall
-    val containerColor = when {
-        isWaterfall && isDark -> CobaltPrimary.copy(alpha = 0.24f)
-        isWaterfall -> CobaltPrimary.copy(alpha = 0.12f)
-        isDark -> SurfacePure.copy(alpha = 0.80f)
-        else -> SurfacePure.copy(alpha = 0.94f)
-    }
-    val borderColor = when {
-        isWaterfall -> CobaltPrimary.copy(alpha = if (isDark) 0.56f else 0.42f)
-        isDark -> HairlineBorder
-        else -> HairlineBorder.copy(alpha = 0.90f)
-    }
-    val iconTint = if (isWaterfall) CobaltPrimary else InkPrimary
+    // 摩登画报选中态 = 金底章（同月头「选本月/整理」跳签语法），未选中 = 内衬纸面 + 弱金描边
+    val containerColor = if (isWaterfall) DecoGold else DecoMat
+    val borderColor = if (isWaterfall) DecoGold else DecoGold.copy(alpha = 0.45f)
+    val iconTint = if (isWaterfall) DecoMat else DecoInkOnGround
 
     Box(
         contentAlignment = Alignment.Center,

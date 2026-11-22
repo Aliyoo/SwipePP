@@ -14,20 +14,19 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -57,12 +56,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -79,14 +79,13 @@ import androidx.media3.ui.PlayerView
 import com.example.R
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
-import com.example.ui.theme.CobaltPrimary
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoGround
+import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoScrimInk
+import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.ObsidianOverlayBorderStrong
-import com.example.ui.theme.ObsidianOverlayChipOnDark
-import com.example.ui.theme.ObsidianOverlayOrb
-import com.example.ui.theme.ObsidianSatinBottom
-import com.example.ui.theme.ObsidianSatinTop
-import com.example.ui.theme.SolarAmber
 import kotlinx.coroutines.delay
 
 /**
@@ -294,25 +293,30 @@ fun InlineVideoPlayer(
             )
         }
 
-        // Buffering spinner
+        // Buffering spinner（摩登画报：深墨印底 + 金色转轮，压视频暗 scrim 保证可读）
         if (isBuffering && playbackError == null && playWhenReady) {
-            ObsidianGlassCard(
-                shape = CircleShape,
-                modifier = Modifier.size(48.dp)
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(DecoScrimInk.copy(alpha = 0.72f))
+                    .border(1.dp, DecoGold.copy(alpha = 0.55f), CircleShape)
             ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    CircularProgressIndicator(
-                        color = Color.White,
-                        strokeWidth = 2.4.dp,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+                CircularProgressIndicator(
+                    color = DecoGold,
+                    strokeWidth = 2.4.dp,
+                    modifier = Modifier.size(22.dp)
+                )
             }
         }
 
-        // Playback error recovery pill
+        // Playback error recovery pill（摩登画报朱红小签：朱底 + 纸黄字 + 纸黄受光边）
         if (playbackError != null) {
-            ObsidianGlassPill(
+            Surface(
+                shape = RoundedCornerShape(3.dp),
+                color = DecoVerm,
+                border = BorderStroke(0.9.dp, DecoPaperCream.copy(alpha = 0.25f)),
                 modifier = Modifier.clickable { togglePlayPause() }
             ) {
                 Row(
@@ -323,31 +327,30 @@ fun InlineVideoPlayer(
                     Icon(
                         imageVector = Icons.Filled.Refresh,
                         contentDescription = "重试播放",
-                        tint = SolarAmber,
+                        tint = DecoPaperCream,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
                         text = "$playbackError · 点击重试",
                         style = MaterialTheme.typography.labelMedium,
-                        color = Color.White
+                        color = DecoPaperCream
                     )
                 }
             }
         }
 
-        // Center Play/Pause Glass Orb (shown when paused, or when chrome is visible in full-control mode)
+        // Center Play/Pause Seal Orb (shown when paused, or when chrome is visible in full-control mode)
         AnimatedVisibility(
             visible = playbackError == null && (!isPlaying || (showFullControls && showChrome)),
             enter = fadeIn(),
             exit = fadeOut()
         ) {
-            ObsidianIconOrb(
+            DecoVideoInkOrb(
                 icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                 contentDescription = if (isPlaying) "暂停视频" else "播放视频",
                 onClick = togglePlayPause,
                 size = if (showFullControls) 64.dp else 54.dp,
                 iconSize = if (showFullControls) 34.dp else 28.dp,
-                borderColor = ObsidianOverlayBorderStrong,
                 modifier = Modifier.testTag("inline_video_play_pause")
             )
         }
@@ -368,23 +371,19 @@ fun InlineVideoPlayer(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        ObsidianIconOrb(
+                        DecoSealChipButton(
                             icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (isPlaying) "暂停视频" else "播放视频",
                             onClick = togglePlayPause,
-                            size = 34.dp,
-                            iconSize = 18.dp,
-                            color = ObsidianOverlayChipOnDark,
-                            borderColor = null,
                             modifier = Modifier.testTag("inline_video_dock_play_pause")
                         )
 
                         Text(
                             text = formatVideoDuration(displayPos),
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.White
+                            color = DecoInkOnGround
                         )
 
                         Slider(
@@ -400,9 +399,9 @@ fun InlineVideoPlayer(
                                 isScrubbing = false
                             },
                             colors = SliderDefaults.colors(
-                                thumbColor = Color.White,
-                                activeTrackColor = CobaltPrimary,
-                                inactiveTrackColor = Color.White.copy(alpha = 0.22f)
+                                thumbColor = DecoPaperCream,
+                                activeTrackColor = DecoGold,
+                                inactiveTrackColor = DecoGold.copy(alpha = 0.30f)
                             ),
                             modifier = Modifier
                                 .weight(1f)
@@ -413,18 +412,14 @@ fun InlineVideoPlayer(
                         Text(
                             text = formatVideoDuration(safeDuration),
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 11.sp,
-                            color = Color.White.copy(alpha = 0.72f)
+                            fontSize = 12.sp,
+                            color = DecoInkOnGround.copy(alpha = 0.62f)
                         )
 
-                        ObsidianIconOrb(
+                        DecoSealChipButton(
                             icon = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
                             contentDescription = if (isMuted) "取消静音" else "静音",
                             onClick = { isMuted = !isMuted },
-                            size = 34.dp,
-                            iconSize = 18.dp,
-                            color = ObsidianOverlayChipOnDark,
-                            borderColor = null,
                             modifier = Modifier.testTag("inline_video_mute_toggle")
                         )
                     }
@@ -446,10 +441,10 @@ fun InlineVideoPlayer(
                         .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
-                    ObsidianGlassCard(
-                        shape = RoundedCornerShape(22.dp),
-                        topColor = ObsidianSatinTop.copy(alpha = 0.94f),
-                        bottomColor = ObsidianSatinBottom.copy(alpha = 0.94f),
+                    // 摩登画报控制托盘：画报纸面版面（金发丝描边 + 3dp 小圆角，平涂无玻璃高光）
+                    DecoPosterPanel(
+                        radius = 3.dp,
+                        borderAlpha = 0.5f,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
@@ -469,21 +464,24 @@ fun InlineVideoPlayer(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                ObsidianGlassPill(
-                    color = ObsidianOverlayOrb
+                // 深墨时间签（压视频暗 scrim + 金发丝描边 + 纸黄字，可读性红线组合）
+                Surface(
+                    shape = RoundedCornerShape(3.dp),
+                    color = DecoScrimInk.copy(alpha = 0.78f),
+                    border = BorderStroke(0.9.dp, DecoGold.copy(alpha = 0.5f))
                 ) {
                     Text(
                         text = "${formatVideoDuration(positionMs)} / ${formatVideoDuration(durationMs)}",
                         fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
+                        color = DecoPaperCream,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ObsidianIconOrb(
+                    DecoVideoInkOrb(
                         icon = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
                         contentDescription = if (isMuted) "取消静音" else "静音",
                         onClick = { isMuted = !isMuted },
@@ -493,7 +491,7 @@ fun InlineVideoPlayer(
                     )
 
                     if (onOpenFullscreen != null) {
-                        ObsidianIconOrb(
+                        DecoVideoInkOrb(
                             icon = Icons.Filled.Fullscreen,
                             contentDescription = "全屏播放",
                             onClick = onOpenFullscreen,
@@ -586,13 +584,12 @@ private fun SampleVideoInlinePreview(
             enter = fadeIn(),
             exit = fadeOut()
         ) {
-            ObsidianIconOrb(
+            DecoVideoInkOrb(
                 icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                 contentDescription = if (isPlaying) "暂停预览" else "播放预览",
                 onClick = { isPlaying = !isPlaying },
                 size = if (showFullControls) 64.dp else 54.dp,
-                iconSize = if (showFullControls) 34.dp else 28.dp,
-                borderColor = ObsidianOverlayBorderStrong
+                iconSize = if (showFullControls) 34.dp else 28.dp
             )
         }
 
@@ -611,13 +608,13 @@ private fun SampleVideoInlinePreview(
                         Icon(
                             imageVector = Icons.Filled.Videocam,
                             contentDescription = null,
-                            tint = SolarAmber,
+                            tint = DecoGold,
                             modifier = Modifier.size(13.dp)
                         )
                         Text(
                             text = "示例视频动效预览 · 扫描本机视频后支持真实音画播放",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.72f)
+                            color = DecoInkOnGround.copy(alpha = 0.62f)
                         )
                     }
                     Row(
@@ -625,29 +622,25 @@ private fun SampleVideoInlinePreview(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        ObsidianIconOrb(
+                        DecoSealChipButton(
                             icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (isPlaying) "暂停预览" else "播放预览",
-                            onClick = { isPlaying = !isPlaying },
-                            size = 34.dp,
-                            iconSize = 18.dp,
-                            color = ObsidianOverlayChipOnDark,
-                            borderColor = null
+                            onClick = { isPlaying = !isPlaying }
                         )
                         Text(
                             text = formatVideoDuration(elapsedMs),
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.White
+                            color = DecoInkOnGround
                         )
                         Slider(
                             value = progress,
                             onValueChange = { elapsedMs = (it * totalMs).toLong() },
                             colors = SliderDefaults.colors(
-                                thumbColor = Color.White,
-                                activeTrackColor = CobaltPrimary,
-                                inactiveTrackColor = Color.White.copy(alpha = 0.22f)
+                                thumbColor = DecoPaperCream,
+                                activeTrackColor = DecoGold,
+                                inactiveTrackColor = DecoGold.copy(alpha = 0.30f)
                             ),
                             modifier = Modifier
                                 .weight(1f)
@@ -656,8 +649,8 @@ private fun SampleVideoInlinePreview(
                         Text(
                             text = formatVideoDuration(totalMs),
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 11.sp,
-                            color = Color.White.copy(alpha = 0.72f)
+                            fontSize = 12.sp,
+                            color = DecoInkOnGround.copy(alpha = 0.62f)
                         )
                     }
                 }
@@ -678,10 +671,10 @@ private fun SampleVideoInlinePreview(
                         .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
-                    ObsidianGlassCard(
-                        shape = RoundedCornerShape(22.dp),
-                        topColor = ObsidianSatinTop.copy(alpha = 0.94f),
-                        bottomColor = ObsidianSatinBottom.copy(alpha = 0.94f),
+                    // 摩登画报控制托盘：画报纸面版面（金发丝描边 + 3dp 小圆角，平涂无玻璃高光）
+                    DecoPosterPanel(
+                        radius = 3.dp,
+                        borderAlpha = 0.5f,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
@@ -699,19 +692,23 @@ private fun SampleVideoInlinePreview(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                ObsidianGlassPill(
-                    color = ObsidianOverlayOrb
+                // 深墨时间签（压视频暗 scrim + 金发丝描边 + 纸黄字，可读性红线组合）
+                Surface(
+                    shape = RoundedCornerShape(3.dp),
+                    color = DecoScrimInk.copy(alpha = 0.78f),
+                    border = BorderStroke(0.9.dp, DecoGold.copy(alpha = 0.5f))
                 ) {
                     Text(
                         text = "${formatVideoDuration(elapsedMs)} / ${formatVideoDuration(totalMs)}",
                         fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 10.sp,
-                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = DecoPaperCream,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
                 if (onOpenFullscreen != null) {
-                    ObsidianIconOrb(
+                    DecoVideoInkOrb(
                         icon = Icons.Filled.Fullscreen,
                         contentDescription = "全屏播放",
                         onClick = onOpenFullscreen,
@@ -720,6 +717,83 @@ private fun SampleVideoInlinePreview(
                     )
                 }
             }
+        }
+    }
+}
+
+// =====================================================================================
+// 摩登画报视频 chrome 私有件（deco-app.html 造型语法）：
+// 深墨印钮 = 压视频/照片控件的可读性红线组合（DecoScrimInk 暗 scrim 底 + 金描边 + 纸黄图标）；
+// 方章控制钮 = 压画报纸面托盘的金描边小方章（3dp 圆角 + 纸地底 + 金图标）。
+// 色彩一律走 ui/theme Deco 令牌（日光画廊 / 暗夜暗房双套自适应），不引入硬编码色。
+// =====================================================================================
+
+/** 深墨印钮：圆形印章钮，暗 scrim 底 + 金环 + 纸黄图标，压视频时保证可读。 */
+@Composable
+private fun DecoVideoInkOrb(
+    icon: ImageVector,
+    contentDescription: String?,
+    onClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    size: Dp,
+    iconSize: Dp
+) {
+    val orbContent: @Composable () -> Unit = {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = DecoPaperCream,
+                modifier = Modifier.size(iconSize)
+            )
+        }
+    }
+    val orbModifier = modifier.size(size)
+    if (onClick != null) {
+        Surface(
+            onClick = onClick,
+            shape = CircleShape,
+            color = DecoScrimInk.copy(alpha = 0.72f),
+            border = BorderStroke(1.2.dp, DecoGold.copy(alpha = 0.85f)),
+            modifier = orbModifier,
+            content = orbContent
+        )
+    } else {
+        Surface(
+            shape = CircleShape,
+            color = DecoScrimInk.copy(alpha = 0.72f),
+            border = BorderStroke(1.2.dp, DecoGold.copy(alpha = 0.85f)),
+            modifier = orbModifier,
+            content = orbContent
+        )
+    }
+}
+
+/** 方章控制钮：纸地底 + 1.2dp 金描边小方章（3dp 圆角），压画报纸面控制托盘。 */
+@Composable
+private fun DecoSealChipButton(
+    icon: ImageVector,
+    contentDescription: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 34.dp,
+    iconSize: Dp = 18.dp
+) {
+    val gold = DecoGold
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(3.dp),
+        color = DecoGround.copy(alpha = 0.55f),
+        border = BorderStroke(1.2.dp, gold),
+        modifier = modifier.size(size)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = gold,
+                modifier = Modifier.size(iconSize)
+            )
         }
     }
 }

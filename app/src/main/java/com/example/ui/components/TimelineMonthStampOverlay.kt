@@ -10,11 +10,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -44,7 +43,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -62,9 +61,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -84,37 +81,52 @@ import com.example.R
 import com.example.data.MonthStampEntity
 import com.example.data.PhotoRepository
 import com.example.ui.GalleryEntry
-import com.example.ui.theme.CobaltDark
-import com.example.ui.theme.CobaltPrimary
-import com.example.ui.theme.CobaltSoft
-import com.example.ui.theme.EmeraldKeep
-import com.example.ui.theme.EmeraldSoft
-import com.example.ui.theme.HairlineBorder
-import com.example.ui.theme.InkPrimary
-import com.example.ui.theme.InkSecondary
-import com.example.ui.theme.InkTertiary
-import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.LocalIsDarkTheme
-import com.example.ui.theme.OutfitFontFamily
-import com.example.ui.theme.SolarAmber
-import com.example.ui.theme.SurfacePure
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoMat
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoScrimInk
+import com.example.ui.theme.DecoVerm
+import com.example.ui.theme.EditorialSerifFontFamily
+import com.example.ui.theme.LocalFlipYearPalette
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-private val StampOverlayShape = RoundedCornerShape(18.dp)
-private val StampInlineShape = RoundedCornerShape(12.dp)
+// =====================================================================
+// 摩登画报造型令牌（design-demos/deco-app.html：3~4dp 画片圆角、金双线画框、
+// 朱红小签、金边跳签）。色彩一律走 ui/theme Deco 令牌（日光画廊/暗夜暗房双套），
+// 仅朱红小签的纸黄受光边为浅暗同值不变量（纸黄只压照片暗部 / 朱红底 —— 可读性红线）。
+// =====================================================================
+private val StampOverlayShape = RoundedCornerShape(3.dp)
 private val JumpChipShape = RoundedCornerShape(50)
-private val ScrollFlagShape = RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp, topEnd = 6.dp, bottomEnd = 6.dp)
+private val ScrollFlagShape = RoundedCornerShape(3.dp)
 
-private val StampActiveFillBrush = Brush.verticalGradient(
-    colors = listOf(Color(0xEB151822), Color(0xE00E1017))
-)
-private val StampDashedEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f), 0f)
-private val StampInnerDarkRim = Color(0x38FFFFFF)
-private val StampInnerLightRim = Color(0x522548D6)
-private val StampShadowHalo = Color(0x26121316)
-private val ScrollRailTrackBg = Color(0x2E121316)
+// 朱红小签的纸黄受光边（原型朱红徽语法 border 1px rgba(239,227,200,0.25)）
+private val VermTagCreamRim = Color(0x40EFE3C8)
+private val VermTagCreamRimActive = Color(0x70EFE3C8)
+
+// 干支纪年（通式推算，同 BurstGalleryGrid 画报月头语法：2026 丙午 / 2025 乙巳 …）
+private val StampGanZhiStems = listOf("甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸")
+private val StampGanZhiBranches = listOf("子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥")
+
+private fun stampGanZhi(year: Int): String =
+    StampGanZhiStems[(year - 4).mod(10)] + StampGanZhiBranches[(year - 4).mod(12)]
+
+private fun stampChineseMonth(month: Int): String = when (month) {
+    1 -> "一月"
+    2 -> "二月"
+    3 -> "三月"
+    4 -> "四月"
+    5 -> "五月"
+    6 -> "六月"
+    7 -> "七月"
+    8 -> "八月"
+    9 -> "九月"
+    10 -> "十月"
+    11 -> "十一月"
+    else -> "十二月"
+}
 
 /**
  * Aggregated monthly cluster metadata used both for inline section stamps and the
@@ -267,8 +279,9 @@ fun buildTimelineClusterLayout(
 }
 
 /**
- * Lightweight inline archival divider stamp placed at the start of every monthly photo cluster
- * in the timeline grid. Uses zero blur and zero hardware shadows to stay 60/120fps locked.
+ * 摩登画报 · 月头画报栏目线（deco-app.html 画廊屏月头语法，与 BurstGalleryGrid.DecoMonthClusterHeader
+ * 同构）：衬线月名 20sp + 金色干支纪年副标 12sp + 弱金通栏细线 + 计数与金边动作跳签。
+ * 供瀑布流模式（GalleryWaterfallLayout）使用；选本月 / 整理·重温 / 已整理标记与 testTag 原样保留。
  */
 @Composable
 fun MonthlyClusterHeaderStamp(
@@ -279,104 +292,86 @@ fun MonthlyClusterHeaderStamp(
     onCleanMonth: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val isDark = LocalIsDarkTheme.current
-    val stampInnerRim = if (isDark) Color(0x666B8FFF) else StampInnerLightRim
-
+    val deco = LocalFlipYearPalette.current
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 6.dp, bottom = 2.dp)
+            .padding(top = 10.dp, bottom = 4.dp)
             .testTag("timeline_cluster_header_${cluster.yearMonthKey}"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Editorial archival postage-style month badge ("2026年1月")
+        // 画报月名 + 干支纪年副标
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            modifier = Modifier
-                .clip(StampInlineShape)
-                .background(SurfacePure)
-                .drawBehind {
-                    val inset = 2.5.dp.toPx()
-                    drawRoundRect(
-                        color = stampInnerRim,
-                        topLeft = Offset(inset, inset),
-                        size = Size(size.width - inset * 2f, size.height - inset * 2f),
-                        cornerRadius = CornerRadius(9.5.dp.toPx(), 9.5.dp.toPx()),
-                        style = Stroke(width = 0.85.dp.toPx(), pathEffect = StampDashedEffect)
-                    )
-                }
-                .border(1.dp, HairlineBorder, StampInlineShape)
-                .padding(horizontal = 10.dp, vertical = 5.dp)
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .clip(CircleShape)
-                    .background(if (cluster.isCleaned) EmeraldKeep else CobaltPrimary)
+            Text(
+                text = stampChineseMonth(cluster.month),
+                fontFamily = EditorialSerifFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                letterSpacing = 0.6.sp,
+                color = deco.decoInkOnGround
             )
             Text(
-                text = cluster.stampLabel,
-                fontFamily = OutfitFontFamily,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 12.5.sp,
-                letterSpacing = 0.4.sp,
-                color = InkPrimary
+                text = "${stampGanZhi(cluster.year)}年",
+                fontSize = 12.sp,
+                letterSpacing = 1.2.sp,
+                color = deco.decoGold
             )
         }
 
-        // Hairline editorial separator rule
+        // 栏目细线（弱金发丝）
         Box(
             modifier = Modifier
                 .weight(1f)
                 .height(1.dp)
-                .background(HairlineBorder)
+                .background(deco.decoGold.copy(alpha = 0.45f))
         )
 
-        // Compact cluster metrics + optional cleaned seal / contextual action pill
+        // 计数 + 金边动作跳签（选本月 / 整理·重温 / 已整理金章）
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
                 text = cluster.compactSummaryText,
-                fontFamily = JetBrainsMonoFontFamily,
-                fontSize = 10.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
-                color = InkSecondary,
+                color = deco.decoInkOnGround.copy(alpha = 0.62f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             if (isSelectionMode && onToggleSelectMonth != null) {
-                androidx.compose.material3.Surface(
+                Surface(
                     onClick = onToggleSelectMonth,
                     shape = JumpChipShape,
-                    color = if (isMonthAllSelected) CobaltPrimary else CobaltSoft,
+                    color = if (isMonthAllSelected) deco.decoGold else Color.Transparent,
+                    border = BorderStroke(1.dp, deco.decoGold.copy(alpha = 0.55f)),
                     modifier = Modifier.testTag("timeline_select_month_${cluster.yearMonthKey}")
                 ) {
                     Text(
                         text = if (isMonthAllSelected) "已选本月" else "选本月",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isMonthAllSelected) Color.White else CobaltDark,
+                        color = if (isMonthAllSelected) deco.decoMat else deco.decoGold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
             } else if (!isSelectionMode && onCleanMonth != null) {
-                androidx.compose.material3.Surface(
+                Surface(
                     onClick = onCleanMonth,
                     shape = JumpChipShape,
-                    color = if (cluster.isCleaned) EmeraldSoft else CobaltSoft,
+                    color = if (cluster.isCleaned) deco.decoGold else Color.Transparent,
+                    border = BorderStroke(1.dp, deco.decoGold.copy(alpha = 0.55f)),
                     modifier = Modifier.testTag("timeline_clean_month_${cluster.yearMonthKey}")
                 ) {
                     Text(
                         text = if (cluster.isCleaned) "重温" else "整理",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (cluster.isCleaned) EmeraldKeep else CobaltDark,
+                        color = if (cluster.isCleaned) deco.decoMat else deco.decoGold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
@@ -384,7 +379,7 @@ fun MonthlyClusterHeaderStamp(
                 Icon(
                     imageVector = Icons.Filled.CheckCircle,
                     contentDescription = stringResource(R.string.timeline_month_cleaned_tag),
-                    tint = EmeraldKeep,
+                    tint = deco.decoGold,
                     modifier = Modifier.size(13.dp)
                 )
             }
@@ -397,11 +392,14 @@ fun MonthlyClusterHeaderStamp(
  * the active monthly photo cluster (e.g., "Jan 2026" + photo/burst/storage summary) as the
  * user scrolls.
  *
+ * 摩登画报重绘：浮动月戳 = DecoMat 纸面章 + 金双线画框（1.5dp 金描边 + 3dp 内衬弱金发丝线），
+ * 左侧朱红小方章日历徽（纸黄字），衬线月名 + 金干支纪年副标；滚动快速签 = 朱红小签（纸黄字）。
+ *
  * Performance Architecture:
  * - Reads [LazyGridState.firstVisibleItemIndex] and [LazyGridState.isScrollInProgress] strictly
  *   inside `derivedStateOf` in a sibling overlay layer — zero recomposition leaks into grid cells.
  * - Uses O(log M) binary search on pre-computed [TimelineClusterLayout].
- * - Draws archival collector-stamp double borders in a single GPU-cheap `drawBehind` pass.
+ * - Draws the gold double-line frame in a single GPU-cheap `drawBehind` pass.
  */
 @Composable
 fun TimelineMonthStampOverlay(
@@ -443,6 +441,12 @@ private fun TimelineMonthStampOverlayCore(
 ) {
     if (clusterLayout.clusters.isEmpty()) return
 
+    val gold = DecoGold
+    val verm = DecoVerm
+    val cream = DecoPaperCream
+    val mat = DecoMat
+    val ink = DecoInkOnGround
+
     val activeCluster by remember(clusterLayout) {
         derivedStateOf {
             clusterLayout.clusterForVisibleIndex(firstVisibleIndexProvider())
@@ -481,11 +485,10 @@ private fun TimelineMonthStampOverlayCore(
     // Stamp visibility follows the scroll-rail flag: while scrolling/dragging +
     // a short post-fling linger — never parked at top.
     val showFloatingStamp = isScrolling || lingerVisible || isDraggingFlag
-    val isElevatedDarkMode = showFloatingStamp
     val stampAccessibilityDesc = "${currentCluster.stampLabel}，${currentCluster.compactSummaryText}"
 
     Box(modifier = modifier.fillMaxSize()) {
-        // Top-Center Floating Archival Monthly Summary Stamp + Tap-to-Jump Month Ribbon
+        // Top-Center Floating Deco Monthly Summary Stamp + Tap-to-Jump Month Ribbon
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -528,30 +531,26 @@ private fun TimelineMonthStampOverlayCore(
                         .drawBehind {
                             // Subtle soft grounded drop halo without RenderNode elevation shadow cost
                             drawRoundRect(
-                                color = StampShadowHalo,
+                                color = DecoScrimInk.copy(alpha = 0.26f),
                                 topLeft = Offset(1.dp.toPx(), 3.dp.toPx()),
                                 size = Size(size.width - 2.dp.toPx(), size.height),
-                                cornerRadius = CornerRadius(18.dp.toPx(), 18.dp.toPx())
+                                cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx())
                             )
                         }
                         .clip(StampOverlayShape)
-                        .background(StampActiveFillBrush)
+                        .background(mat)
                         .drawBehind {
-                            // Archival perforated collector stamp inner dashed frame + corner ticks
-                            val inset = 3.5.dp.toPx()
+                            // 金双线画框第二线：3dp 内衬处的 1dp 弱金发丝环
+                            val inset = 3.dp.toPx()
                             drawRoundRect(
-                                color = StampInnerDarkRim,
+                                color = gold.copy(alpha = 0.40f),
                                 topLeft = Offset(inset, inset),
                                 size = Size(size.width - inset * 2f, size.height - inset * 2f),
-                                cornerRadius = CornerRadius(14.5.dp.toPx(), 14.5.dp.toPx()),
-                                style = Stroke(width = 0.9.dp.toPx(), pathEffect = StampDashedEffect)
+                                cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()),
+                                style = Stroke(width = 1.dp.toPx())
                             )
                         }
-                        .border(
-                            width = 1.dp,
-                            color = if (isElevatedDarkMode) Color(0x47FFFFFF) else HairlineBorder,
-                            shape = StampOverlayShape
-                        )
+                        .border(width = 1.5.dp, color = gold, shape = StampOverlayShape)
                         .semantics { contentDescription = stampAccessibilityDesc }
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                         .testTag("timeline_month_stamp_overlay")
@@ -576,22 +575,20 @@ private fun TimelineMonthStampOverlayCore(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            // Collector Stamp Emblem
+                            // 朱红小方章日历徽（纸黄只压朱红底 —— 可读性红线允许组合）
                             Box(
                                 contentAlignment = Alignment.Center,
                                 modifier = Modifier
-                                    .size(30.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(
-                                        if (isElevatedDarkMode) CobaltPrimary.copy(alpha = 0.28f)
-                                        else CobaltSoft
-                                    )
+                                    .size(28.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(verm)
+                                    .border(1.dp, VermTagCreamRim, RoundedCornerShape(3.dp))
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.CalendarMonth,
                                     contentDescription = null,
-                                    tint = if (isElevatedDarkMode) SolarAmber else CobaltPrimary,
-                                    modifier = Modifier.size(16.dp)
+                                    tint = cream,
+                                    modifier = Modifier.size(15.dp)
                                 )
                             }
 
@@ -602,37 +599,40 @@ private fun TimelineMonthStampOverlayCore(
                                 ) {
                                     Text(
                                         text = cluster.stampLabel,
-                                        fontFamily = OutfitFontFamily,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 15.sp,
+                                        fontFamily = EditorialSerifFontFamily,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 17.sp,
                                         letterSpacing = 0.5.sp,
-                                        color = if (isElevatedDarkMode) Color.White else InkPrimary,
+                                        color = ink,
                                         modifier = Modifier.testTag("timeline_month_stamp_label")
+                                    )
+                                    Text(
+                                        text = "${stampGanZhi(cluster.year)}年",
+                                        fontSize = 12.sp,
+                                        letterSpacing = 1.2.sp,
+                                        color = gold
                                     )
                                     if (cluster.isCleaned) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(3.dp),
                                             modifier = Modifier
                                                 .clip(JumpChipShape)
-                                                .background(
-                                                    if (isElevatedDarkMode) EmeraldKeep.copy(alpha = 0.24f)
-                                                    else EmeraldSoft
-                                                )
-                                                .padding(horizontal = 6.dp, vertical = 1.5.dp)
+                                                .background(gold.copy(alpha = 0.16f))
+                                                .border(1.dp, gold.copy(alpha = 0.45f), JumpChipShape)
+                                                .padding(horizontal = 7.dp, vertical = 2.dp)
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Filled.CheckCircle,
                                                 contentDescription = null,
-                                                tint = if (isElevatedDarkMode) Color(0xFF5EEAD4) else EmeraldKeep,
-                                                modifier = Modifier.size(10.dp)
+                                                tint = gold,
+                                                modifier = Modifier.size(12.dp)
                                             )
                                             Text(
                                                 text = stringResource(R.string.timeline_month_cleaned_tag),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 9.sp,
+                                                fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = if (isElevatedDarkMode) Color(0xFF5EEAD4) else EmeraldKeep
+                                                color = gold
                                             )
                                         }
                                     }
@@ -646,31 +646,26 @@ private fun TimelineMonthStampOverlayCore(
                                     if (cluster.photoCount > 0) {
                                         StampMetricTag(
                                             icon = Icons.Filled.PhotoLibrary,
-                                            text = "${cluster.photoCount}",
-                                            darkMode = isElevatedDarkMode
+                                            text = "${cluster.photoCount}"
                                         )
                                     }
                                     if (cluster.videoCount > 0) {
                                         StampMetricTag(
                                             icon = Icons.Filled.Videocam,
-                                            text = "${cluster.videoCount}",
-                                            darkMode = isElevatedDarkMode
+                                            text = "${cluster.videoCount}"
                                         )
                                     }
                                     if (cluster.burstGroupCount > 0) {
                                         StampMetricTag(
                                             icon = Icons.Filled.BurstMode,
-                                            text = "${cluster.burstGroupCount}组",
-                                            darkMode = isElevatedDarkMode,
-                                            tintOverride = SolarAmber
+                                            text = "${cluster.burstGroupCount}组"
                                         )
                                     }
                                     Text(
                                         text = formatStorageSize(cluster.totalBytes),
-                                        fontFamily = JetBrainsMonoFontFamily,
-                                        fontSize = 10.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = if (isElevatedDarkMode) Color(0xCCFFFFFF) else InkSecondary
+                                        color = ink.copy(alpha = 0.66f)
                                     )
                                 }
                             }
@@ -683,7 +678,7 @@ private fun TimelineMonthStampOverlayCore(
         }
 
         // Persistent Right-Edge Fast-Scrub Rail — always mounted so TalkBack can discover
-        // and control timeline jumping even when the list is idle; expands into the dark
+        // and control timeline jumping even when the list is idle; expands into the vermilion
         // month flag while scrolling or dragging.
         if (clusterLayout.clusters.size >= 2) {
             val railActive = isScrolling || lingerVisible || isDraggingFlag
@@ -706,7 +701,7 @@ private fun TimelineMonthStampOverlayCore(
                 val displayFraction = if (isDraggingFlag) dragFraction else scrollProgressFraction
                 val indicatorOffsetY = (displayFraction * travelPx).roundToInt()
 
-                val scrollRailTrackColor = if (LocalIsDarkTheme.current) Color(0x47FFFFFF) else ScrollRailTrackBg
+                // 轨道：压照片暗部的 scrim 墨细线（可读性红线允许组合）
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
@@ -714,7 +709,7 @@ private fun TimelineMonthStampOverlayCore(
                         .width(3.dp)
                         .fillMaxHeight()
                         .clip(CircleShape)
-                        .background(scrollRailTrackColor)
+                        .background(DecoScrimInk.copy(alpha = 0.32f))
                 )
 
                 // Always-discoverable 48dp-high touch & TalkBack target
@@ -758,40 +753,46 @@ private fun TimelineMonthStampOverlayCore(
                         .testTag("timeline_scroll_rail_flag")
                 ) {
                     if (railActive) {
+                        // 滚动月签：朱红小签（纸黄字 + 纸黄受光边），拖拽时受光边更亮
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(5.dp),
                             modifier = Modifier
                                 .height(30.dp)
                                 .clip(ScrollFlagShape)
-                                .background(if (isDraggingFlag) Color(0xF21A1E29) else Color(0xDE12141C))
-                                .border(0.9.dp, if (isDraggingFlag) Color(0x7AFFFFFF) else Color(0x45FFFFFF), ScrollFlagShape)
+                                .background(verm)
+                                .border(
+                                    0.9.dp,
+                                    if (isDraggingFlag) VermTagCreamRimActive else VermTagCreamRim,
+                                    ScrollFlagShape
+                                )
                                 .padding(start = 9.dp, end = 7.dp)
                         ) {
                             Text(
                                 text = currentCluster.stampLabel,
-                                fontFamily = JetBrainsMonoFontFamily,
+                                fontFamily = EditorialSerifFontFamily,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp,
-                                color = Color.White
+                                fontSize = 12.sp,
+                                letterSpacing = 0.4.sp,
+                                color = cream
                             )
                             Box(
                                 modifier = Modifier
                                     .size(5.dp)
                                     .clip(CircleShape)
-                                    .background(if (currentCluster.isCleaned) EmeraldKeep else SolarAmber)
+                                    .background(if (currentCluster.isCleaned) cream else gold)
                             )
                         }
                     } else {
-                        // Subtle resting pill thumb so users & TalkBack always have a visible anchor
+                        // Subtle resting thumb so users & TalkBack always have a visible anchor
                         Box(
                             modifier = Modifier
                                 .padding(end = 1.dp)
                                 .width(10.dp)
                                 .height(34.dp)
-                                .clip(CircleShape)
-                                .background(CobaltPrimary.copy(alpha = 0.85f))
-                                .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                                .clip(ScrollFlagShape)
+                                .background(verm.copy(alpha = 0.9f))
+                                .border(1.dp, VermTagCreamRim, ScrollFlagShape)
                         )
                     }
                 }
@@ -804,25 +805,25 @@ private fun TimelineMonthStampOverlayCore(
 private fun StampMetricTag(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     text: String,
-    darkMode: Boolean,
     tintOverride: Color? = null
 ) {
+    val gold = DecoGold
+    val ink = DecoInkOnGround
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = tintOverride ?: if (darkMode) Color(0xB8FFFFFF) else InkTertiary,
-            modifier = Modifier.size(11.dp)
+            tint = tintOverride ?: gold,
+            modifier = Modifier.size(13.dp)
         )
         Text(
             text = text,
-            fontFamily = JetBrainsMonoFontFamily,
-            fontSize = 10.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
-            color = if (darkMode) Color(0xDBFFFFFF) else InkSecondary
+            color = ink.copy(alpha = 0.66f)
         )
     }
 }

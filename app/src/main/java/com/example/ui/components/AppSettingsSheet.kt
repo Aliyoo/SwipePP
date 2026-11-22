@@ -68,32 +68,33 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.MediaAccessLevel
 import com.example.ui.theme.AppThemeMode
-import com.example.ui.theme.CobaltPrimary
-import com.example.ui.theme.CoralDanger
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoMat
+import com.example.ui.theme.DecoVerm
+import com.example.ui.theme.DecoVermInk
 import com.example.ui.theme.DefaultStartTab
+import com.example.ui.theme.EditorialSerifFontFamily
 import com.example.ui.theme.FlipbookDefaultView
 import com.example.ui.theme.GalleryGridDensity
-import com.example.ui.theme.GlassSpecularRimStart
-import com.example.ui.theme.HairlineBorder
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.InkSecondary
 import com.example.ui.theme.InkTertiary
 import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.LocalIsDarkTheme
+import com.example.ui.theme.LocalFlipYearPalette
 import com.example.ui.theme.OutfitFontFamily
-import com.example.ui.theme.SolarAmber
-import com.example.ui.theme.StudioCanvas
-import com.example.ui.theme.SurfaceMuted
-import com.example.ui.theme.SurfacePure
-import com.example.ui.theme.SurfaceSubtle
 import com.example.ui.theme.TimelineSortOrder
 import com.example.ui.theme.UserPreferences
 
 /**
- * Unified editorial preferences drawer:
+ * 摩登画报 editorial preferences drawer（deco-app.html 造型语法）：
  * 1. Global chronological sort order, empty-month visibility, default views, and gallery density
  * 2. Appearance theme switcher (shared preview artwork)
  * 3. Library maintenance (rescan, permissions, demo archive removal)
+ *
+ * 造型语法：纸地面（decoGround）+ 纸面分区卡（DecoMat + 1dp 金细线，3dp 小圆角）；
+ * 分区标题 = 衬线小标 + 金发丝分隔线；分段控件 = 金描边跳签（选中金底）；
+ * 开关 = 金底滑块；图标圆钮 = 金描边小方章。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -122,7 +123,8 @@ fun AppSettingsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = StudioCanvas,
+        containerColor = LocalFlipYearPalette.current.decoGround,
+        shape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp),
         dragHandle = {
             Box(
                 modifier = Modifier
@@ -130,7 +132,7 @@ fun AppSettingsSheet(
                     .width(40.dp)
                     .height(4.dp)
                     .clip(CircleShape)
-                    .background(InkTertiary.copy(alpha = 0.42f))
+                    .background(DecoInkOnGround.copy(alpha = 0.40f))
             )
         }
     ) {
@@ -147,13 +149,15 @@ fun AppSettingsSheet(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = stringResource(R.string.settings_sheet_title),
-                    style = MaterialTheme.typography.titleLarge,
+                    fontFamily = EditorialSerifFontFamily,
                     fontWeight = FontWeight.Bold,
+                    fontSize = 24.sp,
                     color = InkPrimary
                 )
                 Text(
                     text = stringResource(R.string.settings_sheet_subtitle),
-                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = JetBrainsMonoFontFamily,
+                    fontSize = 12.sp,
                     color = InkSecondary
                 )
             }
@@ -179,7 +183,7 @@ fun AppSettingsSheet(
                         Text(
                             text = "年度 · 月历 · 画廊 · 整理",
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 10.5.sp,
+                            fontSize = 12.sp,
                             color = InkTertiary
                         )
                     }
@@ -207,17 +211,17 @@ fun AppSettingsSheet(
                         modifier = Modifier.testTag("settings_sort_order_toggle")
                     )
 
-                    // Live directional preview pill
+                    // Live directional preview slip（金染纸面小签）
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = SurfaceSubtle.copy(alpha = 0.72f),
-                        border = BorderStroke(0.75.dp, HairlineBorder.copy(alpha = 0.7f)),
+                        shape = RoundedCornerShape(3.dp),
+                        color = DecoGold.copy(alpha = 0.10f),
+                        border = BorderStroke(1.dp, DecoGold.copy(alpha = 0.45f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
                             text = preferences.timelineSortOrder.previewSummary,
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = InkSecondary,
                             maxLines = 1,
@@ -228,8 +232,8 @@ fun AppSettingsSheet(
                 }
 
                 HorizontalDivider(
-                    thickness = 0.75.dp,
-                    color = HairlineBorder.copy(alpha = 0.75f),
+                    thickness = 0.8.dp,
+                    color = DecoGold.copy(alpha = 0.30f),
                     modifier = Modifier.padding(horizontal = 14.dp)
                 )
 
@@ -261,7 +265,7 @@ fun AppSettingsSheet(
                         Text(
                             text = "关闭时仅展示含照片或视频的月份",
                             style = MaterialTheme.typography.bodySmall,
-                            fontSize = 11.5.sp,
+                            fontSize = 12.sp,
                             color = InkSecondary
                         )
                     }
@@ -272,19 +276,19 @@ fun AppSettingsSheet(
                             onToggleShowEmptyMonths(enabled)
                         },
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = CobaltPrimary,
-                            uncheckedThumbColor = InkSecondary,
-                            uncheckedTrackColor = SurfaceSubtle,
-                            uncheckedBorderColor = HairlineBorder
+                            checkedThumbColor = LocalFlipYearPalette.current.decoMat,
+                            checkedTrackColor = DecoGold,
+                            uncheckedThumbColor = DecoGold,
+                            uncheckedTrackColor = InkPrimary.copy(alpha = 0.06f),
+                            uncheckedBorderColor = DecoGold.copy(alpha = 0.45f)
                         ),
                         modifier = Modifier.testTag("settings_show_empty_months_switch")
                     )
                 }
 
                 HorizontalDivider(
-                    thickness = 0.75.dp,
-                    color = HairlineBorder.copy(alpha = 0.75f),
+                    thickness = 0.8.dp,
+                    color = DecoGold.copy(alpha = 0.30f),
                     modifier = Modifier.padding(horizontal = 14.dp)
                 )
 
@@ -323,8 +327,8 @@ fun AppSettingsSheet(
                 }
 
                 HorizontalDivider(
-                    thickness = 0.75.dp,
-                    color = HairlineBorder.copy(alpha = 0.75f),
+                    thickness = 0.8.dp,
+                    color = DecoGold.copy(alpha = 0.30f),
                     modifier = Modifier.padding(horizontal = 14.dp)
                 )
 
@@ -348,7 +352,7 @@ fun AppSettingsSheet(
                         Text(
                             text = "下次启动生效",
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 10.5.sp,
+                            fontSize = 12.sp,
                             color = InkTertiary
                         )
                     }
@@ -380,8 +384,8 @@ fun AppSettingsSheet(
                 }
 
                 HorizontalDivider(
-                    thickness = 0.75.dp,
-                    color = HairlineBorder.copy(alpha = 0.75f),
+                    thickness = 0.8.dp,
+                    color = DecoGold.copy(alpha = 0.30f),
                     modifier = Modifier.padding(horizontal = 14.dp)
                 )
 
@@ -422,14 +426,7 @@ fun AppSettingsSheet(
 
             // Section 2: Appearance Theme (shares preview artwork with standalone ThemeAppearanceSheet)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "外观与主题",
-                    fontFamily = OutfitFontFamily,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = InkSecondary,
-                    modifier = Modifier.padding(horizontal = 4.dp)
-                )
+                DecoSectionHeader(title = "外观与主题")
                 ThemePreviewCardsRow(
                     currentMode = preferences.themeMode,
                     onSelectMode = { mode ->
@@ -449,7 +446,7 @@ fun AppSettingsSheet(
                 }
                 SettingsActionRow(
                     icon = Icons.Filled.Refresh,
-                    iconTint = CobaltPrimary,
+                    iconTint = DecoGold,
                     title = stringResource(R.string.action_scan_media),
                     subtitle = scanSubtitle,
                     onClick = {
@@ -465,8 +462,8 @@ fun AppSettingsSheet(
                 )
 
                 HorizontalDivider(
-                    thickness = 0.75.dp,
-                    color = HairlineBorder.copy(alpha = 0.75f),
+                    thickness = 0.8.dp,
+                    color = DecoGold.copy(alpha = 0.30f),
                     modifier = Modifier.padding(horizontal = 14.dp)
                 )
 
@@ -477,7 +474,7 @@ fun AppSettingsSheet(
                 }
                 SettingsActionRow(
                     icon = Icons.Filled.FolderOpen,
-                    iconTint = CobaltPrimary,
+                    iconTint = DecoGold,
                     title = "管理相册访问权限",
                     subtitle = permissionStatus,
                     onClick = {
@@ -490,14 +487,15 @@ fun AppSettingsSheet(
 
                 if (hasSamplePhotos) {
                     HorizontalDivider(
-                        thickness = 0.75.dp,
-                        color = HairlineBorder.copy(alpha = 0.75f),
+                        thickness = 0.8.dp,
+                        color = DecoGold.copy(alpha = 0.30f),
                         modifier = Modifier.padding(horizontal = 14.dp)
                     )
                     SettingsActionRow(
                         icon = Icons.Outlined.RestartAlt,
-                        iconTint = CoralDanger,
-                        titleColor = CoralDanger,
+                        iconTint = DecoVermInk,
+                        sealTint = DecoVerm,
+                        titleColor = DecoVermInk,
                         title = "移除示例影集",
                         subtitle = "清除内置体验照片，仅保留设备真实相册",
                         onClick = {
@@ -513,24 +511,47 @@ fun AppSettingsSheet(
     }
 }
 
+/**
+ * 摩登画报分区标题：衬线小标（金、加字距）+ 右侧金发丝分隔线（0.8dp gold 0.35）。
+ */
+@Composable
+private fun DecoSectionHeader(title: String, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = title,
+            fontFamily = EditorialSerifFontFamily,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 2.sp,
+            color = DecoGold
+        )
+        Spacer(
+            modifier = Modifier
+                .weight(1f)
+                .height(0.8.dp)
+                .background(DecoGold.copy(alpha = 0.35f))
+        )
+    }
+}
+
 @Composable
 private fun SettingsSectionGroup(
     title: String,
     content: @Composable () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = title,
-            fontFamily = OutfitFontFamily,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = InkSecondary,
-            modifier = Modifier.padding(horizontal = 4.dp)
-        )
+        DecoSectionHeader(title = title)
+        // 纸面分区卡：DecoMat 内衬 + 1dp 金细线 + 3dp 小圆角
         Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = SurfacePure,
-            border = BorderStroke(0.85.dp, HairlineBorder),
+            shape = RoundedCornerShape(3.dp),
+            color = DecoMat,
+            border = BorderStroke(1.dp, DecoGold.copy(alpha = 0.40f)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -548,7 +569,7 @@ private data class SegmentedOption<T>(
 )
 
 /**
- * Tactile spring-sliding satin segmented pill matching FlipbookViewModeSwitch aesthetics.
+ * 摩登画报跳签分段控件：金描边纸面轨 + 弹性滑动的金底跳签（选中金底、纸面墨字）。
  */
 @Composable
 private fun <T> SettingsSegmentedCapsule(
@@ -557,18 +578,15 @@ private fun <T> SettingsSegmentedCapsule(
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDark = LocalIsDarkTheme.current
     val selectedIndex = items.indexOfFirst { it.value == selectedValue }.coerceAtLeast(0)
-    val trackBg = if (isDark) SurfaceMuted.copy(alpha = 0.90f) else SurfaceSubtle.copy(alpha = 0.88f)
-    val trackBorder = if (isDark) HairlineBorder else GlassSpecularRimStart
 
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .height(44.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(trackBg)
-            .border(0.85.dp, trackBorder, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(3.dp))
+            .background(InkPrimary.copy(alpha = 0.05f))
+            .border(1.dp, DecoGold.copy(alpha = 0.45f), RoundedCornerShape(3.dp))
             .padding(3.dp)
     ) {
         val segmentWidth = maxWidth / items.size.coerceAtLeast(1)
@@ -586,25 +604,20 @@ private fun <T> SettingsSegmentedCapsule(
                 .offset(x = thumbOffset)
                 .width(segmentWidth)
                 .fillMaxHeight()
-                .clip(RoundedCornerShape(11.dp))
-                .background(activeChromeSatinBrush())
-                .border(
-                    width = 0.75.dp,
-                    color = Color.White.copy(alpha = if (isDark) 0.16f else 0.24f),
-                    shape = RoundedCornerShape(11.dp)
-                )
+                .clip(RoundedCornerShape(2.dp))
+                .background(DecoGold)
         )
 
         Row(modifier = Modifier.fillMaxSize()) {
             items.forEach { option ->
                 val isSelected = option.value == selectedValue
                 val textColor by animateColorAsState(
-                    targetValue = if (isSelected) Color.White else InkSecondary,
+                    targetValue = if (isSelected) LocalFlipYearPalette.current.decoMat else InkSecondary,
                     animationSpec = tween(160),
                     label = "seg_text_${option.testTag}"
                 )
                 val iconColor by animateColorAsState(
-                    targetValue = if (isSelected) SolarAmber else InkTertiary,
+                    targetValue = if (isSelected) LocalFlipYearPalette.current.decoMat else DecoGold.copy(alpha = 0.72f),
                     animationSpec = tween(160),
                     label = "seg_icon_${option.testTag}"
                 )
@@ -613,7 +626,7 @@ private fun <T> SettingsSegmentedCapsule(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .clip(RoundedCornerShape(11.dp))
+                        .clip(RoundedCornerShape(2.dp))
                         .semantics {
                             role = Role.Tab
                             selected = isSelected
@@ -636,7 +649,7 @@ private fun <T> SettingsSegmentedCapsule(
                         }
                         Text(
                             text = option.label,
-                            fontFamily = OutfitFontFamily,
+                            fontFamily = if (isSelected) EditorialSerifFontFamily else OutfitFontFamily,
                             fontSize = 12.5.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             color = textColor,
@@ -650,6 +663,9 @@ private fun <T> SettingsSegmentedCapsule(
     }
 }
 
+/**
+ * 维护动作行：图标圆钮方章化（金描边小方章 3dp；警示行朱红方章）。
+ */
 @Composable
 private fun SettingsActionRow(
     icon: ImageVector,
@@ -657,6 +673,7 @@ private fun SettingsActionRow(
     title: String,
     subtitle: String,
     onClick: () -> Unit,
+    sealTint: Color = DecoGold,
     titleColor: Color = InkPrimary,
     modifier: Modifier = Modifier
 ) {
@@ -669,12 +686,14 @@ private fun SettingsActionRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // 金描边小方章（3dp 圆角，1dp 描边）
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(36.dp)
-                .clip(CircleShape)
-                .background(iconTint.copy(alpha = 0.12f))
+                .clip(RoundedCornerShape(3.dp))
+                .background(sealTint.copy(alpha = 0.10f))
+                .border(1.dp, sealTint.copy(alpha = 0.55f), RoundedCornerShape(3.dp))
         ) {
             Icon(
                 imageVector = icon,
@@ -697,7 +716,7 @@ private fun SettingsActionRow(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                fontSize = 11.5.sp,
+                fontSize = 12.sp,
                 color = InkSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

@@ -29,14 +29,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -54,8 +52,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
@@ -73,34 +69,20 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sensor.rememberHapticEngine
-import com.example.ui.theme.CobaltPrimary
-import com.example.ui.theme.CoralDanger
-import com.example.ui.theme.EmeraldKeep
-import com.example.ui.theme.HairlineBorder
-import com.example.ui.theme.InkPrimary
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoInkOnGround
+import com.example.ui.theme.DecoMat
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoScrimInk
+import com.example.ui.theme.DecoVerm
+import com.example.ui.theme.EditorialSerifFontFamily
 import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.LocalIsDarkTheme
-import com.example.ui.theme.OutfitFontFamily
-import com.example.ui.theme.SolarAmber
-import com.example.ui.theme.SurfacePure
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
-private val FootprintFlagExpandedShape = RoundedCornerShape(
-    topStart = 18.dp,
-    bottomStart = 18.dp,
-    topEnd = 9.dp,
-    bottomEnd = 9.dp
-)
-private val FootprintFlagIdleShape = RoundedCornerShape(
-    topStart = 14.dp,
-    bottomStart = 14.dp,
-    topEnd = 6.dp,
-    bottomEnd = 6.dp
-)
-private val FootprintFlagDarkBrush = Brush.verticalGradient(
-    colors = listOf(Color(0xF0151822), Color(0xE80D1018))
-)
+// 摩登画报造型语法：旗签 = 金描边纸面小签，3dp 小圆角（弃 14~18dp 大圆角玻璃旗）
+private val FootprintFlagExpandedShape = RoundedCornerShape(3.dp)
+private val FootprintFlagIdleShape = RoundedCornerShape(3.dp)
 
 /**
  * Unified stop entry for the right-edge [FootprintLocationScrubRail] and bottom-card stepper.
@@ -133,7 +115,7 @@ data class FootprintScrubStop(
  * One-handed right-edge location fast-scrub rail matching the tactile & visual grammar of
  * Gallery's [TimelineMonthStampOverlay].
  *
- * - Vertical drag previews locations live in an obsidian glass flag anchored left of the thumb
+ * - Vertical drag previews locations live in a gold-edged paper flag anchored left of the thumb
  *   with crisp detent haptics while keeping the map camera calm.
  * - Releasing the finger (or tapping anywhere along the rail) commits the highlighted stop and
  *   triggers the smooth camera flight to that location.
@@ -150,7 +132,6 @@ fun FootprintLocationScrubRail(
     if (stops.size < 2) return
 
     val haptics = rememberHapticEngine()
-    val isDark = LocalIsDarkTheme.current
     val density = LocalDensity.current
 
     val safeActiveIndex = activeIndex.coerceIn(0, stops.lastIndex)
@@ -218,11 +199,14 @@ fun FootprintLocationScrubRail(
         val travelPx = (trackHeightPx - handleHeightPx).coerceAtLeast(1f)
         val indicatorOffsetY = (displayFraction * travelPx).roundToInt()
 
-        val trackBgColor = if (isDark) Color(0x47FFFFFF) else Color(0x36121316)
-        val unlocatedDotColor = SolarAmber
-        val cleanedDotColor = EmeraldKeep
-        val activeDotColor = CobaltPrimary
-        val unreviewedDotColor = CoralDanger.copy(alpha = 0.85f)
+        // 摩登画报取色：轨道 = 压照片暗 scrim 细轨（同 TimelineMonthStampOverlay 语法）；
+        // 停留点 = 金(已整理/当前) / 朱红(待理) / 墨(无定位)，拖动指示 = 金发丝
+        val trackScrimColor = DecoScrimInk.copy(alpha = 0.32f)
+        val unlocatedDotColor = DecoInkOnGround.copy(alpha = 0.55f)
+        val cleanedDotColor = DecoGold
+        val activeDotColor = DecoGold
+        val unreviewedDotColor = DecoVerm.copy(alpha = 0.85f)
+        val railGold = DecoGold
 
         // Full-height 48dp-wide touch zone on the right edge (handles immediate drag + direct tap
         // while consuming pointer events so the underlying map never pans during location scrubbing)
@@ -303,10 +287,18 @@ fun FootprintLocationScrubRail(
                     val trackWidth = 3.dp.toPx()
                     val trackX = size.width - 6.dp.toPx()
                     drawRoundRect(
-                        color = trackBgColor,
+                        color = trackScrimColor,
                         topLeft = Offset(trackX - trackWidth * 0.5f, handleHalfPx),
                         size = androidx.compose.ui.geometry.Size(trackWidth, travelPx),
                         cornerRadius = CornerRadius(trackWidth, trackWidth)
+                    )
+
+                    // 拖动/已选进度指示 = 金发丝（deco 语法 0.8~1.5dp 金线）
+                    drawLine(
+                        color = railGold.copy(alpha = 0.9f),
+                        start = Offset(trackX, handleHalfPx),
+                        end = Offset(trackX, handleHalfPx + displayFraction * travelPx),
+                        strokeWidth = 1.2.dp.toPx()
                     )
 
                     // Precision stop dots distributed evenly along the track
@@ -416,8 +408,7 @@ fun FootprintLocationScrubRail(
                     )
                 } else {
                     CompactIdleFootprintFlag(
-                        stop = displayStop,
-                        isDark = isDark
+                        stop = displayStop
                     )
                 }
             }
@@ -427,28 +418,26 @@ fun FootprintLocationScrubRail(
 
 @Composable
 private fun CompactIdleFootprintFlag(
-    stop: FootprintScrubStop,
-    isDark: Boolean
+    stop: FootprintScrubStop
 ) {
-    val bgColor = if (isDark) Color(0xE0181D29) else SurfacePure.copy(alpha = 0.93f)
-    val borderColor = when {
-        stop.isUnlocated -> SolarAmber.copy(alpha = 0.65f)
-        isDark -> Color(0x42FFFFFF)
-        else -> HairlineBorder
-    }
+    val gold = DecoGold
+    val verm = DecoVerm
+    val mat = DecoMat
+    val ink = DecoInkOnGround
     val iconTint = when {
-        stop.isUnlocated -> SolarAmber
-        stop.isCleaned -> EmeraldKeep
-        else -> CobaltPrimary
+        stop.isUnlocated -> ink.copy(alpha = 0.55f)
+        stop.isCleaned -> gold
+        else -> verm
     }
 
+    // 金描边纸面小签（3dp 圆角）：旗签本体 = DecoMat 纸面 + 弱金描边，压地图仍清晰
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
             .clip(FootprintFlagIdleShape)
-            .background(bgColor)
-            .border(0.9.dp, borderColor, FootprintFlagIdleShape)
+            .background(mat)
+            .border(1.dp, gold.copy(alpha = 0.8f), FootprintFlagIdleShape)
             .padding(horizontal = 9.dp, vertical = 6.dp)
     ) {
         Icon(
@@ -459,10 +448,10 @@ private fun CompactIdleFootprintFlag(
         )
         Text(
             text = stop.shortIdleLabel,
-            fontFamily = OutfitFontFamily,
+            fontFamily = EditorialSerifFontFamily,
             fontWeight = FontWeight.Bold,
-            fontSize = 11.5.sp,
-            color = if (isDark) Color.White else InkPrimary,
+            fontSize = 12.sp,
+            color = ink,
             maxLines = 1
         )
     }
@@ -474,18 +463,18 @@ private fun ExpandedFootprintScrubFlag(
     stopIndex: Int,
     totalStops: Int
 ) {
-    val borderColor = if (stop.isUnlocated) {
-        SolarAmber.copy(alpha = 0.65f)
-    } else {
-        Color(0x47FFFFFF)
-    }
+    val gold = DecoGold
+    val verm = DecoVerm
+    val cream = DecoPaperCream
+    val mat = DecoMat
+    val ink = DecoInkOnGround
 
     Box(
         modifier = Modifier
             .widthIn(min = 148.dp, max = 240.dp)
             .clip(FootprintFlagExpandedShape)
-            .background(FootprintFlagDarkBrush)
-            .border(1.dp, borderColor, FootprintFlagExpandedShape)
+            .background(mat)
+            .border(1.5.dp, gold, FootprintFlagExpandedShape)
             .padding(horizontal = 12.dp, vertical = 9.dp)
             .testTag("footprint_scrub_preview_banner")
     ) {
@@ -508,20 +497,19 @@ private fun ExpandedFootprintScrubFlag(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(9.dp)
             ) {
+                // 位置方章：纸地金描边小章（3dp 圆角）
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(28.dp)
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(
-                            if (activeStop.isUnlocated) SolarAmber.copy(alpha = 0.22f)
-                            else CobaltPrimary.copy(alpha = 0.28f)
-                        )
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(gold.copy(alpha = 0.14f))
+                        .border(1.dp, gold.copy(alpha = 0.6f), RoundedCornerShape(3.dp))
                 ) {
                     Icon(
                         imageVector = if (activeStop.isUnlocated) Icons.Filled.LocationOff else Icons.Filled.LocationOn,
                         contentDescription = null,
-                        tint = if (activeStop.isUnlocated) SolarAmber else Color(0xFF93B4FF),
+                        tint = if (activeStop.isUnlocated) verm else gold,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -533,10 +521,10 @@ private fun ExpandedFootprintScrubFlag(
                     ) {
                         Text(
                             text = activeStop.displayName,
-                            fontFamily = OutfitFontFamily,
-                            fontWeight = FontWeight.ExtraBold,
+                            fontFamily = EditorialSerifFontFamily,
+                            fontWeight = FontWeight.Bold,
                             fontSize = 14.5.sp,
-                            color = Color.White,
+                            color = ink,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.widthIn(max = 132.dp)
@@ -544,9 +532,9 @@ private fun ExpandedFootprintScrubFlag(
                         Text(
                             text = "${idx + 1}/$totalStops",
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color(0xAAFFFFFF)
+                            color = gold
                         )
                     }
 
@@ -557,50 +545,49 @@ private fun ExpandedFootprintScrubFlag(
                         Text(
                             text = "${activeStop.mediaCount} 项 · ${formatStorageSize(activeStop.totalBytes)}",
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xCCFFFFFF),
+                            color = ink.copy(alpha = 0.62f),
                             maxLines = 1
                         )
                         if (activeStop.isCleaned) {
+                            // 已整理 = 金底徽（内衬字）
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                                 modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(EmeraldKeep.copy(alpha = 0.24f))
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(gold)
                                     .padding(horizontal = 5.dp, vertical = 1.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.CheckCircle,
                                     contentDescription = null,
-                                    tint = Color(0xFF5EEAD4),
-                                    modifier = Modifier.size(9.dp)
+                                    tint = mat,
+                                    modifier = Modifier.size(11.dp)
                                 )
                                 Text(
                                     text = "已整理",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 9.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF5EEAD4)
+                                    color = mat
                                 )
                             }
                         } else if (activeStop.unreviewedCount > 0) {
+                            // 朱红计数徽（朱底 + 纸黄字 + 纸黄受光边）
                             Box(
                                 modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (activeStop.isUnlocated) SolarAmber.copy(alpha = 0.25f)
-                                        else CoralDanger.copy(alpha = 0.26f)
-                                    )
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(verm)
+                                    .border(0.75.dp, cream.copy(alpha = 0.25f), RoundedCornerShape(2.dp))
                                     .padding(horizontal = 5.dp, vertical = 1.dp)
                             ) {
                                 Text(
                                     text = "${activeStop.unreviewedCount} 待理",
                                     fontFamily = JetBrainsMonoFontFamily,
-                                    fontSize = 9.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (activeStop.isUnlocated) Color(0xFFFDE68A) else Color(0xFFFFA3AE)
+                                    color = cream
                                 )
                             }
                         }

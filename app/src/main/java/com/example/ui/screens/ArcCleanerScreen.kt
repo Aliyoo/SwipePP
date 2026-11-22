@@ -927,7 +927,7 @@ fun ArcCleanerScreen(
                                                 handleKeepEntireStack(current, false)
                                             },
                                             tone = GalleryButtonTone.IMMERSIVE,
-                                            leadingIcon = Icons.Filled.Check,
+                                            // 次要钮去图标：三钮等分窄屏放不下「整组回收」，图标让位给朱红主 CTA
                                             height = 48.dp,
                                             shape = RoundedCornerShape(3.dp),
                                             modifier = Modifier
@@ -938,7 +938,6 @@ fun ArcCleanerScreen(
                                             text = "对比(${current.photos.size})",
                                             onClick = { inspectingStack = current },
                                             tone = GalleryButtonTone.IMMERSIVE,
-                                            leadingIcon = Icons.Filled.Compare,
                                             height = 48.dp,
                                             shape = RoundedCornerShape(3.dp),
                                             modifier = Modifier
