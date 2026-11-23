@@ -106,7 +106,10 @@ fun BatchCompressBottomSheet(
         sheetState = sheetState,
         containerColor = SurfacePure,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        modifier = Modifier.testTag("batch_compress_sheet")
+        dragHandle = { ModalSheetDragHandle() },
+        modifier = Modifier
+            .modalSheetTopClearance()
+            .testTag("batch_compress_sheet")
     ) {
         Column(
             modifier = Modifier
@@ -360,7 +363,10 @@ fun BatchLocationEditorSheet(
         sheetState = sheetState,
         containerColor = SurfacePure,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        modifier = Modifier.testTag("batch_location_sheet")
+        dragHandle = { ModalSheetDragHandle() },
+        modifier = Modifier
+            .modalSheetTopClearance()
+            .testTag("batch_location_sheet")
     ) {
         Column(
             modifier = Modifier

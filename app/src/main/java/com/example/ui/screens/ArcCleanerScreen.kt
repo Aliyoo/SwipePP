@@ -100,12 +100,14 @@ import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.GalleryHeaderOrbButton
 import com.example.ui.components.GalleryTactileOrbButton
+import com.example.ui.components.ModalSheetDragHandle
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.PhotoDetailLightbox
 import com.example.ui.components.activeChromeSatinBrush
 import com.example.ui.components.formatPhotoDateTime
 import com.example.ui.components.formatStorageSize
 import com.example.ui.components.formatVideoDuration
+import com.example.ui.components.modalSheetTopClearance
 import com.example.ui.theme.GlassSpecularRimStart
 import com.example.ui.theme.LocalFlipYearPalette
 import com.example.ui.theme.LocalIsDarkTheme
@@ -1078,7 +1080,10 @@ fun ArcCleanerScreen(
         ModalBottomSheet(
             onDismissRequest = { inspectingStack = null },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = SurfacePure.copy(alpha = 0.94f)
+            containerColor = SurfacePure.copy(alpha = 0.94f),
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { ModalSheetDragHandle() },
+            modifier = Modifier.modalSheetTopClearance()
         ) {
             BurstComparisonSheet(
                 stack = stack,

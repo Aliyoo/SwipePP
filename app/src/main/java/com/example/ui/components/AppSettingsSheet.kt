@@ -123,28 +123,21 @@ fun AppSettingsSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = StudioCanvas,
-        dragHandle = {
-            Box(
-                modifier = Modifier
-                    .padding(top = 12.dp, bottom = 6.dp)
-                    .width(40.dp)
-                    .height(4.dp)
-                    .clip(CircleShape)
-                    .background(InkTertiary.copy(alpha = 0.42f))
-            )
-        }
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = { ModalSheetDragHandle() },
+        modifier = Modifier.modalSheetTopClearance()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(scrollState)
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp)
-                .testTag("app_settings_sheet"),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+                .testTag("app_settings_sheet")
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 Text(
                     text = stringResource(R.string.settings_sheet_title),
                     style = MaterialTheme.typography.titleLarge,
@@ -157,6 +150,24 @@ fun AppSettingsSheet(
                     color = InkSecondary
                 )
             }
+
+            if (scrollState.canScrollBackward) {
+                HorizontalDivider(
+                    color = HairlineBorder,
+                    thickness = 0.8.dp
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(scrollState)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 10.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
 
             // Section 1: Chronology & Default Views
             SettingsSectionGroup(title = "浏览与时间轴") {
@@ -508,6 +519,7 @@ fun AppSettingsSheet(
                         modifier = Modifier.testTag("settings_remove_demo")
                     )
                 }
+            }
             }
         }
     }

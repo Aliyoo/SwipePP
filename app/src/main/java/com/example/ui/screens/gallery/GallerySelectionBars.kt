@@ -52,8 +52,10 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ui.components.FrostedGlassCard
 import com.example.ui.components.GallerySelectableChip
+import com.example.ui.components.ModalSheetDragHandle
 import com.example.ui.components.ObsidianGlassCard
 import com.example.ui.components.formatStorageSize
+import com.example.ui.components.modalSheetTopClearance
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CoralDanger
 import com.example.ui.theme.EmeraldKeep
@@ -84,7 +86,10 @@ internal fun GalleryMoreBatchActionsSheet(
         sheetState = sheetState,
         containerColor = SurfacePure,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        modifier = Modifier.testTag("gallery_more_actions_sheet")
+        dragHandle = { ModalSheetDragHandle() },
+        modifier = Modifier
+            .modalSheetTopClearance()
+            .testTag("gallery_more_actions_sheet")
     ) {
         Column(
             modifier = Modifier

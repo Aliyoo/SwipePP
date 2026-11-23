@@ -41,7 +41,9 @@ import com.example.ui.MediaFilter
 import com.example.ui.components.FrostedGlassCard
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
+import com.example.ui.components.ModalSheetDragHandle
 import com.example.ui.components.formatStorageSize
+import com.example.ui.components.modalSheetTopClearance
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CobaltSoft
 import com.example.ui.theme.CoralDanger
@@ -75,7 +77,10 @@ internal fun BookshelfStorageLedgerSheet(
         sheetState = sheetState,
         containerColor = com.example.ui.theme.SurfacePure,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        modifier = Modifier.testTag("bookshelf_storage_ledger_sheet")
+        dragHandle = { ModalSheetDragHandle() },
+        modifier = Modifier
+            .modalSheetTopClearance()
+            .testTag("bookshelf_storage_ledger_sheet")
     ) {
         Column(
             modifier = Modifier

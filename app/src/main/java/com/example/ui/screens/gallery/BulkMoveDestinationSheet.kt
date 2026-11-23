@@ -50,7 +50,9 @@ import com.example.ui.components.FrostedGlassCard
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.GallerySelectableChip
+import com.example.ui.components.ModalSheetDragHandle
 import com.example.ui.components.formatStorageSize
+import com.example.ui.components.modalSheetTopClearance
 import com.example.ui.components.monthChineseName
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CobaltSoft
@@ -92,7 +94,10 @@ internal fun BulkMoveDestinationSheet(
         sheetState = sheetState,
         containerColor = SurfacePure,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        modifier = Modifier.testTag("bulk_move_sheet")
+        dragHandle = { ModalSheetDragHandle() },
+        modifier = Modifier
+            .modalSheetTopClearance()
+            .testTag("bulk_move_sheet")
     ) {
         Column(
             modifier = Modifier

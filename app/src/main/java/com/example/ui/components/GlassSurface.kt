@@ -10,8 +10,15 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -33,6 +40,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
@@ -49,6 +57,7 @@ import com.example.ui.theme.GlassLightBottom
 import com.example.ui.theme.GlassLightTop
 import com.example.ui.theme.GlassObsidianBottom
 import com.example.ui.theme.GlassObsidianTop
+import com.example.ui.theme.InkTertiary
 import com.example.ui.theme.LocalFlipYearPalette
 import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.ObsidianOverlayBorder
@@ -468,3 +477,37 @@ fun BlurredAmbientPhotoBackdrop(
         }
     }
 }
+
+/**
+ * Ensures edge-to-edge Material 3 ModalBottomSheets never collide with the system status bar
+ * or display cutout when content is tall/scrollable, exposing a visible dimmed scrim margin
+ * above the rounded top sheet corners and keeping the drag handle comfortably reachable.
+ */
+@Composable
+fun Modifier.modalSheetTopClearance(extraTopGap: Dp = 18.dp): Modifier {
+    val density = LocalDensity.current
+    val systemTopDp = with(density) {
+        WindowInsets.statusBars
+            .union(WindowInsets.displayCutout)
+            .getTop(density)
+            .toDp()
+    }
+    val resolvedTopGap = systemTopDp.coerceAtLeast(32.dp) + extraTopGap
+    return this.padding(top = resolvedTopGap)
+}
+
+/**
+ * Unified pill drag handle for FlipYear ModalBottomSheets with balanced vertical breathing room.
+ */
+@Composable
+fun ModalSheetDragHandle(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .padding(top = 12.dp, bottom = 10.dp)
+            .width(40.dp)
+            .height(4.dp)
+            .clip(CircleShape)
+            .background(InkTertiary.copy(alpha = 0.42f))
+    )
+}
+

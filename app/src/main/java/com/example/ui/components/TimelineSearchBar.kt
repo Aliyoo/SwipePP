@@ -524,7 +524,10 @@ fun TimelineSearchFilterSheet(
         sheetState = sheetState,
         containerColor = SurfacePure,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        modifier = Modifier.testTag("timeline_filter_sheet")
+        dragHandle = { ModalSheetDragHandle() },
+        modifier = Modifier
+            .modalSheetTopClearance()
+            .testTag("timeline_filter_sheet")
     ) {
         Column(
             modifier = Modifier
@@ -535,8 +538,7 @@ fun TimelineSearchFilterSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 22.dp)
-                    .padding(bottom = 12.dp),
+                    .padding(start = 22.dp, end = 22.dp, top = 4.dp, bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {

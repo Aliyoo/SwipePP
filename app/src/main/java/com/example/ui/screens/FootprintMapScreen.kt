@@ -2,7 +2,9 @@ package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -10,7 +12,9 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
@@ -38,8 +42,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CenterFocusStrong
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.EditLocationAlt
 import androidx.compose.material.icons.filled.Explore
@@ -121,9 +123,9 @@ import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.SolarAmber
 import com.example.ui.theme.SolarAmberSoft
 import com.example.ui.theme.StudioCanvas
-import com.example.ui.theme.SurfaceMuted
 import java.util.Locale
 import kotlin.math.abs
+import kotlinx.coroutines.launch
 
 @Composable
 fun FootprintMapScreen(
@@ -256,7 +258,15 @@ fun FootprintMapScreen(
         }
     }
 
-    val commitFootprintStop: (FootprintScrubStop, Boolean) -> Unit = { stop, shouldExpand ->
+    // Tracks horizontal transition direction (+1 = forward/swipe-left, -1 = backward/swipe-right)
+    var cardSlideDirection by remember { mutableIntStateOf(1) }
+
+    val commitFootprintStop: (FootprintScrubStop, Boolean, Int?) -> Unit = { stop, shouldExpand, directionOverride ->
+        val targetIdx = scrubStops.indexOfFirst { it.id == stop.id }
+        cardSlideDirection = directionOverride ?: when {
+            targetIdx >= 0 && targetIdx != activeStopIndex -> if (targetIdx > activeStopIndex) 1 else -1
+            else -> cardSlideDirection
+        }
         selectedLocationName = stop.id
         if (stop.isUnlocated) {
             isCardExpanded = true
@@ -277,7 +287,7 @@ fun FootprintMapScreen(
         if (scrubStops.size >= 2) {
             val nextIdx = (activeStopIndex + delta).mod(scrubStops.size)
             haptics.bookshelfDetent()
-            commitFootprintStop(scrubStops[nextIdx], false)
+            commitFootprintStop(scrubStops[nextIdx], false, if (delta >= 0) 1 else -1)
         }
     }
 
@@ -293,6 +303,10 @@ fun FootprintMapScreen(
             cameraState = cameraState,
             mapStyle = mapStyle,
             onSelectCluster = { cluster ->
+                val targetIdx = scrubStops.indexOfFirst { !it.isUnlocated && it.id == cluster.locationName }
+                if (targetIdx >= 0 && targetIdx != activeStopIndex) {
+                    cardSlideDirection = if (targetIdx > activeStopIndex) 1 else -1
+                }
                 selectedLocationName = cluster.locationName
                 isCardExpanded = true
             },
@@ -610,7 +624,7 @@ fun FootprintMapScreen(
             FootprintLocationScrubRail(
                 stops = scrubStops,
                 activeIndex = activeStopIndex,
-                onCommitStop = { stop -> commitFootprintStop(stop, false) },
+                onCommitStop = { stop -> commitFootprintStop(stop, false, null) },
                 topPadding = if (uiState.hasDeviceMedia && !uiState.hasMediaLocationPermission) 156.dp else 80.dp,
                 bottomPadding = railBottomClearance,
                 modifier = Modifier
@@ -780,9 +794,19 @@ fun FootprintMapScreen(
             }
         }
 
-        // Bottom Collapsible Frosted-Glass Detail Card (Tap header or swipe vertically to expand/collapse)
+        // Bottom Collapsible Frosted-Glass Detail Card
+        // Tap header or swipe vertically to expand/collapse; swipe horizontally to glide between locations
+        val activeStopKey = when {
+            showingUnlocated -> UNLOCATED_LOCATION_KEY
+            selectedCluster != null -> selectedCluster.locationName
+            else -> null
+        }
+        val cardSwipeNudgeX = remember { Animatable(0f) }
+        val maxSwipeNudgePx = with(density) { 20.dp.toPx() }
+        val swipeTriggerThresholdPx = with(density) { 42.dp.toPx() }
+
         AnimatedVisibility(
-            visible = hasBottomCard,
+            visible = hasBottomCard && activeStopKey != null,
             enter = fadeIn(tween(185, easing = FastOutSlowInEasing)) +
                 slideInVertically(tween(220, easing = FastOutSlowInEasing)) { it / 3 },
             exit = fadeOut(tween(135)) +
@@ -794,199 +818,57 @@ fun FootprintMapScreen(
                 .widthIn(max = 600.dp)
                 .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 10.dp + floatingDockInset)
         ) {
-        if (showingUnlocated) {
-            val unreviewedUnlocated = remember(unlocatedPhotos) {
-                unlocatedPhotos.count { it.photoStatus == PhotoStatus.UNREVIEWED }
+            val currentKey = activeStopKey ?: return@AnimatedVisibility
+            val horizontalSwipeModifier = Modifier.pointerInput(scrubStops.size, activeStopIndex) {
+                if (scrubStops.size < 2) return@pointerInput
+                var totalDx = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = {
+                        totalDx = 0f
+                        scope.launch { cardSwipeNudgeX.stop() }
+                    },
+                    onHorizontalDrag = { _, dragAmount ->
+                        totalDx += dragAmount
+                        val damped = (totalDx * 0.24f).coerceIn(-maxSwipeNudgePx, maxSwipeNudgePx)
+                        scope.launch { cardSwipeNudgeX.snapTo(damped) }
+                    },
+                    onDragCancel = {
+                        scope.launch {
+                            cardSwipeNudgeX.animateTo(
+                                targetValue = 0f,
+                                animationSpec = spring(dampingRatio = 0.78f, stiffness = 560f)
+                            )
+                        }
+                    },
+                    onDragEnd = {
+                        val delta = when {
+                            totalDx < -swipeTriggerThresholdPx -> +1
+                            totalDx > swipeTriggerThresholdPx -> -1
+                            else -> 0
+                        }
+                        if (delta != 0) {
+                            stepFootprintStop(delta)
+                        }
+                        scope.launch {
+                            cardSwipeNudgeX.animateTo(
+                                targetValue = 0f,
+                                animationSpec = spring(dampingRatio = 0.78f, stiffness = 560f)
+                            )
+                        }
+                    }
+                )
             }
-            val totalBytes = remember(unlocatedPhotos) { unlocatedPhotos.sumOf { it.fileSizeBytes } }
 
-            FrostedGlassCard(
-                shape = RoundedCornerShape(24.dp),
-                borderAccent = SolarAmber,
-                shadowElevation = 14.dp,
-                enableAmbientBlur = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .animateContentSize(
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioLowBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        )
-                    )
-                    .pointerInput(Unit) {
-                        var totalDrag = 0f
-                        detectVerticalDragGestures(
-                            onDragStart = { totalDrag = 0f },
-                            onVerticalDrag = { _, dragAmount -> totalDrag += dragAmount },
-                            onDragEnd = {
-                                if (totalDrag < -36f) isCardExpanded = true
-                                else if (totalDrag > 36f) isCardExpanded = false
-                            }
-                        )
-                    }
-                    .testTag("unlocated_detail_card")
-            ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .width(34.dp)
-                            .height(3.5.dp)
-                            .clip(CircleShape)
-                            .background(InkTertiary.copy(alpha = 0.35f))
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .pointerInput(scrubStops.size, activeStopIndex) {
-                                if (scrubStops.size < 2) return@pointerInput
-                                var totalDx = 0f
-                                detectHorizontalDragGestures(
-                                    onDragStart = { totalDx = 0f },
-                                    onHorizontalDrag = { _, dragAmount -> totalDx += dragAmount },
-                                    onDragEnd = {
-                                        if (totalDx < -48f) stepFootprintStop(+1)
-                                        else if (totalDx > 48f) stepFootprintStop(-1)
-                                    }
-                                )
-                            }
-                            .clickable { isCardExpanded = !isCardExpanded },
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text(
-                                text = "无定位信息的照片与视频",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = InkPrimary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "${unlocatedPhotos.size} 项媒体 · ${formatStorageSize(totalBytes)} · 截图/网图/未开定位拍摄",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = InkSecondary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        if (scrubStops.size >= 2) {
-                            CompactLocationStepper(
-                                onPrevious = { stepFootprintStop(-1) },
-                                onNext = { stepFootprintStop(+1) }
-                            )
-                        }
-                    }
-
-                    AnimatedVisibility(visible = isCardExpanded) {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            val orderedUnlocated = remember(unlocatedPhotos, uiState.timelineSortOrder) {
-                                when (uiState.timelineSortOrder) {
-                                    TimelineSortOrder.NEWEST_FIRST -> unlocatedPhotos.sortedByDescending { it.takenAtMillis }
-                                    TimelineSortOrder.OLDEST_FIRST -> unlocatedPhotos.sortedBy { it.takenAtMillis }
-                                }
-                            }
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                items(orderedUnlocated.take(24), key = { it.id }) { photo ->
-                                    Box(
-                                        modifier = Modifier
-                                            .size(width = 72.dp, height = 84.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp))
-                                            .clickable {
-                                                lightboxPhotos = orderedUnlocated
-                                                lightboxPhoto = photo
-                                            }
-                                    ) {
-                                        PhotoArtwork(
-                                            photo = photo,
-                                            contentDescription = photo.caption,
-                                            downsampleTier = ImageDownsampleTier.MICRO_THUMB,
-                                            targetSizePx = 192,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    }
-                                }
-                                if (unlocatedPhotos.size > 24) {
-                                    item(key = "unlocated_more") {
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier
-                                                .size(width = 76.dp, height = 84.dp)
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(StudioCanvas)
-                                                .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp))
-                                                .clickable {
-                                                    onCleanLocation(UNLOCATED_LOCATION_KEY, unreviewedUnlocated == 0)
-                                                }
-                                        ) {
-                                            Text(
-                                                text = "查看全部",
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = CobaltPrimary,
-                                                textAlign = TextAlign.Center
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                GalleryActionButton(
-                                    text = "批量补全定位",
-                                    onClick = { showBatchLocationSheet = true },
-                                    tone = GalleryButtonTone.OBSIDIAN,
-                                    leadingIcon = Icons.Filled.EditLocationAlt,
-                                    height = 48.dp,
-                                    shape = RoundedCornerShape(14.dp),
-                                    modifier = Modifier
-                                        .weight(1.15f)
-                                        .testTag("batch_tag_unlocated_button")
-                                )
-                                GalleryActionButton(
-                                    text = if (unreviewedUnlocated > 0) {
-                                        "整理 ($unreviewedUnlocated)"
-                                    } else {
-                                        "浏览全部"
-                                    },
-                                    onClick = {
-                                        onCleanLocation(UNLOCATED_LOCATION_KEY, unreviewedUnlocated == 0)
-                                    },
-                                    tone = GalleryButtonTone.GLASS,
-                                    leadingIcon = if (unreviewedUnlocated > 0) Icons.Filled.CleaningServices else Icons.Filled.PhotoCamera,
-                                    height = 48.dp,
-                                    shape = RoundedCornerShape(14.dp),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("clean_unlocated_button")
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        } else selectedCluster?.let { activeCluster ->
             FrostedGlassCard(
                 shape = RoundedCornerShape(26.dp),
+                borderAccent = if (showingUnlocated) SolarAmber else null,
                 shadowElevation = 14.dp,
                 enableAmbientBlur = true,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .graphicsLayer {
+                        translationX = cardSwipeNudgeX.value
+                    }
                     .animateContentSize(
                         animationSpec = spring(
                             dampingRatio = Spring.DampingRatioLowBouncy,
@@ -1004,189 +886,356 @@ fun FootprintMapScreen(
                             }
                         )
                     }
-                    .testTag("location_detail_card")
+                    .testTag(if (showingUnlocated) "unlocated_detail_card" else "location_detail_card")
             ) {
-                AnimatedContent(
-                    targetState = activeCluster,
-                    contentKey = { it.locationName },
-                    transitionSpec = {
-                        (fadeIn(tween(165, easing = FastOutSlowInEasing)) +
-                            slideInVertically(tween(175, easing = FastOutSlowInEasing)) { it / 12 }) togetherWith
-                            (fadeOut(tween(105)) + slideOutVertically(tween(110)) { -it / 14 })
-                    },
-                    label = "map_cluster_card_switch"
-                ) { cluster ->
-                val latLabel = if (cluster.latitude >= 0) "N" else "S"
-                val lonLabel = if (cluster.longitude >= 0) "E" else "W"
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Anchored grab handle strip (also responds to horizontal swipe & tap)
                     Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .width(36.dp)
-                            .height(4.dp)
-                            .clip(CircleShape)
-                            .background(InkTertiary.copy(alpha = 0.35f))
-                    )
-                    Row(
+                        contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .pointerInput(scrubStops.size, activeStopIndex) {
-                                if (scrubStops.size < 2) return@pointerInput
-                                var totalDx = 0f
-                                detectHorizontalDragGestures(
-                                    onDragStart = { totalDx = 0f },
-                                    onHorizontalDrag = { _, dragAmount -> totalDx += dragAmount },
-                                    onDragEnd = {
-                                        if (totalDx < -48f) stepFootprintStop(+1)
-                                        else if (totalDx > 48f) stepFootprintStop(-1)
-                                    }
-                                )
-                            }
-                            .clickable { isCardExpanded = !isCardExpanded },
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .then(horizontalSwipeModifier)
+                            .clickable { isCardExpanded = !isCardExpanded }
+                            .padding(top = 10.dp, bottom = 4.dp)
                     ) {
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    text = cluster.locationName,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = InkPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f, fill = false)
-                                )
-                                Surface(
-                                    shape = RoundedCornerShape(50),
-                                    color = if (cluster.unreviewedCount > 0) CoralSoft else EmeraldSoft
-                                ) {
-                                    Text(
-                                        text = if (cluster.unreviewedCount > 0) "${cluster.unreviewedCount} 待理" else "已整理",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (cluster.unreviewedCount > 0) CoralDanger else EmeraldKeep,
-                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                            Text(
-                                text = String.format(
-                                    Locale.US,
-                                    "%.2f°%s, %.2f°%s · %d 项媒体 · %s",
-                                    abs(cluster.latitude),
-                                    latLabel,
-                                    abs(cluster.longitude),
-                                    lonLabel,
-                                    cluster.photos.size,
-                                    formatStorageSize(cluster.totalBytes)
-                                ),
-                                fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 11.sp,
-                                color = InkSecondary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        if (scrubStops.size >= 2) {
-                            CompactLocationStepper(
-                                onPrevious = { stepFootprintStop(-1) },
-                                onNext = { stepFootprintStop(+1) }
-                            )
-                        }
+                        Box(
+                            modifier = Modifier
+                                .width(36.dp)
+                                .height(4.dp)
+                                .clip(CircleShape)
+                                .background(InkTertiary.copy(alpha = 0.35f))
+                        )
                     }
 
-                    AnimatedVisibility(visible = isCardExpanded) {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            val orderedClusterPhotos = remember(cluster.photos, uiState.timelineSortOrder) {
-                                when (uiState.timelineSortOrder) {
-                                    TimelineSortOrder.NEWEST_FIRST -> cluster.photos.sortedByDescending { it.takenAtMillis }
-                                    TimelineSortOrder.OLDEST_FIRST -> cluster.photos.sortedBy { it.takenAtMillis }
-                                }
+                    // Unified directional left/right horizontal slide transition for all stops (including unlocated)
+                    AnimatedContent(
+                        targetState = currentKey,
+                        transitionSpec = {
+                            val dir = if (cardSlideDirection >= 0) 1 else -1
+                            (slideInHorizontally(
+                                animationSpec = tween(220, easing = FastOutSlowInEasing),
+                                initialOffsetX = { fullWidth -> dir * (fullWidth * 0.36f).toInt() }
+                            ) + fadeIn(tween(180, easing = FastOutSlowInEasing))) togetherWith
+                                (slideOutHorizontally(
+                                    animationSpec = tween(170, easing = FastOutSlowInEasing),
+                                    targetOffsetX = { fullWidth -> -dir * (fullWidth * 0.32f).toInt() }
+                                ) + fadeOut(tween(130))) using SizeTransform(clip = true)
+                        },
+                        label = "map_stop_card_horizontal_switch"
+                    ) { stopKey ->
+                        val stopIdx = remember(scrubStops, stopKey) {
+                            scrubStops.indexOfFirst { it.id == stopKey }
+                        }
+                        if (stopKey == UNLOCATED_LOCATION_KEY) {
+                            val unreviewedUnlocated = remember(unlocatedPhotos) {
+                                unlocatedPhotos.count { it.photoStatus == PhotoStatus.UNREVIEWED }
                             }
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxWidth()
+                            val totalBytes = remember(unlocatedPhotos) { unlocatedPhotos.sumOf { it.fileSizeBytes } }
+
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                items(orderedClusterPhotos.take(24), key = { it.id }) { photo ->
-                                    Box(
-                                        modifier = Modifier
-                                            .size(width = 72.dp, height = 84.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp))
-                                            .clickable {
-                                                lightboxPhotos = orderedClusterPhotos
-                                                lightboxPhoto = photo
-                                            }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .then(horizontalSwipeModifier)
+                                        .clickable { isCardExpanded = !isCardExpanded },
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
                                     ) {
-                                        PhotoArtwork(
-                                            photo = photo,
-                                            contentDescription = photo.caption,
-                                            downsampleTier = ImageDownsampleTier.MICRO_THUMB,
-                                            targetSizePx = 192,
-                                            modifier = Modifier.fillMaxSize()
+                                        Text(
+                                            text = "无定位信息的照片与视频",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = InkPrimary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "${unlocatedPhotos.size} 项媒体 · ${formatStorageSize(totalBytes)} · 截图/网图/未开定位拍摄",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = InkSecondary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    if (scrubStops.size >= 2 && stopIdx >= 0) {
+                                        Text(
+                                            text = "${stopIdx + 1}/${scrubStops.size}",
+                                            fontFamily = JetBrainsMonoFontFamily,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = InkTertiary
                                         )
                                     }
                                 }
-                                if (cluster.photos.size > 24) {
-                                    item(key = "cluster_more_${cluster.locationName}") {
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier
-                                                .size(width = 76.dp, height = 84.dp)
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(StudioCanvas)
-                                                .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp))
-                                                .clickable {
-                                                    onCleanLocation(cluster.locationName, cluster.unreviewedCount == 0)
-                                                }
+
+                                AnimatedVisibility(visible = isCardExpanded) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        val orderedUnlocated = remember(unlocatedPhotos, uiState.timelineSortOrder) {
+                                            when (uiState.timelineSortOrder) {
+                                                TimelineSortOrder.NEWEST_FIRST -> unlocatedPhotos.sortedByDescending { it.takenAtMillis }
+                                                TimelineSortOrder.OLDEST_FIRST -> unlocatedPhotos.sortedBy { it.takenAtMillis }
+                                            }
+                                        }
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.fillMaxWidth()
                                         ) {
-                                            Text(
-                                                text = "查看全部",
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = CobaltPrimary,
-                                                textAlign = TextAlign.Center
+                                            items(orderedUnlocated.take(24), key = { it.id }) { photo ->
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(width = 72.dp, height = 84.dp)
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                        .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp))
+                                                        .clickable {
+                                                            lightboxPhotos = orderedUnlocated
+                                                            lightboxPhoto = photo
+                                                        }
+                                                ) {
+                                                    PhotoArtwork(
+                                                        photo = photo,
+                                                        contentDescription = photo.caption,
+                                                        downsampleTier = ImageDownsampleTier.MICRO_THUMB,
+                                                        targetSizePx = 192,
+                                                        modifier = Modifier.fillMaxSize()
+                                                    )
+                                                }
+                                            }
+                                            if (unlocatedPhotos.size > 24) {
+                                                item(key = "unlocated_more") {
+                                                    Box(
+                                                        contentAlignment = Alignment.Center,
+                                                        modifier = Modifier
+                                                            .size(width = 76.dp, height = 84.dp)
+                                                            .clip(RoundedCornerShape(12.dp))
+                                                            .background(StudioCanvas)
+                                                            .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp))
+                                                            .clickable {
+                                                                onCleanLocation(UNLOCATED_LOCATION_KEY, unreviewedUnlocated == 0)
+                                                            }
+                                                    ) {
+                                                        Text(
+                                                            text = "查看全部",
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = CobaltPrimary,
+                                                            textAlign = TextAlign.Center
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .then(horizontalSwipeModifier)
+                                        ) {
+                                            GalleryActionButton(
+                                                text = "批量补全定位",
+                                                onClick = { showBatchLocationSheet = true },
+                                                tone = GalleryButtonTone.OBSIDIAN,
+                                                leadingIcon = Icons.Filled.EditLocationAlt,
+                                                height = 48.dp,
+                                                shape = RoundedCornerShape(14.dp),
+                                                modifier = Modifier
+                                                    .weight(1.15f)
+                                                    .testTag("batch_tag_unlocated_button")
+                                            )
+                                            GalleryActionButton(
+                                                text = if (unreviewedUnlocated > 0) {
+                                                    "整理 ($unreviewedUnlocated)"
+                                                } else {
+                                                    "浏览全部"
+                                                },
+                                                onClick = {
+                                                    onCleanLocation(UNLOCATED_LOCATION_KEY, unreviewedUnlocated == 0)
+                                                },
+                                                tone = GalleryButtonTone.GLASS,
+                                                leadingIcon = if (unreviewedUnlocated > 0) Icons.Filled.CleaningServices else Icons.Filled.PhotoCamera,
+                                                height = 48.dp,
+                                                shape = RoundedCornerShape(14.dp),
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .testTag("clean_unlocated_button")
                                             )
                                         }
                                     }
                                 }
                             }
+                        } else {
+                            val cluster = remember(clusters, stopKey) {
+                                clusters.firstOrNull { it.locationName == stopKey }
+                            } ?: selectedCluster
+                            if (cluster != null) {
+                                val latLabel = if (cluster.latitude >= 0) "N" else "S"
+                                val lonLabel = if (cluster.longitude >= 0) "E" else "W"
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .then(horizontalSwipeModifier)
+                                            .clickable { isCardExpanded = !isCardExpanded },
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Text(
+                                                    text = cluster.locationName,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = InkPrimary,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f, fill = false)
+                                                )
+                                                Surface(
+                                                    shape = RoundedCornerShape(50),
+                                                    color = if (cluster.unreviewedCount > 0) CoralSoft else EmeraldSoft
+                                                ) {
+                                                    Text(
+                                                        text = if (cluster.unreviewedCount > 0) "${cluster.unreviewedCount} 待理" else "已整理",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = if (cluster.unreviewedCount > 0) CoralDanger else EmeraldKeep,
+                                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                            Text(
+                                                text = String.format(
+                                                    Locale.US,
+                                                    "%.2f°%s, %.2f°%s · %d 项媒体 · %s",
+                                                    abs(cluster.latitude),
+                                                    latLabel,
+                                                    abs(cluster.longitude),
+                                                    lonLabel,
+                                                    cluster.photos.size,
+                                                    formatStorageSize(cluster.totalBytes)
+                                                ),
+                                                fontFamily = JetBrainsMonoFontFamily,
+                                                fontSize = 11.sp,
+                                                color = InkSecondary,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                        if (scrubStops.size >= 2 && stopIdx >= 0) {
+                                            Text(
+                                                text = "${stopIdx + 1}/${scrubStops.size}",
+                                                fontFamily = JetBrainsMonoFontFamily,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = InkTertiary
+                                            )
+                                        }
+                                    }
 
-                            GalleryActionButton(
-                                text = if (cluster.unreviewedCount > 0) {
-                                    "${stringResource(R.string.action_clean_location)} (${cluster.unreviewedCount} 项)"
-                                } else {
-                                    "在弧形时光轴中重温此地回忆"
-                                },
-                                onClick = {
-                                    onCleanLocation(cluster.locationName, cluster.unreviewedCount == 0)
-                                },
-                                tone = GalleryButtonTone.OBSIDIAN,
-                                leadingIcon = if (cluster.unreviewedCount > 0) Icons.Filled.CleaningServices else Icons.Filled.PhotoCamera,
-                                height = 48.dp,
-                                shape = RoundedCornerShape(14.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("clean_location_button")
-                            )
+                                    AnimatedVisibility(visible = isCardExpanded) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            val orderedClusterPhotos = remember(cluster.photos, uiState.timelineSortOrder) {
+                                                when (uiState.timelineSortOrder) {
+                                                    TimelineSortOrder.NEWEST_FIRST -> cluster.photos.sortedByDescending { it.takenAtMillis }
+                                                    TimelineSortOrder.OLDEST_FIRST -> cluster.photos.sortedBy { it.takenAtMillis }
+                                                }
+                                            }
+                                            LazyRow(
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                items(orderedClusterPhotos.take(24), key = { it.id }) { photo ->
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(width = 72.dp, height = 84.dp)
+                                                            .clip(RoundedCornerShape(12.dp))
+                                                            .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp))
+                                                            .clickable {
+                                                                lightboxPhotos = orderedClusterPhotos
+                                                                lightboxPhoto = photo
+                                                            }
+                                                    ) {
+                                                        PhotoArtwork(
+                                                            photo = photo,
+                                                            contentDescription = photo.caption,
+                                                            downsampleTier = ImageDownsampleTier.MICRO_THUMB,
+                                                            targetSizePx = 192,
+                                                            modifier = Modifier.fillMaxSize()
+                                                        )
+                                                    }
+                                                }
+                                                if (cluster.photos.size > 24) {
+                                                    item(key = "cluster_more_${cluster.locationName}") {
+                                                        Box(
+                                                            contentAlignment = Alignment.Center,
+                                                            modifier = Modifier
+                                                                .size(width = 76.dp, height = 84.dp)
+                                                                .clip(RoundedCornerShape(12.dp))
+                                                                .background(StudioCanvas)
+                                                                .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp))
+                                                                .clickable {
+                                                                    onCleanLocation(cluster.locationName, cluster.unreviewedCount == 0)
+                                                                }
+                                                        ) {
+                                                            Text(
+                                                                text = "查看全部",
+                                                                style = MaterialTheme.typography.labelMedium,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = CobaltPrimary,
+                                                                textAlign = TextAlign.Center
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            GalleryActionButton(
+                                                text = if (cluster.unreviewedCount > 0) {
+                                                    "${stringResource(R.string.action_clean_location)} (${cluster.unreviewedCount} 项)"
+                                                } else {
+                                                    "在弧形时光轴中重温此地回忆"
+                                                },
+                                                onClick = {
+                                                    onCleanLocation(cluster.locationName, cluster.unreviewedCount == 0)
+                                                },
+                                                tone = GalleryButtonTone.OBSIDIAN,
+                                                leadingIcon = if (cluster.unreviewedCount > 0) Icons.Filled.CleaningServices else Icons.Filled.PhotoCamera,
+                                                height = 48.dp,
+                                                shape = RoundedCornerShape(14.dp),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .then(horizontalSwipeModifier)
+                                                    .testTag("clean_location_button")
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-                }
             }
-        }
         }
     }
 
@@ -1223,58 +1272,6 @@ fun FootprintMapScreen(
             onTrash = onTrashPhoto,
             onToggleFavorite = onToggleFavorite
         )
-    }
-}
-
-@Composable
-private fun CompactLocationStepper(
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val pillShape = RoundedCornerShape(12.dp)
-    Row(
-        modifier = modifier
-            .height(34.dp)
-            .clip(pillShape)
-            .background(SurfaceMuted.copy(alpha = 0.72f))
-            .border(0.8.dp, HairlineBorder.copy(alpha = 0.75f), pillShape),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(width = 34.dp, height = 34.dp)
-                .clickable(onClick = onPrevious)
-                .testTag("map_prev_location_button")
-        ) {
-            Icon(
-                imageVector = Icons.Filled.ChevronLeft,
-                contentDescription = stringResource(R.string.cd_footprint_prev_location),
-                tint = InkPrimary,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-        Box(
-            modifier = Modifier
-                .width(0.8.dp)
-                .height(16.dp)
-                .background(HairlineBorder.copy(alpha = 0.85f))
-        )
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(width = 34.dp, height = 34.dp)
-                .clickable(onClick = onNext)
-                .testTag("map_next_location_button")
-        ) {
-            Icon(
-                imageVector = Icons.Filled.ChevronRight,
-                contentDescription = stringResource(R.string.cd_footprint_next_location),
-                tint = InkPrimary,
-                modifier = Modifier.size(18.dp)
-            )
-        }
     }
 }
 

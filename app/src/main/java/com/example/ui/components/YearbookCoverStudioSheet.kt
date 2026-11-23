@@ -200,16 +200,9 @@ fun YearbookCoverStudioSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = StudioCanvas,
-        dragHandle = {
-            Box(
-                modifier = Modifier
-                    .padding(top = 12.dp, bottom = 6.dp)
-                    .width(40.dp)
-                    .height(4.dp)
-                    .clip(CircleShape)
-                    .background(InkTertiary.copy(alpha = 0.4f))
-            )
-        }
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = { ModalSheetDragHandle() },
+        modifier = Modifier.modalSheetTopClearance()
     ) {
         Column(
             modifier = Modifier
