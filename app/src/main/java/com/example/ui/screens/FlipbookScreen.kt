@@ -933,7 +933,7 @@ private fun DecoMonthPosterPage(
                 cameraDistance = 26f * density
             }
             .shadow(
-                elevation = 12.dp,
+                elevation = 10.dp,
                 shape = DecoPageShape,
                 spotColor = if (isDark) Color.Black.copy(alpha = 0.55f) else DecoInkDeep.copy(alpha = 0.16f)
             )
@@ -949,7 +949,7 @@ private fun DecoMonthPosterPage(
                 .background(
                     Brush.horizontalGradient(
                         listOf(
-                            Color.Black.copy(alpha = if (isDark) 0.42f else 0.14f),
+                            Color.Black.copy(alpha = if (isDark) 0.32f else 0.18f),
                             Color.Transparent
                         )
                     )

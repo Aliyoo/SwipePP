@@ -653,6 +653,7 @@ private fun <T> SettingsSegmentedCapsule(
                             text = option.label,
                             fontFamily = DecoDisplayFontFamily,
                             fontSize = 12.5.sp,
+                            lineHeight = 18.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             letterSpacing = 0.8.sp,
                             color = textColor,
