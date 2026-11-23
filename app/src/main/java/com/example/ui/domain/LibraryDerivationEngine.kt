@@ -13,6 +13,7 @@ import com.example.ui.UNLOCATED_LOCATION_KEY
 import com.example.ui.YearbookCoverCurator
 import com.example.ui.YearbookSummary
 import com.example.ui.theme.TimelineSortOrder
+import com.example.ui.theme.YearbookCoverStyle
 
 /**
  * Pure, stateless O(N) domain derivation engine for FlipYear.
@@ -60,7 +61,8 @@ object LibraryDerivationEngine {
         photos: List<PhotoItemEntity>,
         stamps: Map<String, MonthStampEntity>,
         coverConfigs: Map<Int, YearbookCoverConfigEntity>,
-        sortOrder: TimelineSortOrder = TimelineSortOrder.NEWEST_FIRST
+        sortOrder: TimelineSortOrder = TimelineSortOrder.NEWEST_FIRST,
+        defaultCoverStyle: YearbookCoverStyle = YearbookCoverStyle.COLLAGE
     ): List<YearbookSummary> {
         if (photos.isEmpty()) return emptyList()
         val byYear = HashMap<Int, YearAcc>(16)
@@ -105,8 +107,10 @@ object LibraryDerivationEngine {
                 }
             }
             val resolvedCover = YearbookCoverCurator.resolveCoverPresentation(
+                year = year,
                 yearPhotos = acc.yearPhotos,
-                config = coverConfigs[year]
+                config = coverConfigs[year],
+                defaultCoverStyle = defaultCoverStyle
             )
 
             YearbookSummary(
@@ -116,6 +120,11 @@ object LibraryDerivationEngine {
                 coverMode = resolvedCover.mode,
                 coverIntervalSeconds = resolvedCover.intervalSeconds,
                 customCoverPhotoIds = resolvedCover.customPhotoIds,
+                effectiveIsCollage = resolvedCover.effectiveIsCollage,
+                collageTemplateId = resolvedCover.collageTemplateId,
+                collageSpacingDp = resolvedCover.collageSpacingDp,
+                collageBackdrop = resolvedCover.collageBackdrop,
+                collageSlotTransforms = resolvedCover.collageSlotTransforms,
                 totalPhotos = acc.total,
                 videoCount = acc.videoCount,
                 unreviewedCount = acc.unreviewedCount,

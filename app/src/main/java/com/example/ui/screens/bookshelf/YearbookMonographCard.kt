@@ -61,6 +61,8 @@ import com.example.ui.YearbookSummary
 import com.example.ui.components.DecoIcon
 import com.example.ui.components.DecoIconKind
 import com.example.ui.components.PhotoArtwork
+import com.example.ui.components.YearbookCollageCanvas
+import com.example.ui.components.YearbookCollageTemplates
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoGround
 import com.example.ui.theme.DecoArtShadowVerm
@@ -68,6 +70,10 @@ import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoScrimInk
+import com.example.ui.theme.EditionCobalt
+import com.example.ui.theme.EditionObsidian
+import com.example.ui.theme.EditionSlatePlum
+import com.example.ui.theme.EditionTeal
 import com.example.ui.theme.EditorialSerifFontFamily
 import com.example.ui.theme.JetBrainsMonoFontFamily
 
@@ -117,7 +123,16 @@ internal fun ModernYearbook3DCard(
     val displayedPhoto = slides.getOrNull(safeSlideIndex) ?: summary.coverPhoto
     val slideProgress = remember(summary.year, slideKeys) { Animatable(0f) }
 
-    val isCarouselActive = isFocused && !isCarouselPaused && slides.size > 1
+    val showCollage = summary.effectiveIsCollage && slides.size >= 2
+    val collageTemplate = remember(summary.collageTemplateId, summary.year, slides.size) {
+        YearbookCollageTemplates.resolveTemplate(
+            templateId = summary.collageTemplateId.ifBlank { null },
+            year = summary.year,
+            availablePhotoCount = slides.size
+        )
+    }
+
+    val isCarouselActive = !showCollage && isFocused && !isCarouselPaused && slides.size > 1
 
     LaunchedEffect(displayedPhoto, isFocused) {
         if (isFocused) {
@@ -174,7 +189,7 @@ internal fun ModernYearbook3DCard(
                 onClick = onClick
             )
     ) {
-        // 画框内画片视窗：外 1.5dp 金 → 3dp 内衬 → 1dp 弱金 → 全幅封面照
+        // 画框内画片视窗：外 1.5dp 金 → 3dp 内衬 → 1dp 弱金 → 全幅封面照（拼图封面走 YearbookCollageCanvas 分支）
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -182,7 +197,23 @@ internal fun ModernYearbook3DCard(
                 .clip(photoShape)
                 .border(width = 1.dp, color = gold.copy(alpha = 0.40f), shape = photoShape)
         ) {
-            if (displayedPhoto != null) {
+            if (showCollage) {
+                YearbookCollageCanvas(
+                    photos = slides,
+                    template = collageTemplate,
+                    spacingDp = summary.collageSpacingDp,
+                    backdrop = summary.collageBackdrop,
+                    // deco 无版本色体系：拼块衬底用画框衬纸 mat
+                    editionColor = mat,
+                    slotTransforms = summary.collageSlotTransforms,
+                    interactive = false,
+                    downsampleTier = ImageDownsampleTier.HERO_CARD,
+                    targetSizePx = 560,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("yearbook_collage_cover_${summary.year}")
+                )
+            } else if (displayedPhoto != null) {
                 val panDirection = if (safeSlideIndex % 2 == 0) 1f else -1f
 
                 Crossfade(
@@ -308,7 +339,7 @@ internal fun ModernYearbook3DCard(
             ) {
                 // 顶部：轮播进度条 + 已整理方章 + 换封面方章
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (slides.size > 1) {
+                    if (!showCollage && slides.size > 1) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()

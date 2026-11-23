@@ -100,6 +100,31 @@ enum class GalleryGridDensity(
     }
 }
 
+enum class YearbookCoverStyle(
+    val storageKey: String,
+    val label: String,
+    val shortLabel: String,
+    val previewSummary: String
+) {
+    COLLAGE(
+        storageKey = "collage",
+        label = "智能不规则拼图",
+        shortLabel = "智能拼图",
+        previewSummary = "首页年度封面默认自动精选多图拼贴，呈现画报与手账质感"
+    ),
+    CAROUSEL(
+        storageKey = "carousel",
+        label = "智能精选轮播",
+        shortLabel = "精选轮播",
+        previewSummary = "首页年度封面默认按节拍柔和轮播该年高分摄影作品"
+    );
+
+    companion object {
+        fun fromStorageKey(key: String?): YearbookCoverStyle =
+            entries.firstOrNull { it.storageKey == key } ?: COLLAGE
+    }
+}
+
 @Immutable
 data class UserPreferences(
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
@@ -107,7 +132,8 @@ data class UserPreferences(
     val defaultStartTab: DefaultStartTab = DefaultStartTab.BOOKSHELF,
     val flipbookDefaultView: FlipbookDefaultView = FlipbookDefaultView.CALENDAR,
     val showEmptyMonths: Boolean = false,
-    val galleryGridDensity: GalleryGridDensity = GalleryGridDensity.STANDARD
+    val galleryGridDensity: GalleryGridDensity = GalleryGridDensity.STANDARD,
+    val yearbookCoverStyle: YearbookCoverStyle = YearbookCoverStyle.COLLAGE
 )
 
 fun resolveIsDarkTheme(mode: AppThemeMode, isSystemInDarkTheme: Boolean): Boolean =
@@ -161,6 +187,9 @@ class ThemePreferences(context: Context) {
             showEmptyMonths = prefs.getBoolean(KEY_SHOW_EMPTY_MONTHS, false),
             galleryGridDensity = GalleryGridDensity.fromStorageKey(
                 prefs.getString(KEY_GALLERY_GRID_DENSITY, GalleryGridDensity.STANDARD.storageKey)
+            ),
+            yearbookCoverStyle = YearbookCoverStyle.fromStorageKey(
+                prefs.getString(KEY_YEARBOOK_COVER_STYLE, YearbookCoverStyle.COLLAGE.storageKey)
             )
         )
     )
@@ -208,6 +237,12 @@ class ThemePreferences(context: Context) {
         prefs.edit().putString(KEY_GALLERY_GRID_DENSITY, density.storageKey).apply()
     }
 
+    fun setYearbookCoverStyle(style: YearbookCoverStyle) {
+        if (_userPreferences.value.yearbookCoverStyle == style) return
+        _userPreferences.value = _userPreferences.value.copy(yearbookCoverStyle = style)
+        prefs.edit().putString(KEY_YEARBOOK_COVER_STYLE, style.storageKey).apply()
+    }
+
     fun markOnboardingGuideSeen() {
         if (_hasSeenOnboardingGuide.value) return
         _hasSeenOnboardingGuide.value = true
@@ -222,6 +257,7 @@ class ThemePreferences(context: Context) {
         private const val KEY_FLIPBOOK_DEFAULT_VIEW = "flipbook_default_view"
         private const val KEY_SHOW_EMPTY_MONTHS = "show_empty_months"
         private const val KEY_GALLERY_GRID_DENSITY = "gallery_grid_density"
+        private const val KEY_YEARBOOK_COVER_STYLE = "yearbook_cover_style"
         private const val KEY_ONBOARDING_SEEN = "has_seen_onboarding_guide_v1"
     }
 }

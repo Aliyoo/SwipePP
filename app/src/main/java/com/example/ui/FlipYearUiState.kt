@@ -2,6 +2,8 @@ package com.example.ui
 
 import androidx.compose.runtime.Immutable
 import com.example.data.CleanupStatsEntity
+import com.example.data.CollageBackdropStyle
+import com.example.data.CollageSlotTransform
 import com.example.data.MediaAccessLevel
 import com.example.data.MonthStampEntity
 import com.example.data.PhotoItemEntity
@@ -23,6 +25,11 @@ data class YearbookSummary(
     val coverMode: YearbookCoverMode = YearbookCoverMode.SMART_CAROUSEL,
     val coverIntervalSeconds: Int = YearbookCoverCurator.DEFAULT_INTERVAL_SECONDS,
     val customCoverPhotoIds: List<Long> = emptyList(),
+    val effectiveIsCollage: Boolean = false,
+    val collageTemplateId: String = "diag_quad_4",
+    val collageSpacingDp: Float = 4f,
+    val collageBackdrop: CollageBackdropStyle = CollageBackdropStyle.EDITION,
+    val collageSlotTransforms: List<CollageSlotTransform> = emptyList(),
     val totalPhotos: Int,
     val videoCount: Int,
     val unreviewedCount: Int,

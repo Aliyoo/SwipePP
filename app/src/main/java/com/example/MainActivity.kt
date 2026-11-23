@@ -55,7 +55,8 @@ class MainActivity : ComponentActivity() {
                     onToggleShowEmptyMonths = themePreferences::setShowEmptyMonths,
                     onSelectFlipbookDefaultView = themePreferences::setFlipbookDefaultView,
                     onSelectDefaultStartTab = themePreferences::setDefaultStartTab,
-                    onSelectGalleryGridDensity = themePreferences::setGalleryGridDensity
+                    onSelectGalleryGridDensity = themePreferences::setGalleryGridDensity,
+                    onSelectYearbookCoverStyle = themePreferences::setYearbookCoverStyle
                 )
             }
         }

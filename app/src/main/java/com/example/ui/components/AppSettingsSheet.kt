@@ -76,6 +76,7 @@ import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LocalFlipYearPalette
 import com.example.ui.theme.TimelineSortOrder
 import com.example.ui.theme.UserPreferences
+import com.example.ui.theme.YearbookCoverStyle
 
 /**
  * 摩登画报 editorial preferences drawer（deco-app.html 造型语法）：
@@ -101,6 +102,7 @@ fun AppSettingsSheet(
     onSelectFlipbookDefaultView: (FlipbookDefaultView) -> Unit,
     onSelectDefaultStartTab: (DefaultStartTab) -> Unit,
     onSelectGalleryGridDensity: (GalleryGridDensity) -> Unit,
+    onSelectYearbookCoverStyle: (YearbookCoverStyle) -> Unit = {},
     onSelectThemeMode: (AppThemeMode) -> Unit,
     onRescanDeviceMedia: () -> Unit,
     onRequestMediaPermission: () -> Unit,
@@ -240,6 +242,78 @@ fun AppSettingsSheet(
                 HorizontalDivider(
                     thickness = 0.8.dp,
                     color = DecoGold.copy(alpha = 0.30f),
+                    modifier = Modifier.padding(horizontal = 14.dp)
+                )
+
+                // Global default yearbook cover style (Collage vs Carousel)
+                Column(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "首页年度封面默认样式",
+                            fontFamily = DecoDisplayFontFamily,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = InkPrimary
+                        )
+                        Text(
+                            text = "单年可独立定制",
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontSize = 10.5.sp,
+                            color = InkTertiary
+                        )
+                    }
+
+                    SettingsSegmentedCapsule(
+                        items = listOf(
+                            SegmentedOption(
+                                value = YearbookCoverStyle.COLLAGE,
+                                label = YearbookCoverStyle.COLLAGE.shortLabel,
+                                iconKind = DecoIconKind.DASHBOARD,
+                                testTag = "settings_cover_collage"
+                            ),
+                            SegmentedOption(
+                                value = YearbookCoverStyle.CAROUSEL,
+                                label = YearbookCoverStyle.CAROUSEL.shortLabel,
+                                iconKind = DecoIconKind.PHOTO_LIBRARY,
+                                testTag = "settings_cover_carousel"
+                            )
+                        ),
+                        selectedValue = preferences.yearbookCoverStyle,
+                        onSelect = { style ->
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onSelectYearbookCoverStyle(style)
+                        },
+                        modifier = Modifier.testTag("settings_yearbook_cover_style")
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = DecoMat,
+                        border = BorderStroke(0.75.dp, DecoGold.copy(alpha = 0.3f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = preferences.yearbookCoverStyle.previewSummary,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.sp,
+                            color = InkSecondary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                        )
+                    }
+                }
+
+                HorizontalDivider(
+                    thickness = 0.75.dp,
+                    color = DecoGold.copy(alpha = 0.34f),
                     modifier = Modifier.padding(horizontal = 14.dp)
                 )
 
