@@ -61,7 +61,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -309,41 +317,85 @@ fun FootprintMapScreen(
 
         // 金双线画框：外 1.5dp 金 + mat 内衬带 + 1dp 弱金（deco-app.html GoldFrame 语法）
         // 纯描边 Canvas，不注册 pointerInput，手势完全穿透到地图。
-        // 画框顶线在状态栏下方（遥测卡下移入框内）；底线停在停靠栏上方——
-        // floatingDockInset 只含 dock 高度，须再叠加系统导航条 inset，否则底线被 dock 吞掉
+        // 顶线贴状态栏下缘（遥测卡下移入框内）；底线实测锚定 dock 顶缘上 9dp。
+        // 框外区域（画框与屏幕边缘之间）填充首页纸地，遮住外溢的地图线
+        var canvasTopYPx by remember { mutableFloatStateOf(0f) }
+        val dockTopYPx = LocalDockTopYPx.current
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.statusBars)
-                // 上下外扩：顶线贴状态栏下缘；底线落进「卡片-底座」缝隙正中
-                //（floatingDockInset 已含导航条，勿再叠加 navigationBars）
-                .padding(bottom = floatingDockInset + 10.dp)
+                .statusBarsPadding()
                 .padding(top = 2.dp)
+                .onGloballyPositioned { canvasTopYPx = it.positionInRoot().y }
         ) {
             val frameInset = 7.dp.toPx()
             val frameRadius = 2.dp.toPx()
-            // mat 内衬带（6dp 描边带，覆盖瓦片边缘形成画框内衬）
+            val marginPx = 9.dp.toPx()
+            // 底线局部 Y = dock 顶缘实测 Y - 9dp 余量 - 画框窗口偏移；锚点未就绪时回落画布底缘
+            val bottomLineY = if (dockTopYPx.isNaN()) size.height - frameInset
+            else dockTopYPx - marginPx - canvasTopYPx
+            val frameRadiusCorner = CornerRadius(frameRadius)
+
+            // 框外填充：上下两条纸地带（纯色渐变 + 4dp 首页纸纹），地图只在框内可见；
+            // 左右窄边（7dp）由渐变底色自然覆盖，不再单独处理
+            val fillTop = frameInset
+            val fillBottom = bottomLineY - frameInset
+            val paperBrush = Brush.verticalGradient(0f to palette.decoGround, 1f to palette.decoGroundDeep, startY = 0f, endY = fillBottom)
+            // 顶带
+            drawRect(brush = paperBrush, topLeft = Offset(0f, 0f), size = Size(size.width, fillTop))
+            // 底带
+            drawRect(
+                brush = Brush.verticalGradient(
+                    0f to palette.decoGround, 1f to palette.decoGroundDeep,
+                    startY = fillBottom, endY = size.height
+                ),
+                topLeft = Offset(0f, fillBottom),
+                size = Size(size.width, size.height - fillBottom)
+            )
+            // 顶带纸纹
+            val texStep = 4.dp.toPx()
+            var ty = 0f
+            while (ty < fillTop) {
+                drawLine(
+                    color = ink.copy(alpha = 0.016f),
+                    start = Offset(0f, ty), end = Offset(size.width, ty),
+                    strokeWidth = 1f
+                )
+                ty += texStep
+            }
+            // 底带纸纹
+            ty = fillBottom
+            while (ty < size.height) {
+                drawLine(
+                    color = ink.copy(alpha = 0.016f),
+                    start = Offset(0f, ty), end = Offset(size.width, ty),
+                    strokeWidth = 1f
+                )
+                ty += texStep
+            }
+
+            // mat 内衬带（6dp 描边带，画框内衬）
             val bandHalf = 3.dp.toPx()
             drawRoundRect(
                 color = mat,
                 topLeft = Offset(frameInset + bandHalf, frameInset + bandHalf),
-                size = Size(size.width - (frameInset + bandHalf) * 2, size.height - (frameInset + bandHalf) * 2),
-                cornerRadius = CornerRadius(frameRadius),
+                size = Size(size.width - (frameInset + bandHalf) * 2, bottomLineY - frameInset - (frameInset + bandHalf)),
+                cornerRadius = frameRadiusCorner,
                 style = Stroke(width = bandHalf * 2)
             )
             drawRoundRect(
                 color = gold,
                 topLeft = Offset(frameInset, frameInset),
-                size = Size(size.width - frameInset * 2, size.height - frameInset * 2),
-                cornerRadius = CornerRadius(frameRadius),
+                size = Size(size.width - frameInset * 2, bottomLineY - frameInset * 2),
+                cornerRadius = frameRadiusCorner,
                 style = Stroke(width = 1.5.dp.toPx())
             )
             val innerInset = frameInset + 5.5.dp.toPx()
             drawRoundRect(
                 color = gold.copy(alpha = 0.40f),
                 topLeft = Offset(innerInset, innerInset),
-                size = Size(size.width - innerInset * 2, size.height - innerInset * 2),
-                cornerRadius = CornerRadius(frameRadius),
+                size = Size(size.width - innerInset * 2, bottomLineY - frameInset - innerInset),
+                cornerRadius = frameRadiusCorner,
                 style = Stroke(width = 1.dp.toPx())
             )
         }
