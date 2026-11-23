@@ -321,16 +321,19 @@ fun FootprintMapScreen(
         // 框外区域（画框与屏幕边缘之间）填充首页纸地，遮住外溢的地图线
         var canvasTopYPx by remember { mutableFloatStateOf(0f) }
         val dockTopYPx = LocalDockTopYPx.current
+        // 画布即全屏（不消费状态栏 inset）：顶带填充可上溯覆盖状态栏区域，
+        // 框顶线位置 = 状态栏高度 + 2dp + frameInset，与原视觉一致
+        val statusBarPx = WindowInsets.statusBars.getTop(LocalDensity.current)
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
                 .padding(top = 2.dp)
                 .onGloballyPositioned { canvasTopYPx = it.positionInRoot().y }
         ) {
             val frameInset = 7.dp.toPx()
             val frameRadius = 2.dp.toPx()
             val marginPx = 9.dp.toPx()
+            val frameTop = statusBarPx + 2.dp.toPx() + frameInset
             // 底线局部 Y = dock 顶缘实测 Y - 9dp 余量 - 画框窗口偏移；锚点未就绪时回落画布底缘
             val bottomLineY = if (dockTopYPx.isNaN()) size.height - frameInset
             else dockTopYPx - marginPx - canvasTopYPx
@@ -338,11 +341,11 @@ fun FootprintMapScreen(
 
             // 框外填充：画框与屏幕边缘之间的全部区域（上/下/左/右四带）填首页纸地，
             // 地图只在框内可见；渐变按各带自身高度铺，纸纹 4dp 细线逐带绘制
-            val fillTop = frameInset
+            val fillTop = statusBarPx + 2.dp.toPx() + frameInset
             val fillLeft = frameInset
             val fillRight = size.width - frameInset
             val fillBottom = bottomLineY - frameInset
-            // 顶带（全宽）
+            // 顶带（全宽，上溯覆盖状态栏区域）
             drawRect(
                 brush = Brush.verticalGradient(
                     0f to palette.decoGround, 1f to palette.decoGroundDeep,
@@ -418,23 +421,23 @@ fun FootprintMapScreen(
             val bandHalf = 3.dp.toPx()
             drawRoundRect(
                 color = mat,
-                topLeft = Offset(frameInset + bandHalf, frameInset + bandHalf),
-                size = Size(size.width - (frameInset + bandHalf) * 2, bottomLineY - frameInset - (frameInset + bandHalf)),
+                topLeft = Offset(frameInset + bandHalf, frameTop + bandHalf),
+                size = Size(size.width - (frameInset + bandHalf) * 2, bottomLineY - frameTop - bandHalf),
                 cornerRadius = frameRadiusCorner,
                 style = Stroke(width = bandHalf * 2)
             )
             drawRoundRect(
                 color = gold,
-                topLeft = Offset(frameInset, frameInset),
-                size = Size(size.width - frameInset * 2, bottomLineY - frameInset * 2),
+                topLeft = Offset(frameInset, frameTop),
+                size = Size(size.width - frameInset * 2, bottomLineY - frameTop),
                 cornerRadius = frameRadiusCorner,
                 style = Stroke(width = 1.5.dp.toPx())
             )
             val innerInset = frameInset + 5.5.dp.toPx()
             drawRoundRect(
                 color = gold.copy(alpha = 0.40f),
-                topLeft = Offset(innerInset, innerInset),
-                size = Size(size.width - innerInset * 2, bottomLineY - frameInset - innerInset),
+                topLeft = Offset(innerInset, frameTop + 5.5f),
+                size = Size(size.width - innerInset * 2, bottomLineY - frameTop - 5.5.dp.toPx()),
                 cornerRadius = frameRadiusCorner,
                 style = Stroke(width = 1.dp.toPx())
             )
