@@ -579,60 +579,6 @@ fun FlipbookScreen(
                         }
                     }
 
-                    // 本外底部：朱红通栏双动作条（整理当月/翻阅画廊；随当前页切换，多选时隐藏）
-                    AnimatedVisibility(
-                        visible = !isSelectionMode,
-                        enter = fadeIn(tween(180)),
-                        exit = fadeOut(tween(120))
-                    ) {
-                        val currentPageModel = monthPages.getOrNull(pagerState.currentPage)
-                        if (currentPageModel != null && currentPageModel.totalPhotos > 0) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 20.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                val monthName = monthChineseName(currentPageModel.month)
-                                val isCleanup = currentPageModel.unreviewedCount > 0
-                                Text(
-                                    text = if (isCleanup) {
-                                        "待清 ${currentPageModel.unreviewedCount} · ${formatStorageSize(currentPageModel.reclaimableBytes)}"
-                                    } else {
-                                        "已归档 ${currentPageModel.keptCount}"
-                                    },
-                                    fontFamily = DecoDisplayFontFamily,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = DecoInkOnGround.copy(alpha = 0.66f),
-                                    textAlign = TextAlign.End,
-                                    maxLines = 1,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                DecoVermStrip(
-                                    leftLabel = if (isCleanup) "整理${monthName}" else "重温${monthName}",
-                                    rightLabel = if (showGalleryMode) "返回月历" else "翻阅画廊",
-                                    onLeft = {
-                                        onStartMonthCleanup(
-                                            currentPageModel.year,
-                                            currentPageModel.month,
-                                            currentPageModel.unreviewedCount == 0,
-                                            null
-                                        )
-                                    },
-                                    onRight = {
-                                        // 与顶栏『月历/画廊』跳签同一入口：朱红通栏副动作切换视图
-                                        haptics.pageFlipLift()
-                                        showGalleryMode = !showGalleryMode
-                                    },
-                                    leftFlex = 1.35f,
-                                    leftTestTag = "clean_month_button_${currentPageModel.month}"
-                                )
-                            }
-                        }
-                    }
-
                     // 月份跳签（表冠刻度画报化：金框跳签 + 已清朱红印点 + 选中金下划线；多选时隐藏给批量栏让位）
                     AnimatedVisibility(
                         visible = !isSelectionMode,
@@ -723,7 +669,61 @@ fun FlipbookScreen(
                             }
                         }
                     }
-                }
+
+
+                    // 本外底部：朱红通栏双动作条（整理当月/翻阅画廊；随当前页切换，多选时隐藏）
+                    AnimatedVisibility(
+                        visible = !isSelectionMode,
+                        enter = fadeIn(tween(180)),
+                        exit = fadeOut(tween(120))
+                    ) {
+                        val currentPageModel = monthPages.getOrNull(pagerState.currentPage)
+                        if (currentPageModel != null && currentPageModel.totalPhotos > 0) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                val monthName = monthChineseName(currentPageModel.month)
+                                val isCleanup = currentPageModel.unreviewedCount > 0
+                                Text(
+                                    text = if (isCleanup) {
+                                        "待清 ${currentPageModel.unreviewedCount} · ${formatStorageSize(currentPageModel.reclaimableBytes)}"
+                                    } else {
+                                        "已归档 ${currentPageModel.keptCount}"
+                                    },
+                                    fontFamily = DecoDisplayFontFamily,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = DecoInkOnGround.copy(alpha = 0.66f),
+                                    textAlign = TextAlign.End,
+                                    maxLines = 1,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                DecoVermStrip(
+                                    leftLabel = if (isCleanup) "整理${monthName}" else "重温${monthName}",
+                                    rightLabel = if (showGalleryMode) "返回月历" else "翻阅画廊",
+                                    onLeft = {
+                                        onStartMonthCleanup(
+                                            currentPageModel.year,
+                                            currentPageModel.month,
+                                            currentPageModel.unreviewedCount == 0,
+                                            null
+                                        )
+                                    },
+                                    onRight = {
+                                        // 与顶栏『月历/画廊』跳签同一入口：朱红通栏副动作切换视图
+                                        haptics.pageFlipLift()
+                                        showGalleryMode = !showGalleryMode
+                                    },
+                                    leftFlex = 1.35f,
+                                    leftTestTag = "clean_month_button_${currentPageModel.month}"
+                                )
+                            }
+                        }
+                    }                }
             }
         }
 
