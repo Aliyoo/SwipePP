@@ -317,7 +317,7 @@ fun FootprintMapScreen(
 
         // 金双线画框：外 1.5dp 金 + 内 1dp 弱金，两线之间不铺内衬（框内保持地图原样）
         // 纯描边 Canvas，不注册 pointerInput，手势完全穿透到地图。
-        // 顶线贴状态栏下缘（遥测卡下移入框内）；底线实测锚定 dock 顶缘上 9dp。
+        // 顶线贴状态栏下缘（遥测卡下移入框内）；底线实测锚定 dock 顶缘上 11dp。
         // 框外区域（画框与屏幕边缘之间）填充首页纸地，遮住外溢的地图线
         var canvasTopYPx by remember { mutableFloatStateOf(0f) }
         val dockTopYPx = LocalDockTopYPx.current
@@ -332,7 +332,7 @@ fun FootprintMapScreen(
         ) {
             val frameInset = 7.dp.toPx()
             val frameRadius = 2.dp.toPx()
-            val marginPx = 9.dp.toPx()
+            val marginPx = 11.dp.toPx()
             val frameTop = statusBarPx + 2.dp.toPx() + frameInset
             // 底线局部 Y = dock 顶缘实测 Y - 9dp 余量 - 画框窗口偏移；锚点未就绪时回落画布底缘
             val bottomLineY = if (dockTopYPx.isNaN()) size.height - frameInset
