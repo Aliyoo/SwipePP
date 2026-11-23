@@ -1196,13 +1196,14 @@ fun FootprintMapScreen(
                                 Text(
                                     text = String.format(
                                         Locale.US,
-                                        "%.2f°%s, %.2f°%s · %d 项媒体 · %s",
+                                        // 有用信息排前面：宽度不够时截掉的是坐标而不是数量
+                                        "%d 项媒体 · %s · %.2f°%s, %.2f°%s",
+                                        cluster.photos.size,
+                                        formatStorageSize(cluster.totalBytes),
                                         abs(cluster.latitude),
                                         latLabel,
                                         abs(cluster.longitude),
-                                        lonLabel,
-                                        cluster.photos.size,
-                                        formatStorageSize(cluster.totalBytes)
+                                        lonLabel
                                     ),
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontSize = 12.sp,

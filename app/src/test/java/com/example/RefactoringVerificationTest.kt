@@ -90,6 +90,7 @@ class RefactoringVerificationTest {
         assertTrue(isMachineGeneratedFilename("20261109_091925"))
         assertTrue(isMachineGeneratedFilename("IMG_20261018_091500"))
         assertTrue(isMachineGeneratedFilename("Screenshot_20251228_102200"))
+        assertTrue(isMachineGeneratedFilename("03fff229ff10c39e4a39875705b54f"))
         assertFalse(isMachineGeneratedFilename("清水寺石阶晚霞"))
 
         val cameraPhoto = photo(1L, caption = "20261109_091925", locationName = "京都")

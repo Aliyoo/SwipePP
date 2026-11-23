@@ -90,7 +90,9 @@ private val MACHINE_FILENAME_REGEX = Regex(
     pattern = "^(?:" +
         "(?:IMG|DSC|PXL|VID|MOV|MVIMG|Screenshot|Screenrecorder|wx_camera|mmexport|RPReplay|DJI)[-_\\d A-Za-z]*|" +
         "\\d{6,8}[_-]\\d{4,6}(?:[_-][A-Za-z0-9]+)*|" +
-        "\\d{10,16}" +
+        "\\d{10,16}|" +
+        // 哈希风格文件名（MD5/SHA 等全小写 hex，无意义标题）
+        "[0-9a-f]{20,64}" +
         ")$",
     option = RegexOption.IGNORE_CASE
 )

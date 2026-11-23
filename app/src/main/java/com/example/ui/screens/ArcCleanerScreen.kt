@@ -951,7 +951,7 @@ fun ArcCleanerScreen(
                                         )
                                         DecoVermStripButton(
                                             title = "整组回收",
-                                            leadingIconKind = DecoIconKind.DELETE,
+                                            // 三钮等分下 24dp 图标会挤掉 4 字标题被省略，让位给文字
                                             height = 48.dp,
                                             onClick = {
                                                 haptics.swipeDeleteConfirm()
