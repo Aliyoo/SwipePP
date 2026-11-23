@@ -74,6 +74,8 @@ import com.example.ui.YearbookSummary
 import com.example.ui.components.ObsidianGlassCard
 import com.example.ui.components.ObsidianGlassPill
 import com.example.ui.components.PhotoArtwork
+import com.example.ui.components.YearbookCollageCanvas
+import com.example.ui.components.YearbookCollageTemplates
 import com.example.ui.theme.EditionCobalt
 import com.example.ui.theme.EditionObsidian
 import com.example.ui.theme.EditionSlatePlum
@@ -121,7 +123,16 @@ internal fun ModernYearbook3DCard(
     val displayedPhoto = slides.getOrNull(safeSlideIndex) ?: summary.coverPhoto
     val slideProgress = remember(summary.year, slideKeys) { Animatable(0f) }
 
-    val isCarouselActive = isFocused && !isCarouselPaused && slides.size > 1
+    val showCollage = summary.effectiveIsCollage && slides.size >= 2
+    val collageTemplate = remember(summary.collageTemplateId, summary.year, slides.size) {
+        YearbookCollageTemplates.resolveTemplate(
+            templateId = summary.collageTemplateId.ifBlank { null },
+            year = summary.year,
+            availablePhotoCount = slides.size
+        )
+    }
+
+    val isCarouselActive = !showCollage && isFocused && !isCarouselPaused && slides.size > 1
 
     LaunchedEffect(displayedPhoto, isFocused) {
         if (isFocused) {
@@ -176,8 +187,23 @@ internal fun ModernYearbook3DCard(
                 onClick = onClick
             )
     ) {
-        // 100% Full-Bleed Edge-to-Edge Living Cover Showcase (Crossfade + GPU-only Ken Burns drift, zero recomposition)
-        if (displayedPhoto != null) {
+        // 100% Full-Bleed Edge-to-Edge Cover Showcase: Irregular Collage OR Living Ken Burns Carousel
+        if (showCollage) {
+            YearbookCollageCanvas(
+                photos = slides,
+                template = collageTemplate,
+                spacingDp = summary.collageSpacingDp,
+                backdrop = summary.collageBackdrop,
+                editionColor = coverColor,
+                slotTransforms = summary.collageSlotTransforms,
+                interactive = false,
+                downsampleTier = ImageDownsampleTier.HERO_CARD,
+                targetSizePx = 560,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("yearbook_collage_cover_${summary.year}")
+            )
+        } else if (displayedPhoto != null) {
             val panDirection = if (safeSlideIndex % 2 == 0) 1f else -1f
 
             Crossfade(
@@ -276,9 +302,9 @@ internal fun ModernYearbook3DCard(
                 .padding(start = 24.dp, end = 16.dp, top = 12.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Top: Ultra-thin slideshow progress bars + refined frosted glass change-cover orb
+            // Top: Ultra-thin slideshow progress bars (carousel mode only) + refined frosted glass change-cover orb
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (slides.size > 1) {
+                if (!showCollage && slides.size > 1) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

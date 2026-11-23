@@ -19,12 +19,18 @@ import com.example.data.PhotoRestoreSpec
 import com.example.data.PhotoStatus
 import com.example.data.ResolvedGeoLocation
 import com.example.data.SameDayLocationMatch
+import com.example.data.CollageBackdropStyle
+import com.example.data.CollageExportResult
+import com.example.data.CollageSlotTransform
+import com.example.data.YearbookCollageExporter
 import com.example.data.YearbookCoverConfigEntity
 import com.example.data.YearbookCoverMode
+import com.example.ui.components.CollageTemplate
 import com.example.ui.components.buildTimelineClusterLayout
 import com.example.ui.domain.LibraryDerivationEngine
 import com.example.ui.theme.ThemePreferences
 import com.example.ui.theme.TimelineSortOrder
+import com.example.ui.theme.YearbookCoverStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -53,6 +59,9 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     private val mediaFilter = MutableStateFlow(MediaFilter.ALL)
     private val timelineSortOrder = MutableStateFlow(
         ThemePreferences(application).userPreferences.value.timelineSortOrder
+    )
+    private val defaultYearbookCoverStyle = MutableStateFlow(
+        ThemePreferences(application).userPreferences.value.yearbookCoverStyle
     )
     private val mediaAccessLevel = MutableStateFlow(repository.checkMediaAccess())
     private val hasMediaLocationPermission = MutableStateFlow(repository.hasMediaLocationAccess())
@@ -158,10 +167,12 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         repository.trashedPhotos,
         combine(repository.monthStamps, repository.yearbookCovers) { stamps, covers -> stamps to covers },
         repository.cleanupStats,
-        combine(mediaFilter, timelineSortOrder) { filter, order -> filter to order }
-    ) { activePhotos, trashed, stampsAndCovers, stats, filterAndOrder ->
+        combine(mediaFilter, timelineSortOrder, defaultYearbookCoverStyle) { filter, order, coverStyle ->
+            Triple(filter, order, coverStyle)
+        }
+    ) { activePhotos, trashed, stampsAndCovers, stats, filterOrderStyle ->
         val (stamps, coverConfigs) = stampsAndCovers
-        val (filter, sortOrder) = filterAndOrder
+        val (filter, sortOrder, coverStyle) = filterOrderStyle
         var totalImageCount = 0
         var totalVideoCount = 0
         var hasDeviceMedia = false
@@ -199,7 +210,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             photos = filtered,
             stamps = stampMap,
             coverConfigs = coverConfigMap,
-            sortOrder = sortOrder
+            sortOrder = sortOrder,
+            defaultCoverStyle = coverStyle
         )
 
         val visibleGallery = ArrayList<PhotoItemEntity>(filtered.size)
@@ -422,11 +434,21 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         mediaFilter.value = filter
     }
 
+    fun setDefaultYearbookCoverStyle(style: YearbookCoverStyle) {
+        if (defaultYearbookCoverStyle.value != style) {
+            defaultYearbookCoverStyle.value = style
+        }
+    }
+
     fun saveYearbookCover(
         year: Int,
         mode: YearbookCoverMode,
         selectedPhotoIds: List<Long>,
-        intervalSeconds: Int
+        intervalSeconds: Int,
+        collageTemplateId: String = "",
+        collageSpacingDp: Float = 4f,
+        collageBackdrop: CollageBackdropStyle = CollageBackdropStyle.EDITION,
+        slotTransforms: List<CollageSlotTransform> = emptyList()
     ) {
         viewModelScope.launch {
             val sanitizedInterval = intervalSeconds.coerceIn(3, 12)
@@ -434,10 +456,18 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 year = year,
                 mode = mode,
                 selectedPhotoIds = selectedPhotoIds,
-                intervalSeconds = sanitizedInterval
+                intervalSeconds = sanitizedInterval,
+                collageTemplateId = collageTemplateId,
+                collageSpacingDp = collageSpacingDp,
+                collageBackdrop = collageBackdrop,
+                slotTransforms = slotTransforms
             )
             val msg = when (mode) {
-                YearbookCoverMode.SMART_CAROUSEL -> "${year}年已切换为智能精选轮播（每${sanitizedInterval}秒）"
+                YearbookCoverMode.SMART_CAROUSEL -> {
+                    val label = if (defaultYearbookCoverStyle.value == YearbookCoverStyle.COLLAGE) "智能拼图" else "智能轮播"
+                    "${year}年已恢复跟随全局默认（$label）"
+                }
+                YearbookCoverMode.CUSTOM_COLLAGE -> "已保存 ${year}年专属不规则拼图封面"
                 YearbookCoverMode.SINGLE_CUSTOM -> "已锁定 ${year}年专属单图封面"
                 YearbookCoverMode.CUSTOM_CAROUSEL -> "已保存 ${year}年 ${selectedPhotoIds.size} 张自选轮播封面"
             }
@@ -448,8 +478,34 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     fun resetYearbookCoverToSmart(year: Int) {
         viewModelScope.launch {
             repository.resetYearbookCover(year)
-            showBanner("${year}年已恢复智能精选轮播封面")
+            val label = if (defaultYearbookCoverStyle.value == YearbookCoverStyle.COLLAGE) "智能拼图" else "智能轮播"
+            showBanner("${year}年已恢复全局默认（$label）")
         }
+    }
+
+    suspend fun exportYearbookCollage(
+        year: Int,
+        photos: List<PhotoItemEntity>,
+        template: CollageTemplate,
+        spacingDp: Float,
+        backdrop: CollageBackdropStyle,
+        editionColorArgb: Int,
+        slotTransforms: List<CollageSlotTransform>,
+        includeYearWatermark: Boolean
+    ): CollageExportResult {
+        val result = YearbookCollageExporter.exportCollageToGallery(
+            context = getApplication(),
+            year = year,
+            photos = photos,
+            template = template,
+            spacingDp = spacingDp,
+            backdrop = backdrop,
+            editionColorArgb = editionColorArgb,
+            slotTransforms = slotTransforms,
+            includeYearWatermark = includeYearWatermark
+        )
+        showBanner(result.message)
+        return result
     }
 
     fun setCustomCleanerSession(title: String, photoIds: Set<Long>, includeReviewed: Boolean = true) {

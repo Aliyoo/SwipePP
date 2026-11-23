@@ -152,6 +152,7 @@ import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.StudioCanvas
 import com.example.ui.theme.SurfacePure
 import com.example.ui.theme.ThemePreferences
+import com.example.ui.theme.YearbookCoverStyle
 
 val LocalFloatingDockInset = compositionLocalOf { 0.dp }
 
@@ -220,6 +221,7 @@ fun FlipYearApp(
     onSelectFlipbookDefaultView: (FlipbookDefaultView) -> Unit = {},
     onSelectDefaultStartTab: (DefaultStartTab) -> Unit = {},
     onSelectGalleryGridDensity: (GalleryGridDensity) -> Unit = {},
+    onSelectYearbookCoverStyle: (YearbookCoverStyle) -> Unit = {},
     viewModel: FlipYearViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -231,6 +233,9 @@ fun FlipYearApp(
 
     LaunchedEffect(userPreferences.timelineSortOrder) {
         viewModel.setTimelineSortOrder(userPreferences.timelineSortOrder)
+    }
+    LaunchedEffect(userPreferences.yearbookCoverStyle) {
+        viewModel.setDefaultYearbookCoverStyle(userPreferences.yearbookCoverStyle)
     }
 
     val initialStartDestination = remember { userPreferences.defaultStartTab.route }
@@ -575,6 +580,10 @@ fun FlipYearApp(
                                 onSelectFlipbookDefaultView = onSelectFlipbookDefaultView,
                                 onSelectDefaultStartTab = onSelectDefaultStartTab,
                                 onSelectGalleryGridDensity = onSelectGalleryGridDensity,
+                                onSelectYearbookCoverStyle = { style ->
+                                    onSelectYearbookCoverStyle(style)
+                                    viewModel.setDefaultYearbookCoverStyle(style)
+                                },
                                 onOpenYearbook = { year ->
                                     navController.navigate(FlipYearRoutes.flipbook(year))
                                 },
@@ -597,7 +606,8 @@ fun FlipYearApp(
                                 onLoadDemoArchive = viewModel::loadDemoArchive,
                                 onRemoveDemoArchive = viewModel::removeDemoArchive,
                                 onSaveYearbookCover = viewModel::saveYearbookCover,
-                                onResetYearbookCover = viewModel::resetYearbookCoverToSmart
+                                onResetYearbookCover = viewModel::resetYearbookCoverToSmart,
+                                onExportYearbookCollage = viewModel::exportYearbookCollage
                             )
                         }
 

@@ -33,7 +33,11 @@ class PhotoRepository(
         year: Int,
         mode: YearbookCoverMode,
         selectedPhotoIds: List<Long>,
-        intervalSeconds: Int
+        intervalSeconds: Int,
+        collageTemplateId: String = "",
+        collageSpacingDp: Float = 4f,
+        collageBackdrop: CollageBackdropStyle = CollageBackdropStyle.EDITION,
+        slotTransforms: List<CollageSlotTransform> = emptyList()
     ) = withContext(Dispatchers.IO) {
         val sanitizedInterval = intervalSeconds.coerceIn(3, 12)
         val csv = selectedPhotoIds.distinct().joinToString(",")
@@ -43,7 +47,11 @@ class PhotoRepository(
                 mode = mode.name,
                 selectedPhotoIdsCsv = csv,
                 intervalSeconds = sanitizedInterval,
-                updatedAtMillis = System.currentTimeMillis()
+                updatedAtMillis = System.currentTimeMillis(),
+                collageTemplateId = collageTemplateId,
+                collageSpacingDp = collageSpacingDp.coerceIn(0f, 16f),
+                collageBackdrop = collageBackdrop.storageKey,
+                slotTransformsCsv = encodeSlotTransforms(slotTransforms)
             )
         )
     }

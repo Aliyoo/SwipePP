@@ -103,9 +103,54 @@ data class CleanupStatsEntity(
 )
 
 enum class YearbookCoverMode(val label: String) {
-    SMART_CAROUSEL("智能轮播"),
+    SMART_CAROUSEL("智能默认"),
+    CUSTOM_COLLAGE("不规则拼图"),
     SINGLE_CUSTOM("单图定格"),
     CUSTOM_CAROUSEL("多图轮播")
+}
+
+enum class CollageBackdropStyle(val storageKey: String, val label: String) {
+    EDITION("edition", "装帧色"),
+    WARM_PAPER("warm_paper", "暖白纸"),
+    OBSIDIAN("obsidian", "曜石黑");
+
+    companion object {
+        fun fromStorageKey(key: String?): CollageBackdropStyle =
+            entries.firstOrNull { it.storageKey == key } ?: EDITION
+    }
+}
+
+@Immutable
+data class CollageSlotTransform(
+    val scale: Float = 1f,
+    val offsetX: Float = 0f,
+    val offsetY: Float = 0f
+) {
+    val isIdentity: Boolean
+        get() = scale in 0.99f..1.01f && offsetX in -0.005f..0.005f && offsetY in -0.005f..0.005f
+}
+
+fun encodeSlotTransforms(transforms: List<CollageSlotTransform>): String =
+    transforms.joinToString(";") { t ->
+        "${"%.3f".format(java.util.Locale.US, t.scale.coerceIn(1f, 3f))}:" +
+            "${"%.3f".format(java.util.Locale.US, t.offsetX.coerceIn(-0.85f, 0.85f))}:" +
+            "${"%.3f".format(java.util.Locale.US, t.offsetY.coerceIn(-0.85f, 0.85f))}"
+    }
+
+fun decodeSlotTransforms(encoded: String): List<CollageSlotTransform> {
+    if (encoded.isBlank()) return emptyList()
+    return encoded.split(';').map { token ->
+        val parts = token.split(':')
+        if (parts.size >= 3) {
+            CollageSlotTransform(
+                scale = (parts[0].toFloatOrNull() ?: 1f).coerceIn(1f, 3f),
+                offsetX = (parts[1].toFloatOrNull() ?: 0f).coerceIn(-0.85f, 0.85f),
+                offsetY = (parts[2].toFloatOrNull() ?: 0f).coerceIn(-0.85f, 0.85f)
+            )
+        } else {
+            CollageSlotTransform()
+        }
+    }
 }
 
 @Immutable
@@ -115,14 +160,25 @@ data class YearbookCoverConfigEntity(
     val mode: String = YearbookCoverMode.SMART_CAROUSEL.name,
     val selectedPhotoIdsCsv: String = "",
     val intervalSeconds: Int = 5,
-    val updatedAtMillis: Long = 0L
+    val updatedAtMillis: Long = 0L,
+    val collageTemplateId: String = "",
+    val collageSpacingDp: Float = 4f,
+    val collageBackdrop: String = CollageBackdropStyle.EDITION.storageKey,
+    val slotTransformsCsv: String = ""
 ) {
     val coverMode: YearbookCoverMode
         get() = when (mode) {
+            YearbookCoverMode.CUSTOM_COLLAGE.name -> YearbookCoverMode.CUSTOM_COLLAGE
             YearbookCoverMode.SINGLE_CUSTOM.name -> YearbookCoverMode.SINGLE_CUSTOM
             YearbookCoverMode.CUSTOM_CAROUSEL.name -> YearbookCoverMode.CUSTOM_CAROUSEL
             else -> YearbookCoverMode.SMART_CAROUSEL
         }
+
+    val backdropStyle: CollageBackdropStyle
+        get() = CollageBackdropStyle.fromStorageKey(collageBackdrop)
+
+    val slotTransforms: List<CollageSlotTransform>
+        get() = decodeSlotTransforms(slotTransformsCsv)
 
     val selectedPhotoIds: List<Long>
         get() = if (selectedPhotoIdsCsv.isBlank()) {
@@ -134,4 +190,5 @@ data class YearbookCoverConfigEntity(
                 .distinct()
         }
 }
+
 

@@ -1,9 +1,13 @@
 package com.example.ui
 
+import com.example.data.CollageBackdropStyle
+import com.example.data.CollageSlotTransform
 import com.example.data.PhotoItemEntity
 import com.example.data.PhotoStatus
 import com.example.data.YearbookCoverConfigEntity
 import com.example.data.YearbookCoverMode
+import com.example.ui.components.YearbookCollageTemplates
+import com.example.ui.theme.YearbookCoverStyle
 import java.util.Locale
 
 data class ResolvedYearbookCover(
@@ -11,7 +15,12 @@ data class ResolvedYearbookCover(
     val slides: List<PhotoItemEntity>,
     val mode: YearbookCoverMode,
     val intervalSeconds: Int,
-    val customPhotoIds: List<Long>
+    val customPhotoIds: List<Long>,
+    val effectiveIsCollage: Boolean,
+    val collageTemplateId: String,
+    val collageSpacingDp: Float,
+    val collageBackdrop: CollageBackdropStyle,
+    val collageSlotTransforms: List<CollageSlotTransform>
 )
 
 /**
@@ -216,25 +225,53 @@ object YearbookCoverCurator {
     }
 
     /**
-     * Resolves the effective cover slides & mode for a year by combining user customization
-     * (if saved) with graceful fallback to smart curation when pinned photos are trashed/deleted.
+     * Convenience overload inferring year from config or first photo (preserves compatibility with tests).
      */
     fun resolveCoverPresentation(
         yearPhotos: List<PhotoItemEntity>,
         config: YearbookCoverConfigEntity?,
+        defaultCoverStyle: YearbookCoverStyle = YearbookCoverStyle.COLLAGE,
+        maxSlides: Int = MAX_COVER_SLIDES
+    ): ResolvedYearbookCover = resolveCoverPresentation(
+        year = config?.year ?: yearPhotos.firstOrNull()?.year ?: 2025,
+        yearPhotos = yearPhotos,
+        config = config,
+        defaultCoverStyle = defaultCoverStyle,
+        maxSlides = maxSlides
+    )
+
+    /**
+     * Resolves the effective cover presentation for a year by combining user customization
+     * (if saved) with global cover style preference (smart collage vs smart carousel) and
+     * graceful fallback when pinned photos are deleted/trashed.
+     */
+    fun resolveCoverPresentation(
+        year: Int,
+        yearPhotos: List<PhotoItemEntity>,
+        config: YearbookCoverConfigEntity?,
+        defaultCoverStyle: YearbookCoverStyle = YearbookCoverStyle.COLLAGE,
         maxSlides: Int = MAX_COVER_SLIDES
     ): ResolvedYearbookCover {
         val smartSlides = curateSmartCoverSlides(yearPhotos, maxSlides)
         val interval = (config?.intervalSeconds ?: DEFAULT_INTERVAL_SECONDS).coerceIn(3, 12)
+        val smartTemplate = YearbookCollageTemplates.defaultTemplateFor(year, smartSlides.size)
+        val defaultSmartIsCollage = defaultCoverStyle == YearbookCoverStyle.COLLAGE && smartSlides.size >= 2
+
+        fun smartDefaultResult(): ResolvedYearbookCover = ResolvedYearbookCover(
+            coverPhoto = smartSlides.firstOrNull(),
+            slides = smartSlides,
+            mode = YearbookCoverMode.SMART_CAROUSEL,
+            intervalSeconds = interval,
+            customPhotoIds = emptyList(),
+            effectiveIsCollage = defaultSmartIsCollage,
+            collageTemplateId = smartTemplate.id,
+            collageSpacingDp = smartTemplate.defaultSpacingDp,
+            collageBackdrop = CollageBackdropStyle.EDITION,
+            collageSlotTransforms = emptyList()
+        )
 
         if (config == null || config.coverMode == YearbookCoverMode.SMART_CAROUSEL) {
-            return ResolvedYearbookCover(
-                coverPhoto = smartSlides.firstOrNull(),
-                slides = smartSlides,
-                mode = YearbookCoverMode.SMART_CAROUSEL,
-                intervalSeconds = interval,
-                customPhotoIds = emptyList()
-            )
+            return smartDefaultResult()
         }
 
         val visibleById = HashMap<Long, PhotoItemEntity>(yearPhotos.size)
@@ -250,17 +287,40 @@ object YearbookCoverCurator {
             .take(maxSlides)
 
         if (resolvedCustom.isEmpty()) {
-            // Graceful fallback if all pinned photos were deleted/trashed
-            return ResolvedYearbookCover(
-                coverPhoto = smartSlides.firstOrNull(),
-                slides = smartSlides,
-                mode = YearbookCoverMode.SMART_CAROUSEL,
-                intervalSeconds = interval,
-                customPhotoIds = emptyList()
-            )
+            return smartDefaultResult()
         }
 
         return when (config.coverMode) {
+            YearbookCoverMode.CUSTOM_COLLAGE -> {
+                val chosenTemplate = YearbookCollageTemplates.resolveTemplate(
+                    templateId = config.collageTemplateId.ifBlank { null },
+                    year = year,
+                    availablePhotoCount = maxOf(resolvedCustom.size, smartSlides.size)
+                )
+                // If user deleted some photos and fewer remain than slots, gracefully pad from smart pool
+                val filledPhotos = buildList(chosenTemplate.slotCount) {
+                    val usedIds = HashSet<Long>()
+                    resolvedCustom.forEach {
+                        if (size < chosenTemplate.slotCount && usedIds.add(it.id)) add(it)
+                    }
+                    smartSlides.forEach {
+                        if (size < chosenTemplate.slotCount && usedIds.add(it.id)) add(it)
+                    }
+                }
+                val canRenderCollage = filledPhotos.size >= 2
+                ResolvedYearbookCover(
+                    coverPhoto = filledPhotos.firstOrNull() ?: resolvedCustom.first(),
+                    slides = filledPhotos.ifEmpty { resolvedCustom },
+                    mode = YearbookCoverMode.CUSTOM_COLLAGE,
+                    intervalSeconds = interval,
+                    customPhotoIds = resolvedCustom.map { it.id },
+                    effectiveIsCollage = canRenderCollage,
+                    collageTemplateId = chosenTemplate.id,
+                    collageSpacingDp = config.collageSpacingDp.coerceIn(0f, 16f),
+                    collageBackdrop = config.backdropStyle,
+                    collageSlotTransforms = config.slotTransforms
+                )
+            }
             YearbookCoverMode.SINGLE_CUSTOM -> {
                 val single = resolvedCustom.first()
                 ResolvedYearbookCover(
@@ -268,7 +328,12 @@ object YearbookCoverCurator {
                     slides = listOf(single),
                     mode = YearbookCoverMode.SINGLE_CUSTOM,
                     intervalSeconds = interval,
-                    customPhotoIds = listOf(single.id)
+                    customPhotoIds = listOf(single.id),
+                    effectiveIsCollage = false,
+                    collageTemplateId = smartTemplate.id,
+                    collageSpacingDp = smartTemplate.defaultSpacingDp,
+                    collageBackdrop = CollageBackdropStyle.EDITION,
+                    collageSlotTransforms = emptyList()
                 )
             }
             YearbookCoverMode.CUSTOM_CAROUSEL -> {
@@ -282,18 +347,15 @@ object YearbookCoverCurator {
                     slides = resolvedCustom,
                     mode = effectiveMode,
                     intervalSeconds = interval,
-                    customPhotoIds = resolvedCustom.map { it.id }
+                    customPhotoIds = resolvedCustom.map { it.id },
+                    effectiveIsCollage = false,
+                    collageTemplateId = smartTemplate.id,
+                    collageSpacingDp = smartTemplate.defaultSpacingDp,
+                    collageBackdrop = CollageBackdropStyle.EDITION,
+                    collageSlotTransforms = emptyList()
                 )
             }
-            YearbookCoverMode.SMART_CAROUSEL -> {
-                ResolvedYearbookCover(
-                    coverPhoto = smartSlides.firstOrNull(),
-                    slides = smartSlides,
-                    mode = YearbookCoverMode.SMART_CAROUSEL,
-                    intervalSeconds = interval,
-                    customPhotoIds = emptyList()
-                )
-            }
+            YearbookCoverMode.SMART_CAROUSEL -> smartDefaultResult()
         }
     }
 }

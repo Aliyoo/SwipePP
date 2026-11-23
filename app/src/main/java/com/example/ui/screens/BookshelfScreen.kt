@@ -81,7 +81,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.data.CollageBackdropStyle
+import com.example.data.CollageExportResult
+import com.example.data.CollageSlotTransform
 import com.example.data.MediaAccessLevel
+import com.example.data.PhotoItemEntity
 import com.example.data.YearbookCoverMode
 import com.example.sensor.rememberHapticEngine
 import com.example.ui.FlipYearUiState
@@ -90,6 +94,7 @@ import com.example.ui.MediaFilter
 import com.example.ui.components.Adaptive3DBookshelfCarousel
 import com.example.ui.components.AppSettingsSheet
 import com.example.ui.components.ArtisticGalleryBackdrop
+import com.example.ui.components.CollageTemplate
 import com.example.ui.components.GalleryHeaderOrbButton
 import com.example.ui.components.ThemeAppearanceSheet
 import com.example.ui.components.YearbookCoverStudioSheet
@@ -120,6 +125,7 @@ import com.example.ui.theme.SurfaceMuted
 import com.example.ui.theme.SurfacePure
 import com.example.ui.theme.TimelineSortOrder
 import com.example.ui.theme.UserPreferences
+import com.example.ui.theme.YearbookCoverStyle
 import com.example.ui.theme.isReducedMotionEnabled
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -136,6 +142,7 @@ fun BookshelfScreen(
     onSelectFlipbookDefaultView: (FlipbookDefaultView) -> Unit = {},
     onSelectDefaultStartTab: (DefaultStartTab) -> Unit = {},
     onSelectGalleryGridDensity: (GalleryGridDensity) -> Unit = {},
+    onSelectYearbookCoverStyle: (YearbookCoverStyle) -> Unit = {},
     onOpenYearbook: (Int) -> Unit,
     onStartYearCleanup: (year: Int, includeReviewed: Boolean) -> Unit = { _, _ -> },
     onOpenVault: () -> Unit = {},
@@ -144,8 +151,29 @@ fun BookshelfScreen(
     onSelectFilter: (MediaFilter) -> Unit,
     onLoadDemoArchive: () -> Unit,
     onRemoveDemoArchive: () -> Unit = {},
-    onSaveYearbookCover: (year: Int, mode: YearbookCoverMode, selectedPhotoIds: List<Long>, intervalSeconds: Int) -> Unit = { _, _, _, _ -> },
+    onSaveYearbookCover: (
+        year: Int,
+        mode: YearbookCoverMode,
+        selectedPhotoIds: List<Long>,
+        intervalSeconds: Int,
+        collageTemplateId: String,
+        collageSpacingDp: Float,
+        collageBackdrop: CollageBackdropStyle,
+        slotTransforms: List<CollageSlotTransform>
+    ) -> Unit = { _, _, _, _, _, _, _, _ -> },
     onResetYearbookCover: (year: Int) -> Unit = {},
+    onExportYearbookCollage: suspend (
+        year: Int,
+        photos: List<PhotoItemEntity>,
+        template: CollageTemplate,
+        spacingDp: Float,
+        backdrop: CollageBackdropStyle,
+        editionColorArgb: Int,
+        slotTransforms: List<CollageSlotTransform>,
+        includeYearWatermark: Boolean
+    ) -> CollageExportResult = { _, _, _, _, _, _, _, _ ->
+        CollageExportResult(false, "", "导出服务未就绪")
+    },
     modifier: Modifier = Modifier
 ) {
     val books = uiState.yearbooks
@@ -593,12 +621,34 @@ fun BookshelfScreen(
         YearbookCoverStudioSheet(
             summary = targetBook,
             yearPhotos = yearPhotos,
+            defaultCoverStyle = userPreferences.yearbookCoverStyle,
             onDismiss = { customizingYear = null },
-            onSaveCover = { mode, ids, interval ->
-                onSaveYearbookCover(targetBook.year, mode, ids, interval)
+            onSaveCover = { mode, ids, interval, templateId, spacingDp, backdrop, slotTransforms ->
+                onSaveYearbookCover(
+                    targetBook.year,
+                    mode,
+                    ids,
+                    interval,
+                    templateId,
+                    spacingDp,
+                    backdrop,
+                    slotTransforms
+                )
             },
             onResetToSmart = {
                 onResetYearbookCover(targetBook.year)
+            },
+            onExportCollage = { photos, template, spacingDp, backdrop, editionColorArgb, slotTransforms, includeWatermark ->
+                onExportYearbookCollage(
+                    targetBook.year,
+                    photos,
+                    template,
+                    spacingDp,
+                    backdrop,
+                    editionColorArgb,
+                    slotTransforms,
+                    includeWatermark
+                )
             }
         )
     }
@@ -624,6 +674,7 @@ fun BookshelfScreen(
             onSelectFlipbookDefaultView = onSelectFlipbookDefaultView,
             onSelectDefaultStartTab = onSelectDefaultStartTab,
             onSelectGalleryGridDensity = onSelectGalleryGridDensity,
+            onSelectYearbookCoverStyle = onSelectYearbookCoverStyle,
             onSelectThemeMode = onSelectThemeMode,
             onRescanDeviceMedia = onRescanDeviceMedia,
             onRequestMediaPermission = onRequestMediaPermission,

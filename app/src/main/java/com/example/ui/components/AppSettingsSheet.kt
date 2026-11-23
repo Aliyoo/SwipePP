@@ -33,6 +33,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.RestartAlt
@@ -88,6 +90,7 @@ import com.example.ui.theme.SurfacePure
 import com.example.ui.theme.SurfaceSubtle
 import com.example.ui.theme.TimelineSortOrder
 import com.example.ui.theme.UserPreferences
+import com.example.ui.theme.YearbookCoverStyle
 
 /**
  * Unified editorial preferences drawer:
@@ -109,6 +112,7 @@ fun AppSettingsSheet(
     onSelectFlipbookDefaultView: (FlipbookDefaultView) -> Unit,
     onSelectDefaultStartTab: (DefaultStartTab) -> Unit,
     onSelectGalleryGridDensity: (GalleryGridDensity) -> Unit,
+    onSelectYearbookCoverStyle: (YearbookCoverStyle) -> Unit = {},
     onSelectThemeMode: (AppThemeMode) -> Unit,
     onRescanDeviceMedia: () -> Unit,
     onRequestMediaPermission: () -> Unit,
@@ -232,6 +236,78 @@ fun AppSettingsSheet(
                             fontWeight = FontWeight.Medium,
                             color = InkSecondary,
                             maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                        )
+                    }
+                }
+
+                HorizontalDivider(
+                    thickness = 0.75.dp,
+                    color = HairlineBorder.copy(alpha = 0.75f),
+                    modifier = Modifier.padding(horizontal = 14.dp)
+                )
+
+                // Global default yearbook cover style (Collage vs Carousel)
+                Column(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "首页年度封面默认样式",
+                            fontFamily = OutfitFontFamily,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = InkPrimary
+                        )
+                        Text(
+                            text = "单年可独立定制",
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontSize = 10.5.sp,
+                            color = InkTertiary
+                        )
+                    }
+
+                    SettingsSegmentedCapsule(
+                        items = listOf(
+                            SegmentedOption(
+                                value = YearbookCoverStyle.COLLAGE,
+                                label = YearbookCoverStyle.COLLAGE.shortLabel,
+                                icon = Icons.Filled.Dashboard,
+                                testTag = "settings_cover_collage"
+                            ),
+                            SegmentedOption(
+                                value = YearbookCoverStyle.CAROUSEL,
+                                label = YearbookCoverStyle.CAROUSEL.shortLabel,
+                                icon = Icons.Filled.Collections,
+                                testTag = "settings_cover_carousel"
+                            )
+                        ),
+                        selectedValue = preferences.yearbookCoverStyle,
+                        onSelect = { style ->
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onSelectYearbookCoverStyle(style)
+                        },
+                        modifier = Modifier.testTag("settings_yearbook_cover_style")
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = SurfaceSubtle.copy(alpha = 0.72f),
+                        border = BorderStroke(0.75.dp, HairlineBorder.copy(alpha = 0.7f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = preferences.yearbookCoverStyle.previewSummary,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.sp,
+                            color = InkSecondary,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
                         )
