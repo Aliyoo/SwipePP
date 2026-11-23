@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -155,7 +156,12 @@ private fun ganzhiOfYear(year: Int): String {
 /** 手势提示短句：色条下划线（回收=朱红警示字 / 保留=金） */
 @Composable
 private fun DecoHintSpan(text: String, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    // IntrinsicSize.Max：列宽收缩到最宽子件（文案），否则 fillMaxWidth 下划线会
+    // 吃掉外层 Row 全部剩余宽度，把后续提示挤成 0 宽
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(IntrinsicSize.Max)
+    ) {
         Text(
             text = text,
             fontSize = 12.5.sp,
