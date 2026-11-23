@@ -26,15 +26,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CenterFocusStrong
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,7 +38,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,19 +47,15 @@ import com.example.data.CollageBackdropStyle
 import com.example.data.CollageSlotTransform
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
-import com.example.ui.theme.CobaltPrimary
-import com.example.ui.theme.CobaltSoft
-import com.example.ui.theme.EditorialSerifFontFamily
-import com.example.ui.theme.HairlineBorder
-import com.example.ui.theme.InkPrimary
-import com.example.ui.theme.InkSecondary
-import com.example.ui.theme.InkTertiary
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoVerm
+import com.example.ui.theme.DecoMat
+import com.example.ui.theme.DecoDisplayFontFamily
+import com.example.ui.theme.DecoInkOnGround
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LocalIsDarkTheme
-import com.example.ui.theme.SolarAmber
-import com.example.ui.theme.SurfaceMuted
-import com.example.ui.theme.SurfacePure
-import com.example.ui.theme.SurfaceSubtle
+import com.example.ui.theme.DecoGround
 
 private val COLLAGE_SPACING_PRESETS = listOf(
     0f to "无缝",
@@ -112,7 +99,7 @@ internal fun YearbookCollageEditorPanel(
 ) {
     val isDark = LocalIsDarkTheme.current
     val bookShape = RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp, topEnd = 16.dp, bottomEnd = 16.dp)
-    val bookShadowColor = if (isDark) Color.Black.copy(alpha = 0.56f) else InkPrimary.copy(alpha = 0.28f)
+    val bookShadowColor = if (isDark) Color.Black.copy(alpha = 0.56f) else DecoInkOnGround.copy(alpha = 0.28f)
     val hasCustomTransforms = slotTransforms.any { !it.isIdentity }
     val filteredTemplates = if (selectedCategory == null || selectedCategory == CollageStyleCategory.ALL) {
         YearbookCollageTemplates.all
@@ -173,11 +160,11 @@ internal fun YearbookCollageEditorPanel(
                     )
                     Text(
                         text = year.toString(),
-                        fontFamily = EditorialSerifFontFamily,
+                        fontFamily = DecoDisplayFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 26.sp,
                         letterSpacing = (-0.8).sp,
-                        color = Color.White,
+                        color = DecoInkOnGround,
                         modifier = Modifier
                             .align(Alignment.BottomStart)
                             .padding(start = 15.dp, bottom = 8.dp)
@@ -207,9 +194,9 @@ internal fun YearbookCollageEditorPanel(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = CobaltSoft,
-                    border = BorderStroke(0.8.dp, CobaltPrimary.copy(alpha = 0.24f)),
+                    shape = RoundedCornerShape(3.dp),
+                    color = DecoMat,
+                    border = BorderStroke(0.8.dp, DecoGold.copy(alpha = 0.24f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
@@ -221,7 +208,7 @@ internal fun YearbookCollageEditorPanel(
                             style = MaterialTheme.typography.labelLarge,
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = CobaltPrimary,
+                            color = DecoGold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -229,7 +216,7 @@ internal fun YearbookCollageEditorPanel(
                             text = "${template.category.label} · ${template.slotCount} 格槽位",
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 10.sp,
-                            color = InkSecondary,
+                            color = DecoInkOnGround.copy(alpha = 0.72f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -238,16 +225,16 @@ internal fun YearbookCollageEditorPanel(
 
                 CollageStudioToolButton(
                     label = "随机排版",
-                    icon = Icons.Filled.Shuffle,
-                    accent = InkPrimary,
+                    iconKind = DecoIconKind.RESTART,
+                    accent = DecoInkOnGround,
                     onClick = onShuffleLayout,
                     modifier = Modifier.testTag("collage_shuffle_button")
                 )
 
                 CollageStudioToolButton(
                     label = if (hasCustomTransforms) "重置缩放" else "构图已居中",
-                    icon = Icons.Filled.CenterFocusStrong,
-                    accent = if (hasCustomTransforms) CobaltPrimary else InkTertiary,
+                    iconKind = DecoIconKind.CENTER_FOCUS,
+                    accent = if (hasCustomTransforms) DecoGold else DecoInkOnGround.copy(alpha = 0.55f),
                     enabled = hasCustomTransforms || activeSlotIndex != null,
                     onClick = onResetTransforms,
                     modifier = Modifier.testTag("collage_reset_transform_button")
@@ -256,8 +243,8 @@ internal fun YearbookCollageEditorPanel(
                 // 1-Tap HD Export CTA
                 Surface(
                     onClick = { if (!isExporting) onExportHdCollage() },
-                    shape = RoundedCornerShape(14.dp),
-                    color = CobaltPrimary,
+                    shape = RoundedCornerShape(3.dp),
+                    color = DecoVerm,
                     shadowElevation = 2.dp,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -271,16 +258,15 @@ internal fun YearbookCollageEditorPanel(
                     ) {
                         if (isExporting) {
                             CircularProgressIndicator(
-                                color = Color.White,
+                                color = DecoPaperCream,
                                 strokeWidth = 2.dp,
                                 modifier = Modifier.size(15.dp)
                             )
                         } else {
-                            Icon(
-                                imageVector = Icons.Filled.Download,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(15.dp)
+                            DecoIcon(
+                                kind = DecoIconKind.ARROW_DOWN,
+                                color = DecoPaperCream,
+                                iconSize = 15.dp
                             )
                         }
                         Spacer(modifier = Modifier.width(6.dp))
@@ -289,7 +275,7 @@ internal fun YearbookCollageEditorPanel(
                             style = MaterialTheme.typography.labelLarge,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = DecoPaperCream,
                             maxLines = 1
                         )
                     }
@@ -299,7 +285,7 @@ internal fun YearbookCollageEditorPanel(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(3.dp))
                         .clickable(onClick = onToggleYearWatermark)
                         .padding(horizontal = 4.dp, vertical = 4.dp)
                         .testTag("collage_watermark_toggle"),
@@ -310,20 +296,19 @@ internal fun YearbookCollageEditorPanel(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .size(16.dp)
-                            .clip(RoundedCornerShape(5.dp))
-                            .background(if (includeYearWatermark) CobaltPrimary else Color.Transparent)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(if (includeYearWatermark) DecoGold else Color.Transparent)
                             .border(
                                 width = 1.2.dp,
-                                color = if (includeYearWatermark) CobaltPrimary else InkTertiary,
-                                shape = RoundedCornerShape(5.dp)
+                                color = if (includeYearWatermark) DecoGold else DecoInkOnGround.copy(alpha = 0.55f),
+                                shape = RoundedCornerShape(2.dp)
                             )
                     ) {
                         if (includeYearWatermark) {
-                            Icon(
-                                imageVector = Icons.Filled.Check,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(11.dp)
+                            DecoIcon(
+                                kind = DecoIconKind.CHECK,
+                                color = DecoInkOnGround,
+                                iconSize = 11.dp
                             )
                         }
                     }
@@ -331,7 +316,7 @@ internal fun YearbookCollageEditorPanel(
                         text = "导出附带 $year 落款",
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 11.sp,
-                        color = InkSecondary,
+                        color = DecoInkOnGround.copy(alpha = 0.72f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -341,11 +326,11 @@ internal fun YearbookCollageEditorPanel(
 
         // 2) Live Gesture Guidance Pill
         Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = if (activeSlotIndex != null) CobaltSoft else SurfaceSubtle.copy(alpha = 0.85f),
+            shape = RoundedCornerShape(3.dp),
+            color = if (activeSlotIndex != null) DecoMat else DecoMat.copy(alpha = 0.85f),
             border = BorderStroke(
                 0.8.dp,
-                if (activeSlotIndex != null) CobaltPrimary.copy(alpha = 0.35f) else HairlineBorder
+                if (activeSlotIndex != null) DecoGold.copy(alpha = 0.35f) else DecoGold.copy(alpha = 0.45f)
             ),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -356,10 +341,9 @@ internal fun YearbookCollageEditorPanel(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(7.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Filled.TouchApp,
-                    contentDescription = null,
-                    tint = if (activeSlotIndex != null) CobaltPrimary else InkTertiary,
+                DecoIcon(
+                    kind = DecoIconKind.TOUCH,
+                    color = if (activeSlotIndex != null) DecoGold else DecoInkOnGround.copy(alpha = 0.55f),
                     modifier = Modifier.size(14.dp)
                 )
                 Text(
@@ -370,7 +354,7 @@ internal fun YearbookCollageEditorPanel(
                     },
                     style = MaterialTheme.typography.bodySmall,
                     fontSize = 11.sp,
-                    color = if (activeSlotIndex != null) CobaltPrimary else InkSecondary,
+                    color = if (activeSlotIndex != null) DecoGold else DecoInkOnGround.copy(alpha = 0.72f),
                     lineHeight = 15.sp,
                     modifier = Modifier.weight(1f)
                 )
@@ -380,14 +364,14 @@ internal fun YearbookCollageEditorPanel(
                         modifier = Modifier
                             .size(26.dp)
                             .clip(CircleShape)
-                            .background(CobaltPrimary.copy(alpha = 0.14f))
+                            .background(DecoGold.copy(alpha = 0.14f))
                             .clickable(onClick = onClearActiveSlot)
                             .testTag("collage_clear_active_slot")
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Close,
+                        DecoIcon(
+                            kind = DecoIconKind.CLOSE,
                             contentDescription = "取消选中槽位",
-                            tint = CobaltPrimary,
+                            color = DecoGold,
                             modifier = Modifier.size(13.dp)
                         )
                     }
@@ -433,7 +417,7 @@ internal fun YearbookCollageEditorPanel(
                 ) { item ->
                     val isSelected = item.id == template.id
                     val borderColor by animateColorAsState(
-                        targetValue = if (isSelected) CobaltPrimary else HairlineBorder,
+                        targetValue = if (isSelected) DecoGold else DecoGold.copy(alpha = 0.45f),
                         animationSpec = tween(160),
                         label = "template_card_border"
                     )
@@ -442,12 +426,12 @@ internal fun YearbookCollageEditorPanel(
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier
                             .width(68.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(if (isSelected) CobaltSoft else SurfacePure)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(if (isSelected) DecoMat else DecoGround)
                             .border(
                                 width = if (isSelected) 1.6.dp else 0.85.dp,
                                 color = borderColor,
-                                shape = RoundedCornerShape(14.dp)
+                                shape = RoundedCornerShape(3.dp)
                             )
                             .clickable { onSelectTemplate(item) }
                             .padding(horizontal = 6.dp, vertical = 7.dp)
@@ -456,9 +440,9 @@ internal fun YearbookCollageEditorPanel(
                         CollageTemplateWireframe(
                             template = item,
                             selected = isSelected,
-                            accentColor = CobaltPrimary,
-                            strokeColor = InkSecondary.copy(alpha = 0.65f),
-                            fillColor = if (isDark) SurfaceMuted else SurfaceSubtle,
+                            accentColor = DecoGold,
+                            strokeColor = DecoInkOnGround.copy(alpha = 0.65f),
+                            fillColor = if (isDark) DecoMat else DecoMat,
                             modifier = Modifier
                                 .width(34.dp)
                                 .aspectRatio(0.70f)
@@ -468,7 +452,7 @@ internal fun YearbookCollageEditorPanel(
                             style = MaterialTheme.typography.labelSmall,
                             fontSize = 10.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) CobaltPrimary else InkPrimary,
+                            color = if (isSelected) DecoGold else DecoInkOnGround,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -479,9 +463,9 @@ internal fun YearbookCollageEditorPanel(
 
         // 4) Gutter Spacing & Canvas Backdrop Tuning Bar
         Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = SurfacePure,
-            border = BorderStroke(0.8.dp, HairlineBorder),
+            shape = RoundedCornerShape(3.dp),
+            color = DecoGround,
+            border = BorderStroke(0.8.dp, DecoGold.copy(alpha = 0.45f)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
@@ -501,18 +485,18 @@ internal fun YearbookCollageEditorPanel(
                             style = MaterialTheme.typography.labelMedium,
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = InkSecondary,
+                            color = DecoInkOnGround.copy(alpha = 0.72f),
                             modifier = Modifier.width(34.dp)
                         )
                         COLLAGE_SPACING_PRESETS.forEach { (dpVal, label) ->
                             val selected = kotlin.math.abs(spacingDp - dpVal) < 0.6f
                             Surface(
                                 onClick = { onSelectSpacing(dpVal) },
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (selected) CobaltPrimary else SurfaceSubtle,
+                                shape = RoundedCornerShape(3.dp),
+                                color = if (selected) DecoGold else DecoMat,
                                 border = BorderStroke(
                                     0.75.dp,
-                                    if (selected) CobaltPrimary else HairlineBorder
+                                    if (selected) DecoGold else DecoGold.copy(alpha = 0.45f)
                                 ),
                                 modifier = Modifier
                                     .weight(1f)
@@ -525,7 +509,7 @@ internal fun YearbookCollageEditorPanel(
                                         style = MaterialTheme.typography.labelSmall,
                                         fontSize = 11.sp,
                                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (selected) Color.White else InkPrimary
+                                        color = if (selected) DecoInkOnGround else DecoInkOnGround
                                     )
                                 }
                             }
@@ -543,7 +527,7 @@ internal fun YearbookCollageEditorPanel(
                         style = MaterialTheme.typography.labelMedium,
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = InkSecondary,
+                        color = DecoInkOnGround.copy(alpha = 0.72f),
                         modifier = Modifier.width(34.dp)
                     )
                     CollageBackdropStyle.entries.forEach { style ->
@@ -551,11 +535,11 @@ internal fun YearbookCollageEditorPanel(
                         val swatchColor = resolveBackdropColor(style, editionColor)
                         Surface(
                             onClick = { onSelectBackdrop(style) },
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (selected) CobaltSoft else SurfaceSubtle,
+                            shape = RoundedCornerShape(3.dp),
+                            color = if (selected) DecoMat else DecoMat,
                             border = BorderStroke(
                                 width = if (selected) 1.3.dp else 0.75.dp,
-                                color = if (selected) CobaltPrimary else HairlineBorder
+                                color = if (selected) DecoGold else DecoGold.copy(alpha = 0.45f)
                             ),
                             modifier = Modifier
                                 .weight(1f)
@@ -572,7 +556,7 @@ internal fun YearbookCollageEditorPanel(
                                         .size(13.dp)
                                         .clip(CircleShape)
                                         .background(swatchColor)
-                                        .border(0.9.dp, InkTertiary.copy(alpha = 0.45f), CircleShape)
+                                        .border(0.9.dp, DecoInkOnGround.copy(alpha = 0.45f), CircleShape)
                                 )
                                 Spacer(modifier = Modifier.width(5.dp))
                                 Text(
@@ -580,7 +564,7 @@ internal fun YearbookCollageEditorPanel(
                                     style = MaterialTheme.typography.labelSmall,
                                     fontSize = 11.sp,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (selected) CobaltPrimary else InkPrimary,
+                                    color = if (selected) DecoGold else DecoInkOnGround,
                                     maxLines = 1
                                 )
                             }
@@ -595,7 +579,7 @@ internal fun YearbookCollageEditorPanel(
 @Composable
 private fun CollageStudioToolButton(
     label: String,
-    icon: ImageVector,
+    iconKind: DecoIconKind,
     accent: Color,
     onClick: () -> Unit,
     enabled: Boolean = true,
@@ -604,9 +588,9 @@ private fun CollageStudioToolButton(
     Surface(
         onClick = onClick,
         enabled = enabled,
-        shape = RoundedCornerShape(13.dp),
-        color = SurfacePure,
-        border = BorderStroke(0.85.dp, HairlineBorder),
+        shape = RoundedCornerShape(3.dp),
+        color = DecoGround,
+        border = BorderStroke(0.85.dp, DecoGold.copy(alpha = 0.45f)),
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 42.dp)
@@ -616,11 +600,10 @@ private fun CollageStudioToolButton(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (enabled) accent else InkTertiary.copy(alpha = 0.6f),
-                modifier = Modifier.size(15.dp)
+            DecoIcon(
+                kind = iconKind,
+                color = if (enabled) accent else DecoInkOnGround.copy(alpha = 0.6f),
+                iconSize = 15.dp
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
@@ -628,7 +611,7 @@ private fun CollageStudioToolButton(
                 style = MaterialTheme.typography.labelLarge,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = if (enabled) accent else InkTertiary.copy(alpha = 0.65f),
+                color = if (enabled) accent else DecoInkOnGround.copy(alpha = 0.65f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -645,9 +628,9 @@ private fun TemplateCategoryPill(
 ) {
     Surface(
         onClick = onClick,
-        shape = CircleShape,
-        color = if (selected) CobaltPrimary else SurfaceSubtle,
-        border = BorderStroke(0.75.dp, if (selected) CobaltPrimary else HairlineBorder),
+        shape = RoundedCornerShape(3.dp),
+        color = if (selected) DecoGold else DecoMat,
+        border = BorderStroke(0.75.dp, if (selected) DecoGold else DecoGold.copy(alpha = 0.45f)),
         modifier = modifier.heightIn(min = 32.dp)
     ) {
         Box(
@@ -659,7 +642,7 @@ private fun TemplateCategoryPill(
                 style = MaterialTheme.typography.labelSmall,
                 fontSize = 11.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = if (selected) Color.White else InkSecondary,
+                color = if (selected) DecoInkOnGround else DecoInkOnGround.copy(alpha = 0.72f),
                 maxLines = 1
             )
         }

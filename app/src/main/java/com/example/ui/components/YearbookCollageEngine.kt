@@ -42,7 +42,7 @@ import com.example.data.CollageBackdropStyle
 import com.example.data.CollageSlotTransform
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
-import com.example.ui.theme.CobaltPrimary
+import com.example.ui.theme.DecoGold
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -809,9 +809,9 @@ fun YearbookCollageCanvas(
                     }
                 }
 
-                // Crisp Cobalt Selection Halo following exact irregular polygon contour
+                // deco 金线选中描边，沿不规则多边形轮廓
                 if (isSelected) {
-                    val selectionAccent = CobaltPrimary
+                    val selectionAccent = DecoGold
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val path = buildRoundedPolygonPath(localPts, cornerPx)
                         drawPath(

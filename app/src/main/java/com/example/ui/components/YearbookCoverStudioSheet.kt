@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -77,10 +78,6 @@ import com.example.ui.YearbookCoverCurator
 import com.example.ui.YearbookSummary
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoMat
-import com.example.ui.theme.EditionCobalt
-import com.example.ui.theme.EditionObsidian
-import com.example.ui.theme.EditionSlatePlum
-import com.example.ui.theme.EditionTeal
 import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoInkOnGround
 import com.example.ui.theme.JetBrainsMonoFontFamily
@@ -249,12 +246,8 @@ fun YearbookCoverStudioSheet(
         }
     }
 
-    val editionBaseColor = when (summary.editionIndex) {
-        0 -> EditionObsidian
-        1 -> EditionCobalt
-        2 -> EditionTeal
-        else -> EditionSlatePlum
-    }
+    // deco 无版本色体系：拼块衬底与预览书封统一用画框衬纸 mat
+    val editionBaseColor = DecoMat
 
     val canSave = when (selectedMode) {
         YearbookCoverMode.SMART_CAROUSEL -> true
@@ -292,7 +285,7 @@ fun YearbookCoverStudioSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = DecoGround,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp),
         dragHandle = { DecoSheetDragHandle() },
         modifier = Modifier.modalSheetTopClearance()
     ) {
@@ -336,9 +329,10 @@ fun YearbookCoverStudioSheet(
                     }
                 }
 
-                FrostedGlassCard(
-                    shape = RoundedCornerShape(50),
-                    shadowElevation = 2.dp,
+                Surface(
+                    shape = RoundedCornerShape(3.dp),
+                    color = DecoInkOnGround.copy(alpha = 0.05f),
+                    border = BorderStroke(1.dp, DecoGold.copy(alpha = 0.45f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -621,7 +615,7 @@ fun YearbookCoverStudioSheet(
                             )
 
                             Surface(
-                                shape = RoundedCornerShape(50),
+                                shape = RoundedCornerShape(3.dp),
                                 color = DecoMat,
                                 border = BorderStroke(0.8.dp, DecoGold.copy(alpha = 0.25f))
                             ) {
@@ -679,7 +673,7 @@ fun YearbookCoverStudioSheet(
                                             slotTransforms = emptyList()
                                             selectedMode = YearbookCoverMode.CUSTOM_COLLAGE
                                         },
-                                        shape = RoundedCornerShape(11.dp),
+                                        shape = RoundedCornerShape(3.dp),
                                         color = DecoMat,
                                         border = BorderStroke(0.85.dp, DecoGold.copy(alpha = 0.45f)),
                                         modifier = Modifier
@@ -719,7 +713,7 @@ fun YearbookCoverStudioSheet(
                                                 )
                                             }
                                         },
-                                        shape = RoundedCornerShape(11.dp),
+                                        shape = RoundedCornerShape(3.dp),
                                         color = DecoGold,
                                         modifier = Modifier
                                             .heightIn(min = 36.dp)
@@ -732,14 +726,14 @@ fun YearbookCoverStudioSheet(
                                         ) {
                                             if (isExporting) {
                                                 CircularProgressIndicator(
-                                                    color = Color.White,
+                                                    color = DecoInkOnGround,
                                                     strokeWidth = 1.8.dp,
                                                     modifier = Modifier.size(13.dp)
                                                 )
                                             } else {
                                                 DecoIcon(
     kind = DecoIconKind.ARROW_DOWN,
-    color = Color.White,
+    color = DecoInkOnGround,
     iconSize = 13.dp,
     modifier = Modifier
                                                 )
@@ -748,7 +742,7 @@ fun YearbookCoverStudioSheet(
                                                 text = if (isExporting) "导出中…" else "导出高清图",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontWeight = FontWeight.Bold,
-                                                color = Color.White
+                                                color = DecoInkOnGround
                                             )
                                         }
                                     }
@@ -776,7 +770,7 @@ fun YearbookCoverStudioSheet(
                                 5 to stringResource(R.string.cover_speed_balanced),
                                 8 to stringResource(R.string.cover_speed_calm)
                             ).forEach { (sec, label) ->
-                                GallerySelectableChip(
+                                CoverStudioChip(
                                     selected = intervalSeconds == sec,
                                     onClick = {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -791,7 +785,7 @@ fun YearbookCoverStudioSheet(
                                         text = label,
                                         style = MaterialTheme.typography.labelMedium,
                                         fontSize = 11.sp,
-                                        color = if (intervalSeconds == sec) Color.White else DecoInkOnGround,
+                                        color = if (intervalSeconds == sec) DecoInkOnGround else DecoInkOnGround,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -859,7 +853,7 @@ fun YearbookCoverStudioSheet(
                                     CoverPickerFilter.FAVORITES -> favoritePhotos.size
                                     CoverPickerFilter.ALL_CHRONOLOGICAL -> visiblePhotos.size
                                 }
-                                GallerySelectableChip(
+                                CoverStudioChip(
                                     selected = pickerFilter == filter,
                                     onClick = { pickerFilter = filter },
                                     modifier = Modifier
@@ -870,7 +864,7 @@ fun YearbookCoverStudioSheet(
                                         text = "${filter.label}($count)",
                                         style = MaterialTheme.typography.labelMedium,
                                         fontSize = 11.sp,
-                                        color = if (pickerFilter == filter) Color.White else DecoInkOnGround,
+                                        color = if (pickerFilter == filter) DecoInkOnGround else DecoInkOnGround,
                                         maxLines = 1
                                     )
                                 }
@@ -987,7 +981,7 @@ fun YearbookCoverStudioSheet(
             }
 
             // 4) Pinned Bottom Action Row
-            HorizontalDivider(color = DecoGold.copy(alpha = 0.45f).copy(alpha = 0.7f), thickness = 0.75.dp)
+            HorizontalDivider(color = DecoGold.copy(alpha = 0.7f), thickness = 0.75.dp)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1015,7 +1009,7 @@ fun YearbookCoverStudioSheet(
                 GalleryActionButton(
                     text = stringResource(R.string.cover_studio_save),
                     leadingIconKind = DecoIconKind.CHECK,
-                    tone = GalleryButtonTone.OBSIDIAN,
+                    tone = GalleryButtonTone.IMMERSIVE,
                     enabled = canSave,
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -1076,6 +1070,29 @@ fun YearbookCoverStudioSheet(
 }
 
 @Composable
+private fun CoverStudioChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(3.dp),
+        color = if (selected) DecoGold else Color.Transparent,
+        border = BorderStroke(0.85.dp, if (selected) DecoGold else DecoGold.copy(alpha = 0.45f)),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            content = content
+        )
+    }
+}
+
+@Composable
 private fun CoverModeSegment(
     label: String,
     iconKind: DecoIconKind,
@@ -1083,13 +1100,11 @@ private fun CoverModeSegment(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val palette = LocalFlipYearPalette.current
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(50),
-        color = if (selected) palette.activeChromeMid else Color.Transparent,
-        border = if (selected) BorderStroke(0.9.dp, palette.activeChromeBorderStart) else null,
-        shadowElevation = if (selected) 3.dp else 0.dp,
+        shape = RoundedCornerShape(3.dp),
+        color = if (selected) DecoGold else Color.Transparent,
+        border = if (selected) BorderStroke(0.9.dp, DecoGold) else null,
         modifier = modifier.heightIn(min = 48.dp)
     ) {
         Row(
@@ -1099,7 +1114,7 @@ private fun CoverModeSegment(
         ) {
             DecoIcon(
                 kind = iconKind,
-                color = if (selected) DecoGold else DecoInkOnGround.copy(alpha = 0.72f),
+                color = if (selected) DecoInkOnGround else DecoInkOnGround.copy(alpha = 0.72f),
                 iconSize = 14.dp
             )
             Spacer(modifier = Modifier.width(4.dp))
@@ -1108,7 +1123,7 @@ private fun CoverModeSegment(
                 style = MaterialTheme.typography.labelLarge,
                 fontSize = 11.5.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = if (selected) Color.White else DecoInkOnGround.copy(alpha = 0.72f),
+                color = if (selected) DecoInkOnGround else DecoInkOnGround.copy(alpha = 0.72f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1135,7 +1150,7 @@ private fun MiniCollageCoverPreview(
                 .padding(top = 4.dp, bottom = 4.dp, start = 4.dp)
                 .clip(RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 13.dp, bottomEnd = 13.dp))
                 .background(if (isDark) Color(0xFF282E3D) else Color(0xFFEBE8E0))
-                .border(0.6.dp, DecoGold.copy(alpha = 0.45f).copy(alpha = 0.7f), RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 13.dp, bottomEnd = 13.dp))
+                .border(0.6.dp, DecoGold.copy(alpha = 0.7f), RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 13.dp, bottomEnd = 13.dp))
         )
 
         Box(
@@ -1217,7 +1232,7 @@ private fun MiniBookCoverPreview(
                 .padding(top = 4.dp, bottom = 4.dp, start = 4.dp)
                 .clip(RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 13.dp, bottomEnd = 13.dp))
                 .background(if (isDark) Color(0xFF282E3D) else Color(0xFFEBE8E0))
-                .border(0.6.dp, DecoGold.copy(alpha = 0.45f).copy(alpha = 0.7f), RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 13.dp, bottomEnd = 13.dp))
+                .border(0.6.dp, DecoGold.copy(alpha = 0.7f), RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 13.dp, bottomEnd = 13.dp))
         )
 
         Box(
@@ -1318,7 +1333,7 @@ private fun MiniBookCoverPreview(
                     fontWeight = FontWeight.Bold,
                     fontSize = 21.sp,
                     lineHeight = 22.sp,
-                    color = Color.White
+                    color = DecoInkOnGround
                 )
             }
         }
@@ -1470,7 +1485,7 @@ private fun CoverPickerGridTile(
                 } else {
                     DecoIcon(
     kind = DecoIconKind.CHECK,
-    color = Color.White,
+    color = DecoInkOnGround,
     iconSize = 14.dp,
     modifier = Modifier
                     )
