@@ -47,7 +47,6 @@ import com.example.ui.theme.AppThemeMode
 import com.example.ui.theme.DarkFlipYearPalette
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoInkDeep
-import com.example.ui.theme.DecoInkOnGround
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.DecoDisplayFontFamily
@@ -72,16 +71,8 @@ fun ThemeAppearanceSheet(
         sheetState = sheetState,
         containerColor = LocalFlipYearPalette.current.decoGround,
         shape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp),
-        dragHandle = {
-            Box(
-                modifier = Modifier
-                    .padding(top = 12.dp, bottom = 6.dp)
-                    .width(40.dp)
-                    .height(4.dp)
-                    .clip(CircleShape)
-                    .background(DecoInkOnGround.copy(alpha = 0.40f))
-            )
-        }
+        dragHandle = { DecoSheetDragHandle() },
+        modifier = Modifier.modalSheetTopClearance()
     ) {
         Column(
             modifier = Modifier

@@ -45,9 +45,11 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ui.components.DecoIcon
 import com.example.ui.components.DecoIconKind
+import com.example.ui.components.DecoSheetDragHandle
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.formatStorageSize
+import com.example.ui.components.modalSheetTopClearance
 import com.example.ui.components.monthChineseName
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoGround
@@ -92,7 +94,10 @@ internal fun BulkMoveDestinationSheet(
         sheetState = sheetState,
         containerColor = DecoMat,
         shape = MoveSheetShape,
-        modifier = Modifier.testTag("bulk_move_sheet")
+        dragHandle = { DecoSheetDragHandle() },
+        modifier = Modifier
+            .modalSheetTopClearance()
+            .testTag("bulk_move_sheet")
     ) {
         Column(
             modifier = Modifier

@@ -184,16 +184,8 @@ fun YearbookCoverStudioSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = LocalFlipYearPalette.current.decoGround,
-        dragHandle = {
-            Box(
-                modifier = Modifier
-                    .padding(top = 12.dp, bottom = 6.dp)
-                    .width(40.dp)
-                    .height(4.dp)
-                    .clip(CircleShape)
-                    .background(DecoInkOnGround.copy(alpha = 0.40f))
-            )
-        }
+        dragHandle = { DecoSheetDragHandle() },
+        modifier = Modifier.modalSheetTopClearance()
     ) {
         Column(
             modifier = Modifier

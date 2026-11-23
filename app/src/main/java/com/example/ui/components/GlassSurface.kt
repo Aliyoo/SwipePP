@@ -14,11 +14,15 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -49,6 +53,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -883,4 +888,37 @@ fun DecoSealOrb(
             )
         }
     }
+}
+
+/**
+ * Ensures edge-to-edge Material 3 ModalBottomSheets never collide with the system status bar
+ * or display cutout when content is tall/scrollable, exposing a visible dimmed scrim margin
+ * above the sheet's top edge and keeping the drag handle comfortably reachable.
+ */
+@Composable
+fun Modifier.modalSheetTopClearance(extraTopGap: Dp = 18.dp): Modifier {
+    val density = LocalDensity.current
+    val systemTopDp = with(density) {
+        WindowInsets.statusBars
+            .union(WindowInsets.displayCutout)
+            .getTop(density)
+            .toDp()
+    }
+    val resolvedTopGap = systemTopDp.coerceAtLeast(32.dp) + extraTopGap
+    return this.padding(top = resolvedTopGap)
+}
+
+/**
+ * Unified drag handle for deco ModalBottomSheets — 40dp pill in ground ink at 40% alpha.
+ */
+@Composable
+fun DecoSheetDragHandle(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .padding(top = 12.dp, bottom = 10.dp)
+            .width(40.dp)
+            .height(4.dp)
+            .clip(CircleShape)
+            .background(DecoInkOnGround.copy(alpha = 0.40f))
+    )
 }

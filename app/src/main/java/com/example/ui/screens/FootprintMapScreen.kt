@@ -2,7 +2,9 @@ package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -10,7 +12,9 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
@@ -117,6 +121,7 @@ import com.example.ui.theme.TimelineSortOrder
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.JetBrainsMonoFontFamily
+import kotlinx.coroutines.launch
 import com.example.ui.theme.LocalFlipYearPalette
 import java.util.Locale
 import kotlin.math.abs
@@ -268,7 +273,15 @@ fun FootprintMapScreen(
         }
     }
 
-    val commitFootprintStop: (FootprintScrubStop, Boolean) -> Unit = { stop, shouldExpand ->
+    // Tracks horizontal transition direction (+1 = forward/swipe-left, -1 = backward/swipe-right)
+    var cardSlideDirection by remember { mutableIntStateOf(1) }
+
+    val commitFootprintStop: (FootprintScrubStop, Boolean, Int?) -> Unit = { stop, shouldExpand, directionOverride ->
+        val targetIdx = scrubStops.indexOfFirst { it.id == stop.id }
+        cardSlideDirection = directionOverride ?: when {
+            targetIdx >= 0 && targetIdx != activeStopIndex -> if (targetIdx > activeStopIndex) 1 else -1
+            else -> cardSlideDirection
+        }
         selectedLocationName = stop.id
         if (stop.isUnlocated) {
         } else {
@@ -285,7 +298,7 @@ fun FootprintMapScreen(
         if (scrubStops.size >= 2) {
             val nextIdx = (activeStopIndex + delta).mod(scrubStops.size)
             haptics.bookshelfDetent()
-            commitFootprintStop(scrubStops[nextIdx], false)
+            commitFootprintStop(scrubStops[nextIdx], false, delta)
         }
     }
 
@@ -759,7 +772,7 @@ fun FootprintMapScreen(
             FootprintLocationScrubRail(
                 stops = scrubStops,
                 activeIndex = activeStopIndex,
-                onCommitStop = { stop -> commitFootprintStop(stop, false) },
+                onCommitStop = { stop -> commitFootprintStop(stop, false, null) },
                 topPadding = if (uiState.hasDeviceMedia && !uiState.hasMediaLocationPermission) 144.dp else 68.dp,
                 bottomPadding = railBottomClearance,
                 modifier = Modifier
@@ -937,8 +950,17 @@ fun FootprintMapScreen(
         }
 
         // 底部可折叠画报详情卡（点击卡头或纵向拖拽展开/收起；选中有定位地点 或 无定位媒体清单）
+        val activeStopKey = when {
+            showingUnlocated -> UNLOCATED_LOCATION_KEY
+            selectedCluster != null -> selectedCluster.locationName
+            else -> null
+        }
+        val cardSwipeNudgeX = remember { Animatable(0f) }
+        val maxSwipeNudgePx = with(density) { 20.dp.toPx() }
+        val swipeTriggerThresholdPx = with(density) { 42.dp.toPx() }
+
         AnimatedVisibility(
-            visible = hasBottomCard,
+            visible = hasBottomCard && activeStopKey != null,
             enter = fadeIn(tween(185, easing = FastOutSlowInEasing)) +
                 slideInVertically(tween(220, easing = FastOutSlowInEasing)) { it / 3 },
             exit = fadeOut(tween(135)) +
@@ -950,16 +972,52 @@ fun FootprintMapScreen(
                 .widthIn(max = 600.dp)
                 .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 10.dp + floatingDockInset)
         ) {
-        if (showingUnlocated) {
-            val unreviewedUnlocated = remember(unlocatedPhotos) {
-                unlocatedPhotos.count { it.photoStatus == PhotoStatus.UNREVIEWED }
+            val currentKey = activeStopKey ?: return@AnimatedVisibility
+            val horizontalSwipeModifier = Modifier.pointerInput(scrubStops.size, activeStopIndex) {
+                if (scrubStops.size < 2) return@pointerInput
+                var totalDx = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = {
+                        totalDx = 0f
+                        scope.launch { cardSwipeNudgeX.stop() }
+                    },
+                    onHorizontalDrag = { _, dragAmount ->
+                        totalDx += dragAmount
+                        val damped = (totalDx * 0.24f).coerceIn(-maxSwipeNudgePx, maxSwipeNudgePx)
+                        scope.launch { cardSwipeNudgeX.snapTo(damped) }
+                    },
+                    onDragCancel = {
+                        scope.launch {
+                            cardSwipeNudgeX.animateTo(
+                                targetValue = 0f,
+                                animationSpec = spring(dampingRatio = 0.78f, stiffness = 560f)
+                            )
+                        }
+                    },
+                    onDragEnd = {
+                        val delta = when {
+                            totalDx < -swipeTriggerThresholdPx -> +1
+                            totalDx > swipeTriggerThresholdPx -> -1
+                            else -> 0
+                        }
+                        if (delta != 0) {
+                            stepFootprintStop(delta)
+                        }
+                        scope.launch {
+                            cardSwipeNudgeX.animateTo(
+                                targetValue = 0f,
+                                animationSpec = spring(dampingRatio = 0.78f, stiffness = 560f)
+                            )
+                        }
+                    }
+                )
             }
-            val totalBytes = remember(unlocatedPhotos) { unlocatedPhotos.sumOf { it.fileSizeBytes } }
 
             DecoPosterPanel(
                 shadowElevation = 8.dp,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .graphicsLayer { translationX = cardSwipeNudgeX.value }
                     .animateContentSize(
                         animationSpec = spring(
                             dampingRatio = Spring.DampingRatioLowBouncy,
@@ -977,27 +1035,39 @@ fun FootprintMapScreen(
                             }
                         )
                     }
-                    .testTag("unlocated_detail_card")
+                    .testTag(if (showingUnlocated) "unlocated_detail_card" else "location_detail_card")
             ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
+                AnimatedContent(
+                    targetState = currentKey,
+                    transitionSpec = {
+                        val dir = if (cardSlideDirection >= 0) 1 else -1
+                        (slideInHorizontally(
+                            animationSpec = tween(220, easing = FastOutSlowInEasing),
+                            initialOffsetX = { fullWidth -> dir * (fullWidth * 0.36f).toInt() }
+                        ) + fadeIn(tween(180, easing = FastOutSlowInEasing))) togetherWith
+                            (slideOutHorizontally(
+                                animationSpec = tween(170, easing = FastOutSlowInEasing),
+                                targetOffsetX = { fullWidth -> -dir * (fullWidth * 0.32f).toInt() }
+                            ) + fadeOut(tween(130))) using SizeTransform(clip = true)
+                    },
+                    label = "map_stop_card_horizontal_switch"
+                ) { stopKey ->
+                    val stopIdx = remember(scrubStops, stopKey) {
+                        scrubStops.indexOfFirst { it.id == stopKey }
+                    }
+                    if (stopKey == UNLOCATED_LOCATION_KEY) {
+                        val unreviewedUnlocated = remember(unlocatedPhotos) {
+                            unlocatedPhotos.count { it.photoStatus == PhotoStatus.UNREVIEWED }
+                        }
+                        val totalBytes = remember(unlocatedPhotos) { unlocatedPhotos.sumOf { it.fileSizeBytes } }
+                        Column(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .pointerInput(scrubStops.size, activeStopIndex) {
-                                if (scrubStops.size < 2) return@pointerInput
-                                var totalDx = 0f
-                                detectHorizontalDragGestures(
-                                    onDragStart = { totalDx = 0f },
-                                    onHorizontalDrag = { _, dragAmount -> totalDx += dragAmount },
-                                    onDragEnd = {
-                                        if (totalDx < -48f) stepFootprintStop(+1)
-                                        else if (totalDx > 48f) stepFootprintStop(-1)
-                                    }
-                                )
-                            }
+                            .then(horizontalSwipeModifier)
                             .clickable { isCardExpanded = !isCardExpanded },
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -1025,6 +1095,14 @@ fun FootprintMapScreen(
                             )
                         }
 
+                        if (scrubStops.size >= 2 && stopIdx >= 0) {
+                            Text(
+                                text = "${stopIdx + 1}/${scrubStops.size}",
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = 11.sp,
+                                color = ink.copy(alpha = 0.55f)
+                            )
+                        }
                     }
 
                     AnimatedVisibility(visible = isCardExpanded) {
@@ -1056,67 +1134,26 @@ fun FootprintMapScreen(
                                 },
                                 leftTestTag = "batch_tag_unlocated_button",
                                 rightTestTag = "clean_unlocated_button",
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().then(horizontalSwipeModifier)
                             )
                         }
                     }
                 }
-            }
-        } else selectedCluster?.let { activeCluster ->
-            DecoPosterPanel(
-                shadowElevation = 8.dp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .animateContentSize(
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioLowBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        )
-                    )
-                    .pointerInput(Unit) {
-                        var totalDrag = 0f
-                        detectVerticalDragGestures(
-                            onDragStart = { totalDrag = 0f },
-                            onVerticalDrag = { _, dragAmount -> totalDrag += dragAmount },
-                            onDragEnd = {
-                                if (totalDrag < -36f) isCardExpanded = true
-                                else if (totalDrag > 36f) isCardExpanded = false
-                            }
-                        )
-                    }
-                    .testTag("location_detail_card")
-            ) {
-                AnimatedContent(
-                    targetState = activeCluster,
-                    contentKey = { it.locationName },
-                    transitionSpec = {
-                        (fadeIn(tween(165, easing = FastOutSlowInEasing)) +
-                            slideInVertically(tween(175, easing = FastOutSlowInEasing)) { it / 12 }) togetherWith
-                            (fadeOut(tween(105)) + slideOutVertically(tween(110)) { -it / 14 })
-                    },
-                    label = "map_cluster_card_switch"
-                ) { cluster ->
-                val latLabel = if (cluster.latitude >= 0) "N" else "S"
-                val lonLabel = if (cluster.longitude >= 0) "E" else "W"
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
+                    } else {
+                        val cluster = remember(clusters, stopKey) {
+                            clusters.firstOrNull { it.locationName == stopKey }
+                        } ?: selectedCluster
+                        if (cluster != null) {
+                            val latLabel = if (cluster.latitude >= 0) "N" else "S"
+                            val lonLabel = if (cluster.longitude >= 0) "E" else "W"
+                            Column(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .pointerInput(scrubStops.size, activeStopIndex) {
-                                if (scrubStops.size < 2) return@pointerInput
-                                var totalDx = 0f
-                                detectHorizontalDragGestures(
-                                    onDragStart = { totalDx = 0f },
-                                    onHorizontalDrag = { _, dragAmount -> totalDx += dragAmount },
-                                    onDragEnd = {
-                                        if (totalDx < -48f) stepFootprintStop(+1)
-                                        else if (totalDx > 48f) stepFootprintStop(-1)
-                                    }
-                                )
-                            }
+                            .then(horizontalSwipeModifier)
                             .clickable { isCardExpanded = !isCardExpanded },
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -1180,6 +1217,14 @@ fun FootprintMapScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
+                            if (scrubStops.size >= 2 && stopIdx >= 0) {
+                                Text(
+                                    text = "${stopIdx + 1}/${scrubStops.size}",
+                                    fontFamily = JetBrainsMonoFontFamily,
+                                    fontSize = 11.sp,
+                                    color = ink.copy(alpha = 0.55f)
+                                )
+                            }
                             DecoSealTag(
                                 pendingCount = cluster.unreviewedCount,
                                 ink = ink,
@@ -1224,14 +1269,15 @@ fun FootprintMapScreen(
                                 leftFlex = 1.2f,
                                 leftTestTag = "view_location_media_button",
                                 rightTestTag = "clean_location_button",
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().then(horizontalSwipeModifier)
                             )
                         }
                     }
-                }
+                            }
+                        }
+                    }
                 }
             }
-        }
         }
     }
 

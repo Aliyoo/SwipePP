@@ -92,10 +92,12 @@ import com.example.ui.components.DecoOrbTone
 import com.example.ui.components.DecoPaperGround
 import com.example.ui.components.DecoSealButton
 import com.example.ui.components.DecoSealOrb
+import com.example.ui.components.DecoSheetDragHandle
 import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.PhotoDetailLightbox
 import com.example.ui.components.formatPhotoDateTime
 import com.example.ui.components.formatStorageSize
+import com.example.ui.components.modalSheetTopClearance
 import com.example.ui.components.formatVideoDuration
 import com.example.ui.screens.cleaner.BurstComparisonSheet
 import com.example.ui.screens.cleaner.CleanupCompletedCelebration
@@ -1085,7 +1087,9 @@ fun ArcCleanerScreen(
         ModalBottomSheet(
             onDismissRequest = { inspectingStack = null },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = DecoMat
+            containerColor = DecoMat,
+            dragHandle = { DecoSheetDragHandle() },
+            modifier = Modifier.modalSheetTopClearance()
         ) {
             BurstComparisonSheet(
                 stack = stack,

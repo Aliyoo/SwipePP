@@ -62,7 +62,6 @@ import com.example.ui.components.DecoIcon
 import com.example.ui.components.DecoIconKind
 import com.example.ui.theme.AppThemeMode
 import com.example.ui.theme.DecoGold
-import com.example.ui.theme.DecoInkOnGround
 import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.DecoVermInk
@@ -117,28 +116,20 @@ fun AppSettingsSheet(
         sheetState = sheetState,
         containerColor = LocalFlipYearPalette.current.decoGround,
         shape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp),
-        dragHandle = {
-            Box(
-                modifier = Modifier
-                    .padding(top = 12.dp, bottom = 6.dp)
-                    .width(40.dp)
-                    .height(4.dp)
-                    .clip(CircleShape)
-                    .background(DecoInkOnGround.copy(alpha = 0.40f))
-            )
-        }
+        dragHandle = { DecoSheetDragHandle() },
+        modifier = Modifier.modalSheetTopClearance()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(scrollState)
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp)
-                .testTag("app_settings_sheet"),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+                .testTag("app_settings_sheet")
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 Text(
                     text = stringResource(R.string.settings_sheet_title),
                     fontFamily = DecoDisplayFontFamily,
@@ -155,6 +146,24 @@ fun AppSettingsSheet(
                     color = InkSecondary
                 )
             }
+
+            if (scrollState.canScrollBackward) {
+                HorizontalDivider(
+                    thickness = 0.8.dp,
+                    color = DecoGold.copy(alpha = 0.30f)
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(scrollState)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 10.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
 
             // Section 1: Chronology & Default Views
             SettingsSectionGroup(title = "浏览与时间轴") {
@@ -509,6 +518,7 @@ fun AppSettingsSheet(
                         modifier = Modifier.testTag("settings_remove_demo")
                     )
                 }
+            }
             }
         }
     }

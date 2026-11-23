@@ -43,7 +43,9 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ui.components.DecoIcon
 import com.example.ui.components.DecoIconKind
+import com.example.ui.components.DecoSheetDragHandle
 import com.example.ui.components.formatStorageSize
+import com.example.ui.components.modalSheetTopClearance
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoInkOnGround
 import com.example.ui.theme.DecoMat
@@ -73,7 +75,10 @@ internal fun GalleryMoreBatchActionsSheet(
         sheetState = sheetState,
         containerColor = DecoMat,
         shape = SelectionSheetShape,
-        modifier = Modifier.testTag("gallery_more_actions_sheet")
+        dragHandle = { DecoSheetDragHandle() },
+        modifier = Modifier
+            .modalSheetTopClearance()
+            .testTag("gallery_more_actions_sheet")
     ) {
         Column(
             modifier = Modifier

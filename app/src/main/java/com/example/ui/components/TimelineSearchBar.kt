@@ -541,7 +541,10 @@ fun TimelineSearchFilterSheet(
         sheetState = sheetState,
         containerColor = DecoMat,
         shape = DecoSheetTopShape,
-        modifier = Modifier.testTag("timeline_filter_sheet")
+        dragHandle = { DecoSheetDragHandle() },
+        modifier = Modifier
+            .modalSheetTopClearance()
+            .testTag("timeline_filter_sheet")
     ) {
         Column(
             modifier = Modifier

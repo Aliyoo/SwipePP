@@ -37,9 +37,11 @@ import com.example.data.MediaAccessLevel
 import com.example.ui.MediaFilter
 import com.example.ui.components.DecoIcon
 import com.example.ui.components.DecoIconKind
+import com.example.ui.components.DecoSheetDragHandle
 import com.example.ui.components.GalleryActionButton
 import com.example.ui.components.GalleryButtonTone
 import com.example.ui.components.formatStorageSize
+import com.example.ui.components.modalSheetTopClearance
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoInkOnGround
 import com.example.ui.theme.DecoMat
@@ -75,7 +77,10 @@ internal fun BookshelfStorageLedgerSheet(
         sheetState = sheetState,
         containerColor = palette.decoGround,
         shape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp),
-        modifier = Modifier.testTag("bookshelf_storage_ledger_sheet")
+        dragHandle = { DecoSheetDragHandle() },
+        modifier = Modifier
+            .modalSheetTopClearance()
+            .testTag("bookshelf_storage_ledger_sheet")
     ) {
         Column(
             modifier = Modifier
