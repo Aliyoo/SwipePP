@@ -96,10 +96,10 @@ fun DecoIcon(
 
 private fun DrawScope.drawDecoIcon(kind: DecoIconKind, color: Color, selected: Boolean, strokeStyle: Stroke) {
     when (kind) {
-        DecoIconKind.ALBUM -> drawAlbum(color, selected, strokeStyle)
-        DecoIconKind.GALLERY -> drawGallery(color, selected, strokeStyle)
-        DecoIconKind.FOOTPRINT -> drawFootprint(color, selected, strokeStyle)
-        DecoIconKind.VAULT -> drawVault(color, selected, strokeStyle)
+        DecoIconKind.ALBUM -> drawAlbum(color, selected)
+        DecoIconKind.GALLERY -> drawGallery(color, selected)
+        DecoIconKind.FOOTPRINT -> drawFootprint(color, selected)
+        DecoIconKind.VAULT -> drawVault(color, selected)
         DecoIconKind.CLOSE -> drawClose(color, strokeStyle)
         DecoIconKind.CHECK -> drawCheck(color, strokeStyle)
         DecoIconKind.CHECK_CIRCLE -> drawCheckCircle(color, strokeStyle)
@@ -233,67 +233,78 @@ private fun DrawScope.arcArrow(
 
 // ── 底部导航四签（原 DecoTabIcons 语汇原样保留） ─────────────────────
 
-/** 影集：错位叠放的双画片 + 内框印点（画报画片语法） */
-private fun DrawScope.drawAlbum(color: Color, selected: Boolean, strokeStyle: Stroke) {
-    val r = CornerRadius(1.5f)
-    drawRoundRect(
-        color = color.copy(alpha = if (selected) 0.55f else 0.4f),
-        topLeft = Offset(4f, 3f),
-        size = Size(13f, 13f),
-        cornerRadius = r,
-        style = strokeStyle
+/** 影集（宋刻）：底层细框 + 前框横细竖粗填充笔画 + 中心章点 */
+private fun DrawScope.drawAlbum(color: Color, selected: Boolean) {
+    drawRect(
+        color = color.copy(alpha = 0.55f),
+        topLeft = Offset(4.2f, 3f),
+        size = Size(12.6f, 12.6f),
+        style = Stroke(width = 0.55f)
     )
-    drawRoundRect(color = color, topLeft = Offset(3f, 6f), size = Size(13f, 12f), cornerRadius = r, style = strokeStyle)
-    if (selected) {
-        drawRoundRect(color = color, topLeft = Offset(6f, 9f), size = Size(3f, 3f), cornerRadius = r)
-    }
+    drawRect(color = color, topLeft = Offset(3f, 6f), size = Size(2.1f, 10.6f))
+    drawRect(color = color, topLeft = Offset(14.9f, 6f), size = Size(2.1f, 10.6f))
+    drawRect(color = color, topLeft = Offset(3f, 6f), size = Size(14f, 1.05f))
+    drawRect(color = color, topLeft = Offset(3f, 15.55f), size = Size(14f, 1.05f))
+    drawRect(color = color, topLeft = Offset(8f, 9.4f), size = Size(4f, 3.4f))
 }
 
-/** 画廊：金双框画片 + 山折线 + 画报日轮（选中日轮填实） */
-private fun DrawScope.drawGallery(color: Color, selected: Boolean, strokeStyle: Stroke) {
-    val r = CornerRadius(1.5f)
-    drawRoundRect(color = color, topLeft = Offset(2f, 3f), size = Size(16f, 14f), cornerRadius = r, style = strokeStyle)
+/** 画廊（宋刻）：竖粗横细外框 + 细山折线 + 实心日轮 */
+private fun DrawScope.drawGallery(color: Color, selected: Boolean) {
+    drawRect(color = color, topLeft = Offset(2.6f, 3f), size = Size(1.9f, 14f))
+    drawRect(color = color, topLeft = Offset(15.5f, 3f), size = Size(1.9f, 14f))
+    drawRect(color = color, topLeft = Offset(2.6f, 3f), size = Size(14.8f, 0.95f))
+    drawRect(color = color, topLeft = Offset(2.6f, 16.05f), size = Size(14.8f, 0.95f))
     drawPath(
-        path = decoPath(5f to 13.5f, 8.5f to 9.5f, 11f to 12f, 13f to 10f, 15.5f to 13.5f),
+        path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(5.2f, 13.4f)
+            lineTo(8.6f, 9.2f)
+            lineTo(11f, 11.8f)
+            lineTo(13.2f, 9.6f)
+            lineTo(15.4f, 13.2f)
+        },
         color = color,
-        style = strokeStyle
+        style = Stroke(width = 0.6f)
     )
-    if (selected) {
-        drawCircle(color = color, radius = 1.6f, center = Offset(13.5f, 6.8f))
-    }
+    drawCircle(color = color, radius = 1.5f, center = Offset(13.4f, 6.6f))
 }
 
-/** 足迹：山河折线两重峰 + 途经印点（选中填实） */
-private fun DrawScope.drawFootprint(color: Color, selected: Boolean, strokeStyle: Stroke) {
+/** 足迹（宋刻）：粗山河折线 + 方峰印 + 细地平线 */
+private fun DrawScope.drawFootprint(color: Color, selected: Boolean) {
     drawPath(
-        path = decoPath(2f to 15f, 6.5f to 8.5f, 10f to 12f, 13.5f to 5.5f, 18f to 13f),
+        path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(2f, 15.2f)
+            lineTo(6.6f, 8.4f)
+            lineTo(10f, 12f)
+            lineTo(13.4f, 5.4f)
+            lineTo(18f, 13.2f)
+        },
         color = color,
-        style = strokeStyle
+        style = Stroke(width = 1.9f)
     )
-    if (selected) {
-        drawCircle(color = color, radius = 1.7f, center = Offset(13.5f, 5.5f))
-    } else {
-        drawCircle(color = color, radius = 1.7f, center = Offset(13.5f, 5.5f), style = strokeStyle)
-    }
-    drawLine(color = color.copy(alpha = 0.5f), start = Offset(2f, 17.5f), end = Offset(18f, 17.5f), strokeWidth = 1.2f, cap = StrokeCap.Round)
+    drawRect(color = color, topLeft = Offset(12.5f, 4.5f), size = Size(1.9f, 1.9f))
+    drawRect(color = color, topLeft = Offset(1.6f, 17.2f), size = Size(16.8f, 0.9f))
 }
 
-/** 回收站：方篓 + 篓盖双线 + 竖篾纹 */
-private fun DrawScope.drawVault(color: Color, selected: Boolean, strokeStyle: Stroke) {
-    val r = CornerRadius(1.5f)
-    drawLine(color = color, start = Offset(3.5f, 5.5f), end = Offset(16.5f, 5.5f), strokeWidth = 1.5f, cap = StrokeCap.Round)
-    drawPath(
-        path = decoPath(8f to 5.5f, 8f to 3.5f, 12f to 3.5f, 12f to 5.5f),
-        color = color,
-        style = strokeStyle
+/** 回收站（宋刻）：细篓盖提手 + 竖粗篓边 + 横细口底 + 细篾纹 */
+private fun DrawScope.drawVault(color: Color, selected: Boolean) {
+    drawRect(color = color, topLeft = Offset(3.2f, 5.2f), size = Size(13.6f, 1f))
+    drawRect(color = color, topLeft = Offset(7.6f, 3f), size = Size(4.8f, 0.9f))
+    drawRect(color = color, topLeft = Offset(4.4f, 7.2f), size = Size(2f, 10.4f))
+    drawRect(color = color, topLeft = Offset(13.6f, 7.2f), size = Size(2f, 10.4f))
+    drawRect(color = color, topLeft = Offset(6.4f, 7.2f), size = Size(7.2f, 0.9f))
+    drawRect(color = color, topLeft = Offset(6.4f, 16.7f), size = Size(7.2f, 0.9f))
+    drawLine(
+        color = color.copy(alpha = 0.8f),
+        start = Offset(8.6f, 9.4f),
+        end = Offset(8.6f, 15.8f),
+        strokeWidth = 0.6f
     )
-    drawRoundRect(color = color, topLeft = Offset(4.5f, 7.5f), size = Size(11f, 10f), cornerRadius = r, style = strokeStyle)
-    if (selected) {
-        drawLine(color = color, start = Offset(8f, 10f), end = Offset(8f, 14.5f), strokeWidth = 1.3f, cap = StrokeCap.Round)
-        drawLine(color = color, start = Offset(12f, 10f), end = Offset(12f, 14.5f), strokeWidth = 1.3f, cap = StrokeCap.Round)
-    } else {
-        drawLine(color = color, start = Offset(10f, 10f), end = Offset(10f, 14.5f), strokeWidth = 1.3f, cap = StrokeCap.Round)
-    }
+    drawLine(
+        color = color.copy(alpha = 0.8f),
+        start = Offset(11.4f, 9.4f),
+        end = Offset(11.4f, 15.8f),
+        strokeWidth = 0.6f
+    )
 }
 
 // ── 基础符号 ──────────────────────────────────────────────────────────
