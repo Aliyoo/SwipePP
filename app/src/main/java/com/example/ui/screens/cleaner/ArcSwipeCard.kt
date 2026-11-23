@@ -549,6 +549,9 @@ internal fun ModernArcSwipeCard(
                 }
 
                 // 卡片底部信息行（压照片暗部）：纸黄标题 + 金色提示
+                // 聚焦视频走内嵌播放时隐藏——播放器紧凑控制条占用同一底缘，
+                // 标题/日期在卡片下元数据行已可见
+                if (!(item.primaryPhoto.isVideo && isFocused)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -584,6 +587,7 @@ internal fun ModernArcSwipeCard(
                             fontWeight = FontWeight.Bold
                         )
                     }
+                }
                 }
             }
         }
