@@ -336,14 +336,22 @@ fun FootprintMapScreen(
             else dockTopYPx - marginPx - canvasTopYPx
             val frameRadiusCorner = CornerRadius(frameRadius)
 
-            // 框外填充：上下两条纸地带（纯色渐变 + 4dp 首页纸纹），地图只在框内可见；
-            // 左右窄边（7dp）由渐变底色自然覆盖，不再单独处理
+            // 框外填充：画框与屏幕边缘之间的全部区域（上/下/左/右四带）填首页纸地，
+            // 地图只在框内可见；渐变按各带自身高度铺，纸纹 4dp 细线逐带绘制
             val fillTop = frameInset
+            val fillLeft = frameInset
+            val fillRight = size.width - frameInset
             val fillBottom = bottomLineY - frameInset
-            val paperBrush = Brush.verticalGradient(0f to palette.decoGround, 1f to palette.decoGroundDeep, startY = 0f, endY = fillBottom)
-            // 顶带
-            drawRect(brush = paperBrush, topLeft = Offset(0f, 0f), size = Size(size.width, fillTop))
-            // 底带
+            // 顶带（全宽）
+            drawRect(
+                brush = Brush.verticalGradient(
+                    0f to palette.decoGround, 1f to palette.decoGroundDeep,
+                    startY = 0f, endY = fillTop
+                ),
+                topLeft = Offset(0f, 0f),
+                size = Size(size.width, fillTop)
+            )
+            // 底带（全宽，含底线以下到屏幕底）
             drawRect(
                 brush = Brush.verticalGradient(
                     0f to palette.decoGround, 1f to palette.decoGroundDeep,
@@ -352,7 +360,26 @@ fun FootprintMapScreen(
                 topLeft = Offset(0f, fillBottom),
                 size = Size(size.width, size.height - fillBottom)
             )
-            // 顶带纸纹
+            // 左带 / 右带（上下带之间）
+            val sideTop = fillTop
+            val sideHeight = fillBottom - fillTop
+            drawRect(
+                brush = Brush.verticalGradient(
+                    0f to palette.decoGround, 1f to palette.decoGroundDeep,
+                    startY = sideTop, endY = sideTop + sideHeight
+                ),
+                topLeft = Offset(0f, sideTop),
+                size = Size(fillLeft, sideHeight)
+            )
+            drawRect(
+                brush = Brush.verticalGradient(
+                    0f to palette.decoGround, 1f to palette.decoGroundDeep,
+                    startY = sideTop, endY = sideTop + sideHeight
+                ),
+                topLeft = Offset(fillRight, sideTop),
+                size = Size(size.width - fillRight, sideHeight)
+            )
+            // 纸纹 4dp 细线：顶带全宽；左右带限宽；底带全宽
             val texStep = 4.dp.toPx()
             var ty = 0f
             while (ty < fillTop) {
@@ -363,7 +390,20 @@ fun FootprintMapScreen(
                 )
                 ty += texStep
             }
-            // 底带纸纹
+            ty = fillTop
+            while (ty < fillBottom) {
+                drawLine(
+                    color = ink.copy(alpha = 0.016f),
+                    start = Offset(0f, ty), end = Offset(fillLeft, ty),
+                    strokeWidth = 1f
+                )
+                drawLine(
+                    color = ink.copy(alpha = 0.016f),
+                    start = Offset(fillRight, ty), end = Offset(size.width, ty),
+                    strokeWidth = 1f
+                )
+                ty += texStep
+            }
             ty = fillBottom
             while (ty < size.height) {
                 drawLine(
