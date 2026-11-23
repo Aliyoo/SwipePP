@@ -123,7 +123,7 @@ import kotlin.math.abs
 
 /**
  * 足迹地图 · 摩登画报（山河图）
- * 金双线画框包住全屏自绘山河图：金线经纬网格底 + 画片式地点照片印记（朱红计数徽）；
+ * 金双线画框包住全屏自绘山河图（框外纸地填充、框内不铺内衬）：金线经纬网格底 + 画片式地点照片印记（朱红计数徽）；
  * 底部地点卡 + 朱红通栏双动作条（查看此地/清理此地）。磨砂 → 画报纸面 mat。
  * 功能基线（87a2cd3）：Web Mercator 瓦片 + 离线矢量、图源切换、瓦片重试、GPS 解析进度、
  * ACCESS_MEDIA_LOCATION 授权、地点快速跳转 chips、右侧控制栏、可拖拽展开详情卡、
@@ -315,7 +315,7 @@ fun FootprintMapScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        // 金双线画框：外 1.5dp 金 + mat 内衬带 + 1dp 弱金（deco-app.html GoldFrame 语法）
+        // 金双线画框：外 1.5dp 金 + 内 1dp 弱金，两线之间不铺内衬（框内保持地图原样）
         // 纯描边 Canvas，不注册 pointerInput，手势完全穿透到地图。
         // 顶线贴状态栏下缘（遥测卡下移入框内）；底线实测锚定 dock 顶缘上 9dp。
         // 框外区域（画框与屏幕边缘之间）填充首页纸地，遮住外溢的地图线
@@ -417,15 +417,7 @@ fun FootprintMapScreen(
                 ty += texStep
             }
 
-            // mat 内衬带（6dp 描边带，画框内衬）
-            val bandHalf = 3.dp.toPx()
-            drawRoundRect(
-                color = mat,
-                topLeft = Offset(frameInset + bandHalf, frameTop + bandHalf),
-                size = Size(size.width - (frameInset + bandHalf) * 2, bottomLineY - frameTop - bandHalf),
-                cornerRadius = frameRadiusCorner,
-                style = Stroke(width = bandHalf * 2)
-            )
+            // 双金线画框：外线与内线之间不铺内衬带（框内保持地图原样），只留两条金线
             drawRoundRect(
                 color = gold,
                 topLeft = Offset(frameInset, frameTop),
