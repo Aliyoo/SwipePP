@@ -1,9 +1,25 @@
 # SwipePP (FlipYear)
 
+[![Android CI](https://github.com/Aliyoo/SwipePP/actions/workflows/android-ci.yml/badge.svg)](https://github.com/Aliyoo/SwipePP/actions/workflows/android-ci.yml)
+
 **SwipePP**（曾用名 FlipYear）是一款本地优先的 Android 3D 照片与视频整理应用：将相册按年份装进 3D 书架上的年度影集，结合不规则杂志拼图封面、双模式翻书月历、时间刻度弧形滑动清理、连拍智能堆叠、多阶无级缩放画廊、足迹地图和摇一摇撤销，让"清理相册"变成一次翻阅典藏年鉴的体验。全部数据保存在本机，无需联网账号。
 
-- 应用名：`SwipePP`（包名 `com.aistudio.flipyear.xkqmvz`，源码包路径 `com.example`）
-- SDK：`minSdk 24` · `targetSdk 36` · `compileSdk 36.1` · Kotlin + Jetpack Compose 单 Activity 架构
+- 应用名：`SwipePP`（applicationId `com.aistudio.flipyear.xkqmvz`，源码包路径 `com.example`）
+- SDK：`minSdk 24` · `targetSdk 36` · `compileSdk 36`（`minorApiLevel 1`）· Kotlin + Jetpack Compose 单 Activity 架构
+
+> 关于两个包名：项目由 Google AI Studio 模板脚手架生成，`applicationId` 沿用模板分配的应用标识，源码包路径保留模板默认的 `com.example` 命名空间；二者互不影响，正式发布前可按需统一替换。
+
+## 界面预览
+
+| 影集书架 | 画廊时间轴 | 翻书月历 |
+|:---:|:---:|:---:|
+| ![影集书架](docs/screenshots/bookshelf.png) | ![画廊时间轴](docs/screenshots/gallery.png) | ![翻书月历](docs/screenshots/flipbook.png) |
+
+| 弧形清理 | 足迹地图 | 回收站 |
+|:---:|:---:|:---:|
+| ![弧形清理](docs/screenshots/arc_cleaner.png) | ![足迹地图](docs/screenshots/footprint.png) | ![回收站](docs/screenshots/trash.png) |
+
+> 截图来自内置示例影集（首次启动空相册页可一键"加载示例影集"体验全部功能）。
 
 ## 核心功能
 
@@ -106,7 +122,7 @@ app/src/main/java/com/example/
 ## 构建与运行
 
 **环境要求**
-- JDK 17+（编译字节码目标为 Java 11，已配置 Foojay Toolchain 自动解析）
+- JDK 21（编译字节码目标为 Java 11；Robolectric 单元测试需在 JDK 21 下运行，可用 `JAVA_HOME` 指定）
 - Android SDK（`compileSdk 36`，minor API level `1`）
 - Gradle `9.3.1`（主分支未内置 `gradlew`，可直接用本机 Gradle 9.3.1，或先执行 `gradle wrapper` 生成）
 
@@ -155,6 +171,16 @@ KEY_PASSWORD    # keyAlias 固定为 upload
 ## 测试
 
 `app/src/test/java/com/example/` 下包含 13 个 JVM 单元测试与 Robolectric Compose UI 测试文件（覆盖弧形清理与摇一摇撤销、书架筛选切换、全屏灯箱布局与导航栏 Insets、毛玻璃遮罩点击穿透、双主题切换、时间轴月度印章、高级搜索筛选、封面智能策展、安全压缩与定位推断，以及 `LibraryDerivationEngine` 线性派生重构验证）；`app/src/androidTest/` 提供仪器测试入口。
+
+## 贡献与反馈
+
+- 欢迎通过 Issue 反馈问题或建议；也欢迎 PR，请沿用现有的 Kotlin + Jetpack Compose 代码风格与单 Activity + MVVM 结构。
+- 提交 PR 前请先在本地运行 `gradle :app:testDebugUnitTest` 确认测试通过；仓库已配置 GitHub Actions CI 自动执行单元测试与 Debug 构建验证。
+- 请勿提交 `.env`、`local.properties`、签名 keystore 等本地文件或真实密钥（已在 `.gitignore` 中排除）。
+
+## License
+
+本项目以 [MIT License](LICENSE) 开源。
 
 ## 备注
 
