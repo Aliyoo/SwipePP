@@ -299,7 +299,7 @@ fun BookshelfScreen(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (uiState.isScanningDevice) {
                         CircularProgressIndicator(
@@ -311,9 +311,9 @@ fun BookshelfScreen(
                         )
                     }
 
-                    // 画报金线圆钮（38dp 视觉 + 48dp 命中区，地面透底 + 1.5dp 金描边）：
-                    // 替换旧磨砂玻璃圆钮，色取 DecoGold / DecoInkOnGround
-                    DecoHeaderRoundSeal(
+                    // 画报方形双章：纸底墨字 + 1dp 金发线 + 3dp 方角（与封面 seal/sheet 圆角同语法），
+                    // 替换旧磨砂玻璃圆钮，36dp 视觉 + 44dp 命中区
+                    DecoHeaderSquareSeal(
                         onClick = { showThemeSheet = true },
                         modifier = Modifier.testTag("bookshelf_theme_button")
                     ) {
@@ -323,20 +323,20 @@ fun BookshelfScreen(
                                 AppThemeMode.LIGHT -> DecoIconKind.SUN
                                 AppThemeMode.DARK -> DecoIconKind.MOON
                             },
-                            color = gold,
-                            iconSize = 19.dp,
+                            color = groundInk,
+                            iconSize = 18.dp,
                             contentDescription = stringResource(R.string.cd_theme_switcher)
                         )
                     }
 
-                    DecoHeaderRoundSeal(
+                    DecoHeaderSquareSeal(
                         onClick = { showSettingsSheet = true },
                         modifier = Modifier.testTag("bookshelf_settings_button")
                     ) {
                         DecoIcon(
                             kind = DecoIconKind.SETTINGS,
                             color = groundInk,
-                            iconSize = 19.dp,
+                            iconSize = 18.dp,
                             contentDescription = stringResource(R.string.cd_open_settings)
                         )
                     }
@@ -809,27 +809,35 @@ private fun DecoYearCell(
 
 /** 画报金线圆钮：38dp 正圆、地面透底、1.5dp 金描边 + 48dp 命中区（替换旧磨砂玻璃圆钮） */
 @Composable
-private fun DecoHeaderRoundSeal(
+private fun DecoHeaderSquareSeal(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
     val gold = DecoGold
-    val ground = DecoGround
+    val mat = DecoMat
+    val sealShape = RoundedCornerShape(3.dp)
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .background(ground.copy(alpha = 0.55f))
-            .border(1.5.dp, gold, CircleShape)
+            .size(44.dp)
+            .clip(sealShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = gold),
                 onClick = onClick
             )
     ) {
-        content()
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(36.dp)
+                .clip(sealShape)
+                .background(mat.copy(alpha = 0.72f))
+                .border(1.dp, gold.copy(alpha = 0.75f), sealShape)
+        ) {
+            content()
+        }
     }
 }
 
