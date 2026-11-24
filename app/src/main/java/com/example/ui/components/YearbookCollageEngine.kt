@@ -8,17 +8,23 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -43,6 +49,8 @@ import com.example.data.CollageSlotTransform
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
 import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoVerm
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -699,21 +707,22 @@ fun YearbookCollageCanvas(
             ) {
                 when (slot.frameStyle) {
                     CollageSlotFrameStyle.POLAROID -> {
-                        val paperShape = RoundedCornerShape(slot.cornerRadiusDp.dp)
+                        // deco 手账卡：纸面直角 + 金发丝线框，底部题签区改金发线 + 朱章点
+                        val paperShape = RoundedCornerShape(2.dp)
                         val sidePad = (boxW * 0.065f).coerceIn(with(density) { 4.dp.toPx() }, with(density) { 10.dp.toPx() })
-                        val bottomPad = (boxH * 0.16f).coerceIn(with(density) { 12.dp.toPx() }, with(density) { 26.dp.toPx() })
+                        val bottomPad = (boxH * 0.12f).coerceIn(with(density) { 9.dp.toPx() }, with(density) { 20.dp.toPx() })
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .shadow(
-                                    elevation = 9.dp,
+                                    elevation = 6.dp,
                                     shape = paperShape,
-                                    ambientColor = Color.Black.copy(alpha = 0.38f),
-                                    spotColor = Color.Black.copy(alpha = 0.45f)
+                                    ambientColor = Color.Black.copy(alpha = 0.30f),
+                                    spotColor = Color.Black.copy(alpha = 0.36f)
                                 )
                                 .clip(paperShape)
-                                .background(Color(0xFFFAF8F3))
-                                .border(0.75.dp, Color.Black.copy(alpha = 0.08f), paperShape)
+                                .background(DecoPaperCream)
+                                .border(0.8.dp, DecoGold.copy(alpha = 0.5f), paperShape)
                         ) {
                             Box(
                                 modifier = Modifier
@@ -722,7 +731,7 @@ fun YearbookCollageCanvas(
                                         width = with(density) { (boxW - sidePad * 2f).coerceAtLeast(1f).toDp() },
                                         height = with(density) { (boxH - sidePad - bottomPad).coerceAtLeast(1f).toDp() }
                                     )
-                                    .clip(RoundedCornerShape(2.dp))
+                                    .clip(RoundedCornerShape(1.5.dp))
                             ) {
                                 if (photo != null) {
                                     PhotoArtwork(
@@ -743,6 +752,31 @@ fun YearbookCollageCanvas(
                                     )
                                 }
                             }
+                            // 题签区：居中短发线 + 朱章点
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .height(with(density) { bottomPad.toDp() }),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(with(density) { (boxW * 0.30f).toDp() })
+                                            .height(0.75.dp)
+                                            .background(DecoGold.copy(alpha = 0.55f))
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(3.5.dp)
+                                            .background(DecoVerm)
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -758,7 +792,7 @@ fun YearbookCollageCanvas(
                                     spotColor = Color.Black.copy(alpha = 0.52f)
                                 )
                                 .clip(insetShape)
-                                .border(2.2.dp, Color.White.copy(alpha = 0.92f), insetShape)
+                                .border(1.dp, DecoGold.copy(alpha = 0.65f), insetShape)
                         ) {
                             if (photo != null) {
                                 PhotoArtwork(

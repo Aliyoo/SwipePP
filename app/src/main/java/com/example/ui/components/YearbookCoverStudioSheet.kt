@@ -1160,7 +1160,7 @@ private fun MiniCollageCoverPreview(
                 .shadow(10.dp, bookShape, spotColor = miniShadowColor)
                 .clip(bookShape)
                 .background(editionColor)
-                .border(0.8.dp, Color.White.copy(alpha = 0.22f), bookShape)
+                .border(0.8.dp, DecoGold.copy(alpha = 0.5f), bookShape)
         ) {
             YearbookCollageCanvas(
                 photos = photos,
@@ -1192,7 +1192,7 @@ private fun MiniCollageCoverPreview(
                         Brush.horizontalGradient(
                             listOf(
                                 Color.Black.copy(alpha = 0.48f),
-                                Color.White.copy(alpha = 0.20f),
+                                DecoGold.copy(alpha = 0.2f),
                                 Color.Transparent
                             )
                         )
@@ -1242,7 +1242,7 @@ private fun MiniBookCoverPreview(
                 .shadow(10.dp, bookShape, spotColor = miniShadowColor)
                 .clip(bookShape)
                 .background(editionColor)
-                .border(0.8.dp, Color.White.copy(alpha = 0.20f), bookShape)
+                .border(0.8.dp, DecoGold.copy(alpha = 0.5f), bookShape)
         ) {
             Crossfade(
                 targetState = activePhoto,
@@ -1283,7 +1283,7 @@ private fun MiniBookCoverPreview(
                             listOf(
                                 Color.Black.copy(alpha = 0.50f),
                                 Color.Black.copy(alpha = 0.16f),
-                                Color.White.copy(alpha = 0.22f),
+                                DecoGold.copy(alpha = 0.2f),
                                 Color.Transparent
                             )
                         )
