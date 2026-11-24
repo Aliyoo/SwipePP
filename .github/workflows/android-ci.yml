@@ -26,5 +26,8 @@ jobs:
       - name: Run JVM and Robolectric unit tests
         run: gradle :app:testDebugUnitTest
 
+      - name: Generate debug signing keystore
+        run: keytool -genkeypair -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10950 -dname "CN=Android Debug"
+
       - name: Assemble debug APK
         run: gradle :app:assembleDebug
