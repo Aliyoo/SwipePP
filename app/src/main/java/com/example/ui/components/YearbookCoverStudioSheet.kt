@@ -9,6 +9,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -78,6 +79,8 @@ import com.example.ui.YearbookCoverCurator
 import com.example.ui.YearbookSummary
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoMat
+import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoScrimInk
 import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoInkOnGround
 import com.example.ui.theme.JetBrainsMonoFontFamily
@@ -1132,6 +1135,36 @@ private fun CoverModeSegment(
 }
 
 @Composable
+private fun DecoMiniCoverFrame(
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val isDark = LocalIsDarkTheme.current
+    val frameShape = RoundedCornerShape(4.dp)
+    val photoShape = RoundedCornerShape(2.dp)
+    val miniShadowColor = if (isDark) Color.Black.copy(alpha = 0.56f) else DecoInkOnGround.copy(alpha = 0.28f)
+
+    // 与书架 YearbookMonographCard 同构：金双框衬纸画框
+    Box(
+        modifier = modifier
+            .shadow(10.dp, frameShape, spotColor = miniShadowColor)
+            .clip(frameShape)
+            .background(DecoMat)
+            .border(1.5.dp, DecoGold, frameShape)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(4.5.dp)
+                .clip(photoShape)
+                .border(1.dp, DecoGold.copy(alpha = 0.40f), photoShape)
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
 private fun MiniCollageCoverPreview(
     year: Int,
     editionColor: Color,
@@ -1139,76 +1172,39 @@ private fun MiniCollageCoverPreview(
     template: CollageTemplate,
     modifier: Modifier = Modifier
 ) {
-    val bookShape = RoundedCornerShape(topStart = 5.dp, bottomStart = 5.dp, topEnd = 13.dp, bottomEnd = 13.dp)
-    val isDark = LocalIsDarkTheme.current
-    val miniShadowColor = if (isDark) Color.Black.copy(alpha = 0.56f) else DecoInkOnGround.copy(alpha = 0.28f)
-
-    Box(modifier = modifier) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 4.dp, bottom = 4.dp, start = 4.dp)
-                .clip(RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 13.dp, bottomEnd = 13.dp))
-                .background(if (isDark) Color(0xFF282E3D) else Color(0xFFEBE8E0))
-                .border(0.6.dp, DecoGold.copy(alpha = 0.7f), RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 13.dp, bottomEnd = 13.dp))
+    DecoMiniCoverFrame(modifier = modifier) {
+        YearbookCollageCanvas(
+            photos = photos,
+            template = template,
+            spacingDp = template.defaultSpacingDp * 0.65f,
+            backdrop = CollageBackdropStyle.EDITION,
+            editionColor = editionColor,
+            slotTransforms = emptyList(),
+            interactive = false,
+            downsampleTier = ImageDownsampleTier.PREVIEW_CARD,
+            targetSizePx = 320,
+            modifier = Modifier.fillMaxSize()
         )
-
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(end = 4.dp)
-                .shadow(10.dp, bookShape, spotColor = miniShadowColor)
-                .clip(bookShape)
-                .background(editionColor)
-                .border(0.8.dp, DecoGold.copy(alpha = 0.5f), bookShape)
-        ) {
-            YearbookCollageCanvas(
-                photos = photos,
-                template = template,
-                spacingDp = template.defaultSpacingDp * 0.65f,
-                backdrop = CollageBackdropStyle.EDITION,
-                editionColor = editionColor,
-                slotTransforms = emptyList(),
-                interactive = false,
-                downsampleTier = ImageDownsampleTier.PREVIEW_CARD,
-                targetSizePx = 320,
-                modifier = Modifier.fillMaxSize()
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0.50f to Color.Transparent,
-                            1.0f to editionColor.copy(alpha = 0.84f)
-                        )
+                .background(
+                    Brush.verticalGradient(
+                        0.55f to Color.Transparent,
+                        1.0f to DecoScrimInk.copy(alpha = 0.78f)
                     )
-            )
-            Box(
-                modifier = Modifier
-                    .width(9.dp)
-                    .fillMaxHeight()
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                Color.Black.copy(alpha = 0.48f),
-                                DecoGold.copy(alpha = 0.2f),
-                                Color.Transparent
-                            )
-                        )
-                    )
-            )
-            Text(
-                text = year.toString(),
-                fontFamily = DecoDisplayFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                color = Color.White,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 11.dp, bottom = 7.dp)
-            )
-        }
+                )
+        )
+        Text(
+            text = year.toString(),
+            fontFamily = DecoDisplayFontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 20.sp,
+            color = DecoPaperCream,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 9.dp, bottom = 6.dp)
+        )
     }
 }
 
@@ -1220,122 +1216,85 @@ private fun MiniBookCoverPreview(
     currentIndex: Int,
     modifier: Modifier = Modifier
 ) {
-    val bookShape = RoundedCornerShape(topStart = 5.dp, bottomStart = 5.dp, topEnd = 13.dp, bottomEnd = 13.dp)
     val activePhoto = slides.getOrNull(currentIndex.coerceIn(0, (slides.size - 1).coerceAtLeast(0)))
-    val isDark = LocalIsDarkTheme.current
-    val miniShadowColor = if (isDark) Color.Black.copy(alpha = 0.56f) else DecoInkOnGround.copy(alpha = 0.28f)
 
-    Box(modifier = modifier) {
+    DecoMiniCoverFrame(modifier = modifier) {
+        Crossfade(
+            targetState = activePhoto,
+            animationSpec = tween(durationMillis = 650),
+            label = "mini_cover_preview",
+            modifier = Modifier.fillMaxSize()
+        ) { photo ->
+            if (photo != null) {
+                PhotoArtwork(
+                    photo = photo,
+                    contentDescription = null,
+                    showVideoBadge = false,
+                    downsampleTier = ImageDownsampleTier.PREVIEW_CARD,
+                    targetSizePx = 384,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Box(modifier = Modifier.fillMaxSize().background(DecoGround))
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 4.dp, bottom = 4.dp, start = 4.dp)
-                .clip(RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 13.dp, bottomEnd = 13.dp))
-                .background(if (isDark) Color(0xFF282E3D) else Color(0xFFEBE8E0))
-                .border(0.6.dp, DecoGold.copy(alpha = 0.7f), RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 13.dp, bottomEnd = 13.dp))
+                .background(
+                    Brush.verticalGradient(
+                        0.0f to DecoScrimInk.copy(alpha = 0.30f),
+                        0.42f to Color.Transparent,
+                        1.0f to DecoScrimInk.copy(alpha = 0.78f)
+                    )
+                )
         )
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(end = 4.dp)
-                .shadow(10.dp, bookShape, spotColor = miniShadowColor)
-                .clip(bookShape)
-                .background(editionColor)
-                .border(0.8.dp, DecoGold.copy(alpha = 0.5f), bookShape)
-        ) {
-            Crossfade(
-                targetState = activePhoto,
-                animationSpec = tween(durationMillis = 650),
-                label = "mini_cover_preview",
-                modifier = Modifier.fillMaxSize()
-            ) { photo ->
-                if (photo != null) {
-                    PhotoArtwork(
-                        photo = photo,
-                        contentDescription = null,
-                        showVideoBadge = false,
-                        downsampleTier = ImageDownsampleTier.PREVIEW_CARD,
-                        targetSizePx = 384,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-            }
-
-            Box(
+        if (slides.size > 1) {
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0.0f to editionColor.copy(alpha = 0.48f),
-                            0.42f to Color.Transparent,
-                            1.0f to editionColor.copy(alpha = 0.84f)
-                        )
-                    )
-            )
-
-            Box(
-                modifier = Modifier
-                    .width(9.dp)
-                    .fillMaxHeight()
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                Color.Black.copy(alpha = 0.50f),
-                                Color.Black.copy(alpha = 0.16f),
-                                DecoGold.copy(alpha = 0.2f),
-                                Color.Transparent
-                            )
-                        )
-                    )
-            )
-
-            if (slides.size > 1) {
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .fillMaxWidth()
-                        .padding(start = 12.dp, end = 7.dp, top = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    slides.indices.forEach { idx ->
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(2.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (idx == currentIndex) Color.White else Color.White.copy(alpha = 0.34f)
-                                )
-                        )
-                    }
-                }
-            }
-
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 11.dp, end = 6.dp, bottom = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(1.dp)
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(start = 10.dp, end = 8.dp, top = 5.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                if (activePhoto != null) {
-                    Text(
-                        text = "${activePhoto.month}月",
-                        fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = DecoGold
+                slides.indices.forEach { idx ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(1.6.dp)
+                            .background(
+                                if (idx == currentIndex) DecoGold else DecoPaperCream.copy(alpha = 0.34f)
+                            )
                     )
                 }
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 9.dp, end = 6.dp, bottom = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(1.dp)
+        ) {
+            if (activePhoto != null) {
                 Text(
-                    text = year.toString(),
-                    fontFamily = DecoDisplayFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 21.sp,
-                    lineHeight = 22.sp,
-                    color = DecoInkOnGround
+                    text = "${activePhoto.month}月",
+                    fontFamily = JetBrainsMonoFontFamily,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = DecoGold
                 )
             }
+            Text(
+                text = year.toString(),
+                fontFamily = DecoDisplayFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 21.sp,
+                lineHeight = 22.sp,
+                color = DecoPaperCream
+            )
         }
     }
 }

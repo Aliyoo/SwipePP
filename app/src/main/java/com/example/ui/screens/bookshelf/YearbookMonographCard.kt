@@ -308,7 +308,7 @@ internal fun ModernYearbook3DCard(
                             brush = Brush.radialGradient(
                                 colors = listOf(
                                     Color.Transparent,
-                                    DecoScrimInk.copy(alpha = 0.50f)
+                                    DecoScrimInk.copy(alpha = 0.36f)
                                 ),
                                 center = Offset(size.width * 0.50f, size.height * 0.42f),
                                 radius = size.width * 0.95f
@@ -317,15 +317,15 @@ internal fun ModernYearbook3DCard(
                     }
             )
 
-            // 可读性红线：压照片文字必须暗 scrim（线性 0.62 → 透明 → 0.94）
+            // 可读性红线：压照片文字必须暗 scrim（线性 0.46 → 透明 → 0.80，整体调透亮一档）
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            0.0f to DecoScrimInk.copy(alpha = 0.62f),
+                            0.0f to DecoScrimInk.copy(alpha = 0.46f),
                             0.42f to Color.Transparent,
-                            1.0f to DecoScrimInk.copy(alpha = 0.94f)
+                            1.0f to DecoScrimInk.copy(alpha = 0.80f)
                         )
                     )
             )
