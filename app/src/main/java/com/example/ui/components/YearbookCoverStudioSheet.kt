@@ -996,7 +996,6 @@ fun YearbookCoverStudioSheet(
                 if (summary.coverMode != YearbookCoverMode.SMART_CAROUSEL || selectedMode != YearbookCoverMode.SMART_CAROUSEL) {
                     GalleryActionButton(
                         text = stringResource(R.string.cover_studio_reset_smart),
-                        leadingIconKind = DecoIconKind.RESTART,
                         tone = GalleryButtonTone.GLASS,
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -1004,7 +1003,7 @@ fun YearbookCoverStudioSheet(
                             onDismiss()
                         },
                         modifier = Modifier
-                            .weight(0.95f)
+                            .weight(1f)
                             .testTag("cover_reset_smart_button")
                     )
                 }

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -47,8 +48,10 @@ import com.example.data.CollageBackdropStyle
 import com.example.data.CollageSlotTransform
 import com.example.data.ImageDownsampleTier
 import com.example.data.PhotoItemEntity
+import com.example.ui.theme.DecoArtShadowVerm
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoScrimInk
 import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.DecoMat
 import com.example.ui.theme.DecoDisplayFontFamily
@@ -98,7 +101,6 @@ internal fun YearbookCollageEditorPanel(
     modifier: Modifier = Modifier
 ) {
     val isDark = LocalIsDarkTheme.current
-    val bookShape = RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp, topEnd = 16.dp, bottomEnd = 16.dp)
     val bookShadowColor = if (isDark) Color.Black.copy(alpha = 0.56f) else DecoInkOnGround.copy(alpha = 0.28f)
     val hasCustomTransforms = slotTransforms.any { !it.isIdentity }
     val filteredTemplates = if (selectedCategory == null || selectedCategory == CollageStyleCategory.ALL) {
@@ -118,74 +120,87 @@ internal fun YearbookCollageEditorPanel(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left: Portrait 0.70 Interactive Monograph Collage Canvas
+            // Left: Portrait 0.70 Interactive Collage Canvas — 与书架卡片同构的金双框衬纸画框
             Box(
                 modifier = Modifier
                     .width(164.dp)
                     .aspectRatio(0.70f)
-                    .shadow(14.dp, bookShape, spotColor = bookShadowColor)
-                    .clip(bookShape)
-                    .background(editionColor)
-                    .border(0.9.dp, Color.White.copy(alpha = 0.26f), bookShape)
+                    .shadow(14.dp, RoundedCornerShape(4.dp), spotColor = bookShadowColor)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(DecoMat)
+                    .border(1.5.dp, DecoGold, RoundedCornerShape(4.dp))
                     .testTag("collage_studio_canvas")
             ) {
-                YearbookCollageCanvas(
-                    photos = photos,
-                    template = template,
-                    spacingDp = spacingDp,
-                    backdrop = backdrop,
-                    editionColor = editionColor,
-                    slotTransforms = slotTransforms,
-                    interactive = true,
-                    activeSlotIndex = activeSlotIndex,
-                    downsampleTier = ImageDownsampleTier.HERO_CARD,
-                    targetSizePx = 560,
-                    onSlotTap = onSlotTap,
-                    onTransformSlot = onTransformSlot,
-                    modifier = Modifier.fillMaxSize()
-                )
-
-                // Subtle bottom vignette + year folio watermark preview (non-blocking for gestures)
-                if (includeYearWatermark) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .fillMaxWidth()
-                            .height(64.dp)
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(Color.Transparent, editionColor.copy(alpha = 0.78f))
-                                )
-                            )
-                    )
-                    Text(
-                        text = year.toString(),
-                        fontFamily = DecoDisplayFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 26.sp,
-                        letterSpacing = (-0.8).sp,
-                        color = DecoInkOnGround,
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(start = 15.dp, bottom = 8.dp)
-                    )
-                }
-
-                // Subtle left hardcover spine groove
                 Box(
                     modifier = Modifier
-                        .width(10.dp)
-                        .fillMaxHeight()
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(
-                                    Color.Black.copy(alpha = 0.44f),
-                                    Color.White.copy(alpha = 0.16f),
-                                    Color.Transparent
+                        .fillMaxSize()
+                        .padding(4.5.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .border(1.dp, DecoGold.copy(alpha = 0.40f), RoundedCornerShape(2.dp))
+                ) {
+                    YearbookCollageCanvas(
+                        photos = photos,
+                        template = template,
+                        spacingDp = spacingDp,
+                        backdrop = backdrop,
+                        editionColor = editionColor,
+                        slotTransforms = slotTransforms,
+                        interactive = true,
+                        activeSlotIndex = activeSlotIndex,
+                        downsampleTier = ImageDownsampleTier.HERO_CARD,
+                        targetSizePx = 560,
+                        onSlotTap = onSlotTap,
+                        onTransformSlot = onTransformSlot,
+                        modifier = Modifier.fillMaxSize()
+                    )
+
+                    // 底部墨色渐隐 + 年份美术字落款（黑/朱红错位 + 纸黄主字，与书架卡片同款）
+                    if (includeYearWatermark) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(Color.Transparent, DecoScrimInk.copy(alpha = 0.62f))
+                                    )
                                 )
-                            )
                         )
-                )
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(start = 12.dp, bottom = 8.dp)
+                        ) {
+                            Text(
+                                text = year.toString(),
+                                fontFamily = DecoDisplayFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 26.sp,
+                                letterSpacing = (-0.8).sp,
+                                color = Color.Black.copy(alpha = 0.55f),
+                                modifier = Modifier.offset(x = 1.dp, y = 1.dp)
+                            )
+                            Text(
+                                text = year.toString(),
+                                fontFamily = DecoDisplayFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 26.sp,
+                                letterSpacing = (-0.8).sp,
+                                color = DecoArtShadowVerm,
+                                modifier = Modifier.offset(x = 2.dp, y = 2.dp)
+                            )
+                            Text(
+                                text = year.toString(),
+                                fontFamily = DecoDisplayFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 26.sp,
+                                letterSpacing = (-0.8).sp,
+                                color = DecoPaperCream
+                            )
+                        }
+                    }
+                }
             }
 
             // Right: Compact Tactile Studio Actions

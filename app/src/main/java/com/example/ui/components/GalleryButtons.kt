@@ -45,6 +45,7 @@ import com.example.ui.theme.CobaltDark
 import com.example.ui.theme.CobaltPrimary
 import com.example.ui.theme.CoralDanger
 import com.example.ui.theme.DecoDisplayFontFamily
+import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoInkDeep
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.GlassLightBottom
@@ -109,10 +110,10 @@ fun GalleryActionButton(
     val coral = CoralDanger
     val inkPrimary = InkPrimary
 
-    // 未显式传 shape 时按分支取默认：IMMERSIVE 画报纸面 = 3dp（画片圆角语法），
-    // 其余 satin/glass 分支维持旧 16dp 胶囊
+    // 未显式传 shape 时按分支取默认：IMMERSIVE 画报纸面 / GLASS 玻璃面 = 3dp（画片圆角语法），
+    // 其余 satin 分支维持旧 16dp 胶囊
     val resolvedShape = shape
-        ?: if (tone == GalleryButtonTone.IMMERSIVE) RoundedCornerShape(3.dp) else RoundedCornerShape(16.dp)
+        ?: if (tone == GalleryButtonTone.IMMERSIVE || tone == GalleryButtonTone.GLASS) RoundedCornerShape(3.dp) else RoundedCornerShape(16.dp)
 
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -188,7 +189,7 @@ fun GalleryActionButton(
     val resolvedIconTint = iconTint ?: when (tone) {
         GalleryButtonTone.OBSIDIAN -> SolarAmber
         GalleryButtonTone.SAPPHIRE, GalleryButtonTone.DANGER -> Color.White
-        GalleryButtonTone.GLASS -> cobalt
+        GalleryButtonTone.GLASS -> DecoGold
         GalleryButtonTone.DANGER_GLASS -> coral
         GalleryButtonTone.IMMERSIVE -> DecoInkDeep
     }
