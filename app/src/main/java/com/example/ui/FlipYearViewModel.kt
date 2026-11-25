@@ -390,9 +390,9 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     }
                 }
                 if (notifyResult && newlyLocated > 0) {
-                    showBanner("已完成全量定位解析，新增 $newlyLocated 项足迹媒体")
+                    showBanner("已完成全部定位解析，新增 $newlyLocated 项足迹媒体")
                 } else if (notifyResult && forceRescan) {
-                    showBanner("全量定位检查完成，当前足迹已是最新")
+                    showBanner("全部定位检查完成，当前足迹已是最新")
                 }
             } finally {
                 gpsIndexProgress.value = GpsIndexProgress(isIndexing = false, processed = 0, total = 0)

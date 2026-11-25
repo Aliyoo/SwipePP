@@ -580,7 +580,7 @@ internal fun ModernArcSwipeCard(
                         )
                     } else if (item.primaryPhoto.isVideo) {
                         Text(
-                            text = "内嵌播放中 · 点全屏",
+                            text = "播放中 · 点按全屏",
                             fontSize = 12.sp,
                             fontFamily = DecoDisplayFontFamily,
                             color = decoGold,

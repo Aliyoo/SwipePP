@@ -525,7 +525,7 @@ fun FootprintMapScreen(
                                     "解析定位 ${uiState.gpsIndexedCount}/${uiState.gpsTotalCount}"
                                 totalVisibleCount > 0 ->
                                     "${clusters.size} 个足迹 · 已定位 $locatedCount/$totalVisibleCount"
-                                else -> "暂无带 GPS 信息的照片"
+                                else -> "暂无带定位信息的照片"
                             }
                             Text(
                                 text = statsLabel,
@@ -552,7 +552,7 @@ fun FootprintMapScreen(
                                         kind = DecoIconKind.REFRESH,
                                         color = ink.copy(alpha = 0.72f),
                                         iconSize = 16.dp,
-                                        contentDescription = "重新解析全量照片定位"
+                                        contentDescription = "重新解析全部照片定位"
                                     )
                                 }
                             }
@@ -635,7 +635,7 @@ fun FootprintMapScreen(
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "未开启媒体位置权限，系统已隐藏照片 GPS",
+                                text = "未开启媒体位置权限，系统已隐藏照片定位坐标",
                                 fontFamily = DecoDisplayFontFamily,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
@@ -899,7 +899,7 @@ fun FootprintMapScreen(
                         )
                         Text(
                             text = if (unlocatedPhotos.isNotEmpty()) {
-                                "当前 ${unlocatedPhotos.size} 项媒体均不含 GPS 信息"
+                                "当前 ${unlocatedPhotos.size} 项媒体均不含定位信息"
                             } else {
                                 "尚未发现带定位信息的照片"
                             },
@@ -911,9 +911,9 @@ fun FootprintMapScreen(
                         )
                         Text(
                             text = if (unlocatedPhotos.isNotEmpty()) {
-                                "截图、社交软件保存图或拍摄时未开启定位开关的照片/视频不会写入 GPS 坐标。你可以点击下方直接查看或批量补全定位。"
+                                "截图、社交软件保存图或拍摄时未开启定位开关的照片/视频不会写入定位坐标。你可以点击下方直接查看或批量补全定位。"
                             } else {
-                                "当本地相册包含 GPS 拍摄位置时，这里会自动在地图上聚合足迹并支持按地点批量清理。"
+                                "当本地相册包含拍摄位置时，这里会自动在地图上聚合足迹并支持按地点批量清理。"
                             },
                             fontSize = 14.sp,
                             color = ink.copy(alpha = 0.75f),
@@ -1351,7 +1351,7 @@ private fun DecoSealTag(
         )
     ) {
         Text(
-            text = if (hasPending) "$pendingCount 待理" else "已整理",
+            text = if (hasPending) "$pendingCount 待清" else "已整理",
             fontFamily = DecoDisplayFontFamily,
             fontWeight = FontWeight.Bold,
             fontSize = 12.sp,

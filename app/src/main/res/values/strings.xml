@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">SwipePP</string>
-    <string name="app_tagline">3D Photo &amp; Video Cleaner</string>
+    <string name="app_tagline">摩登画报 · 影集整理</string>
     <string name="nav_bookshelf">影集</string>
     <string name="nav_gallery">画廊</string>
     <string name="nav_map">足迹</string>
@@ -25,9 +25,9 @@
     <string name="action_clean_location">清理此地媒体</string>
     <string name="action_load_demo">加载示例影集</string>
     <string name="shake_hint">摇一摇手机即可撤销误删</string>
-    <string name="shake_undo_toast">已摇动撤销 · 媒体回到时光轴</string>
+    <string name="shake_undo_toast">已摇动撤销 · 媒体回到时间轴</string>
     <string name="stamp_cleaned">已整理</string>
-    <string name="vault_retention_note">暂存项目会一直保留在此，经您确认后才会清理并释放空间</string>
+    <string name="vault_retention_note">暂存项目会一直保留在此，经你确认后才会清理并释放空间</string>
     <string name="cd_back">返回</string>
     <string name="cd_scan_media">重新扫描设备全部照片和视频</string>
     <string name="cd_undo">撤销上一步清理操作</string>
@@ -86,7 +86,7 @@
     <string name="cover_speed_balanced">5秒 · 舒缓</string>
     <string name="cover_speed_calm">8秒 · 沉静</string>
     <string name="theme_appearance_title">外观主题</string>
-    <string name="theme_appearance_subtitle">选择画廊氛围，支持自动跟随系统或手动切换日光画廊 / 暗夜暗房</string>
+    <string name="theme_appearance_subtitle">跟随系统，或手动切换日光画廊 / 暗夜暗房</string>
     <string name="cd_theme_switcher">切换浅色或暗色主题外观</string>
     <string name="cd_open_settings">打开偏好设置</string>
     <string name="settings_sheet_title">偏好设置</string>

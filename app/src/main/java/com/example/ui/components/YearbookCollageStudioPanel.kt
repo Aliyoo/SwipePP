@@ -228,7 +228,7 @@ internal fun YearbookCollageEditorPanel(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = "${template.category.label} · ${template.slotCount} 格槽位",
+                            text = "${template.category.label} · ${template.slotCount} 画格",
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 10.sp,
                             color = DecoInkOnGround.copy(alpha = 0.72f),
@@ -247,7 +247,7 @@ internal fun YearbookCollageEditorPanel(
                 )
 
                 CollageStudioToolButton(
-                    label = if (hasCustomTransforms) "重置缩放" else "构图已居中",
+                    label = "重置构图",
                     iconKind = DecoIconKind.CENTER_FOCUS,
                     accent = if (hasCustomTransforms) DecoGold else DecoInkOnGround.copy(alpha = 0.55f),
                     enabled = hasCustomTransforms || activeSlotIndex != null,
@@ -365,7 +365,7 @@ internal fun YearbookCollageEditorPanel(
                     text = if (activeSlotIndex != null) {
                         "已选中第 ${activeSlotIndex + 1} 格 · 双指缩放拖动构图，点另一格互换或点下方照片替换"
                     } else {
-                        "点击画布任意槽位选中微调缩放，依次点两格可互换照片位置"
+                        "点击画布任意画格选中微调缩放，依次点两格可互换照片位置"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     fontSize = 11.sp,
@@ -385,7 +385,7 @@ internal fun YearbookCollageEditorPanel(
                     ) {
                         DecoIcon(
                             kind = DecoIconKind.CLOSE,
-                            contentDescription = "取消选中槽位",
+                            contentDescription = "取消选中画格",
                             color = DecoGold,
                             modifier = Modifier.size(13.dp)
                         )

@@ -318,7 +318,7 @@ fun TrashVaultScreen(
                         text = if (sessionFilterIds != null && uiState.trashedPhotos.isNotEmpty()) {
                             "回收站中还有 ${uiState.trashedPhotos.size} 项历史暂存项目，可点击上方查看全部。"
                         } else {
-                            "在清理器中上滑移入回收站的照片和视频会先暂存在这里，您可以随时还原或按需释放空间。"
+                            "整理时上滑舍弃的照片和视频会先暂存于此，你可随时还原或确认释放空间。"
                         },
                         fontSize = 13.sp,
                         color = DecoInkOnGround.copy(alpha = 0.66f),

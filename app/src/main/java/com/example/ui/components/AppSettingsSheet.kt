@@ -527,7 +527,7 @@ fun AppSettingsSheet(
                 val scanSubtitle = when {
                     isScanningDevice -> "正在增量扫描本地媒体…"
                     totalImageCount + totalVideoCount > 0 ->
-                        "已索引 $totalImageCount 张照片 · $totalVideoCount 个视频"
+                        "已收录 $totalImageCount 张照片 · $totalVideoCount 个视频"
                     else -> "扫描设备相册以构建年度影集"
                 }
                 SettingsActionRow(

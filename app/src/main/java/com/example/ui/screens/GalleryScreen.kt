@@ -885,7 +885,7 @@ fun GalleryScreen(
                                 selectedAlbumFilter != null -> "「$selectedAlbumFilter」相册暂无媒体"
                                 smartFilter == GallerySmartFilter.BURSTS -> "当前没有待展开的连拍组"
                                 smartFilter == GallerySmartFilter.LARGE_PHOTOS -> "暂未发现大于 3 MB 的高体积照片"
-                                smartFilter == GallerySmartFilter.MISSING_LOCATION -> "太棒了！全部媒体均已拥有定位"
+                                smartFilter == GallerySmartFilter.MISSING_LOCATION -> "全部媒体均已拥有定位"
                                 else -> "画廊暂无照片与视频"
                             },
                             style = MaterialTheme.typography.headlineMedium,

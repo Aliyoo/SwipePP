@@ -581,7 +581,7 @@ private fun ExpandedFootprintScrubFlag(
                                     .padding(horizontal = 5.dp, vertical = 1.dp)
                             ) {
                                 Text(
-                                    text = "${activeStop.unreviewedCount} 待理",
+                                    text = "${activeStop.unreviewedCount} 待清",
                                     fontFamily = DecoDisplayFontFamily,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,

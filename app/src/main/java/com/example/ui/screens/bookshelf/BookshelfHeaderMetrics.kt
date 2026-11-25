@@ -331,10 +331,10 @@ internal fun EmptyLibraryPermissionCard(
                 }
 
                 val desc = when {
-                    isScanning -> "正在按年份和月份自动整理您的相册与连拍组。"
-                    activeFilter != MediaFilter.ALL -> "切换回“全部”即可查看您的完整年度影集。"
+                    isScanning -> "正在按年份和月份自动整理你的相册与连拍组。"
+                    activeFilter != MediaFilter.ALL -> "切换回“全部”即可查看你的完整年度影集。"
                     accessLevel == MediaAccessLevel.NONE -> "授权后，SwipePP 将自动在设备本地扫描全部照片和视频，生成 3D 年度影集并智能识别相似连拍，数据全程不上传云端。"
-                    else -> "您可以先拍照/录屏后点击重新扫描，或加载精选示例影集（含 4K 视频与连拍）立即体验全部功能。"
+                    else -> "你可以先拍照/录屏后点击重新扫描，或加载精选示例影集（含 4K 视频与连拍）立即体验全部功能。"
                 }
 
                 Text(

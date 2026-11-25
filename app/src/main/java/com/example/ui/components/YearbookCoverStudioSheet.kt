@@ -95,7 +95,7 @@ import kotlinx.coroutines.launch
 private enum class CoverPickerFilter(val label: String) {
     RECOMMENDED("智能推荐"),
     FAVORITES("我的收藏"),
-    ALL_CHRONOLOGICAL("全部时间线")
+    ALL_CHRONOLOGICAL("全部时间轴")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
