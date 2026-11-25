@@ -130,7 +130,7 @@ class LocalMediaScanner(private val context: Context) {
                 val info = detector.detect(
                     contentUri = image.contentUri.orEmpty(),
                     mimeType = image.mimeType,
-                    displayName = image.caption,
+                    displayName = image.caption + ".jpg",
                     fileSizeBytes = image.fileSizeBytes
                 )
                 if (info == null) {

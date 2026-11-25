@@ -51,7 +51,7 @@ interface FlipYearDao {
             "motionVideoUri = :motionVideoUri, motionVideoDurationMs = :motionVideoDurationMs, " +
             "motionVideoOffset = :motionVideoOffset, motionVideoLength = :motionVideoLength, " +
             "pairedMediaStoreKey = :pairedMediaStoreKey, fileSizeBytes = :fileSizeBytes, " +
-            "widthPx = :widthPx, heightPx = :heightPx, caption = :caption, bucketName = :bucketName " +
+            "widthPx = :widthPx, heightPx = :heightPx " +
             "WHERE mediaStoreKey = :mediaStoreKey AND isSample = 0"
     )
     suspend fun updateDeviceMediaMetadata(
@@ -70,8 +70,6 @@ interface FlipYearDao {
         fileSizeBytes: Long,
         widthPx: Int,
         heightPx: Int,
-        caption: String,
-        bucketName: String?
     )
 
     @Query("SELECT * FROM photos WHERE isSample = 0 AND gpsScanned = 0 AND status != 'PURGED' AND (latitude IS NULL OR longitude IS NULL OR locationName IS NULL OR locationName = '') ORDER BY takenAtMillis DESC")
@@ -211,8 +209,6 @@ interface FlipYearDao {
                 fileSizeBytes = item.fileSizeBytes,
                 widthPx = item.widthPx,
                 heightPx = item.heightPx,
-                caption = item.caption,
-                bucketName = item.bucketName
             )
         }
     }
