@@ -318,7 +318,7 @@ fun FlipbookScreen(
             val topSubtitle = if (showGalleryMode) {
                 "$year 年度影集 · ${populatedMonthCount} 个活跃月 · 展开管理连拍"
             } else {
-                "$year 年度影集 · 已归档 $cleanedMonthCount/$populatedMonthCount 月 · 轻触日期直达"
+                "$year 年度影集 · 已归档 $cleanedMonthCount/$populatedMonthCount 月"
             }
 
             AnimatedContent(
@@ -689,7 +689,7 @@ fun FlipbookScreen(
                                 val isCleanup = currentPageModel.unreviewedCount > 0
                                 Text(
                                     text = if (isCleanup) {
-                                        "待清 ${currentPageModel.unreviewedCount} · ${formatStorageSize(currentPageModel.reclaimableBytes)}"
+                                        "待清 ${currentPageModel.unreviewedCount} 项 · ${formatStorageSize(currentPageModel.reclaimableBytes)}"
                                     } else {
                                         "已归档 ${currentPageModel.keptCount}"
                                     },

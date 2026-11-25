@@ -582,7 +582,7 @@ fun GalleryScreen(
                                         text = if (burstEntries.isNotEmpty()) {
                                             "共 ${displayedEntries.size} 项 · 含 ${burstEntries.size} 组连拍 · 双指缩放"
                                         } else {
-                                            "共 ${displayedEntries.size} 项 · 双指缩放切大图 · 长按多选"
+                                            "共 ${displayedEntries.size} 项 · 双指缩放换布局 · 长按多选"
                                         },
                                         style = MaterialTheme.typography.bodySmall,
                                         fontSize = 12.sp,

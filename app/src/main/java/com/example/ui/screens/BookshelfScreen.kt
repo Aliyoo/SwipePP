@@ -227,7 +227,7 @@ fun BookshelfScreen(
                     totalFreedBytes > 0L ->
                         "已释放 ${formatStorageSize(totalFreedBytes)}"
                     totalMediaCount > 0 ->
-                        "$totalMediaCount 项回忆 · 账本"
+                        "共 $totalMediaCount 项回忆 · 空间账本"
                     else ->
                         "空间账本"
                 }
