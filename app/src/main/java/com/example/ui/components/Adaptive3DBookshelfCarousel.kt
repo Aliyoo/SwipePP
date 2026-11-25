@@ -26,9 +26,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +46,7 @@ import com.example.ui.theme.DecoGround
 import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.InkPrimary
 import com.example.ui.theme.LocalIsDarkTheme
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
@@ -89,7 +88,6 @@ fun <T> Adaptive3DBookshelfCarousel(
     // IMPORTANT: Never read `.value` in composition scope — read ONLY inside Canvas & graphicsLayer!
     val animatedSpeedFactor = remember { Animatable(0f) }
     val animatedSignedVelocity = remember { Animatable(0f) }
-    var lastVelocitySampleNanos by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(pagerState) {
         val initFrac = pagerState.currentPageOffsetFraction.let { if (it.isFinite()) it else 0f }
@@ -97,6 +95,7 @@ fun <T> Adaptive3DBookshelfCarousel(
         var prevTimeNanos = System.nanoTime()
         var smoothedSpeed = 0f
         var smoothedSigned = 0f
+        var idleSettleJob: Job? = null
 
         snapshotFlow {
             val frac = pagerState.currentPageOffsetFraction
@@ -116,18 +115,27 @@ fun <T> Adaptive3DBookshelfCarousel(
                 // Low-pass filter to eliminate pointer jitter while staying super responsive
                 smoothedSpeed = lerp(smoothedSpeed, normalizedSpeed, 0.42f)
                 smoothedSigned = lerp(smoothedSigned, normalizedSigned, 0.38f)
-                lastVelocitySampleNanos = now.toFloat()
 
                 launch {
                     animatedSpeedFactor.snapTo(smoothedSpeed)
                     animatedSignedVelocity.snapTo(smoothedSigned)
+                }
+
+                // 用户按住不动（无滚动事件）时，90ms 防抖后让速度自然衰减归零；
+                // 防抖 Job 挂在父作用域随 LaunchedEffect 消亡，避免此前 mutableState key
+                // 每帧触发整个轮播重组 + 反复取消重启 LaunchedEffect
+                idleSettleJob?.cancel()
+                idleSettleJob = launch {
+                    delay(90L)
+                    animatedSpeedFactor.animateTo(0f, spring(stiffness = Spring.StiffnessLow))
+                    animatedSignedVelocity.animateTo(0f, spring(stiffness = Spring.StiffnessLow))
                 }
             }
         }
     }
 
     // Spring-decay perspective & depth-of-field gracefully back to calm gallery rest when scrolling stops
-    LaunchedEffect(pagerState.isScrollInProgress, lastVelocitySampleNanos) {
+    LaunchedEffect(pagerState.isScrollInProgress) {
         if (!pagerState.isScrollInProgress) {
             launch {
                 animatedSpeedFactor.animateTo(
@@ -146,15 +154,6 @@ fun <T> Adaptive3DBookshelfCarousel(
                         stiffness = Spring.StiffnessMediumLow
                     )
                 )
-            }
-        } else {
-            // If user holds finger still mid-drag, smoothly settle velocity after 90ms idle
-            delay(90L)
-            launch {
-                animatedSpeedFactor.animateTo(0f, spring(stiffness = Spring.StiffnessLow))
-            }
-            launch {
-                animatedSignedVelocity.animateTo(0f, spring(stiffness = Spring.StiffnessLow))
             }
         }
     }

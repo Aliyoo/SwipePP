@@ -129,7 +129,7 @@ import kotlin.math.abs
 /**
  * 足迹地图 · 摩登画报（山河图）
  * 金双线画框包住全屏自绘山河图（框外纸地填充、框内不铺内衬）：金线经纬网格底 + 画片式地点照片印记（朱红计数徽）；
- * 底部地点卡 + 朱红通栏双动作条（查看此地/清理此地）。磨砂 → 画报纸面 mat。
+ * 底部地点卡 + 朱红通栏双动作条（查看此地/整理此地）。磨砂 → 画报纸面 mat。
  * 功能基线（87a2cd3）：Web Mercator 瓦片 + 离线矢量、图源切换、瓦片重试、GPS 解析进度、
  * ACCESS_MEDIA_LOCATION 授权、地点快速跳转 chips、右侧控制栏、可拖拽展开详情卡、
  * 批量补全定位（同日推断）——入口、testTag、回调全部保留。
@@ -1193,35 +1193,44 @@ fun FootprintMapScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                Text(
-                                    text = String.format(
-                                        Locale.US,
-                                        "%d 项媒体 · %s",
-                                        cluster.photos.size,
-                                        formatStorageSize(cluster.totalBytes)
-                                    ),
-                                    fontFamily = JetBrainsMonoFontFamily,
-                                    fontSize = 12.sp,
-                                    color = ink.copy(alpha = 0.68f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                // 坐标独立一行：不再与数量/体积竞争宽度被截断
-                                Text(
-                                    text = String.format(
-                                        Locale.US,
-                                        "%.2f°%s · %.2f°%s",
-                                        abs(cluster.latitude),
-                                        latLabel,
-                                        abs(cluster.longitude),
-                                        lonLabel
-                                    ),
-                                    fontFamily = JetBrainsMonoFontFamily,
-                                    fontSize = 10.5.sp,
-                                    letterSpacing = 0.4.sp,
-                                    color = gold.copy(alpha = 0.9f),
-                                    maxLines = 1
-                                )
+                                // 数量/体积与坐标同一行：数量体积优先完整显示，坐标作为低优先级
+                                // 元数据占剩余宽度（窄屏省略）。地名已明确时坐标独占一行会抬高底卡、
+                                // 压缩地图有效视窗
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = String.format(
+                                            Locale.US,
+                                            "%d 项媒体 · %s",
+                                            cluster.photos.size,
+                                            formatStorageSize(cluster.totalBytes)
+                                        ),
+                                        fontFamily = JetBrainsMonoFontFamily,
+                                        fontSize = 12.sp,
+                                        color = ink.copy(alpha = 0.68f),
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                    Text(
+                                        text = String.format(
+                                            Locale.US,
+                                            "%.2f°%s %.2f°%s",
+                                            abs(cluster.latitude),
+                                            latLabel,
+                                            abs(cluster.longitude),
+                                            lonLabel
+                                        ),
+                                        fontFamily = JetBrainsMonoFontFamily,
+                                        fontSize = 10.5.sp,
+                                        letterSpacing = 0.4.sp,
+                                        color = gold.copy(alpha = 0.9f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                }
                             }
                         }
 
@@ -1265,10 +1274,10 @@ fun FootprintMapScreen(
                                 keyPrefix = "cluster_${cluster.locationName}"
                             )
 
-                            // 朱红通栏：查看此地媒体 / 清理此地
+                            // 朱红通栏：查看此地媒体 / 整理此地
                             DecoVermStrip(
                                 leftLabel = "查看此地",
-                                rightLabel = "清理此地",
+                                rightLabel = "整理此地",
                                 onLeft = {
                                     if (orderedClusterPhotos.isNotEmpty()) {
                                         lightboxPhotos = orderedClusterPhotos

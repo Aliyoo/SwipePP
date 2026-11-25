@@ -94,9 +94,11 @@ import com.example.sensor.rememberHapticEngine
 import com.example.ui.theme.CoralDanger
 import com.example.ui.theme.DecoDisplayFontFamily
 import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoGoldOnPhoto
 import com.example.ui.theme.DecoGround
 import com.example.ui.theme.DecoGroundDeep
 import com.example.ui.theme.DecoPaperCream
+import com.example.ui.theme.DecoScrimInk
 import com.example.ui.theme.DecoVerm
 import com.example.ui.theme.EmeraldKeep
 import com.example.ui.theme.JetBrainsMonoFontFamily
@@ -763,7 +765,8 @@ private fun LightboxBottomHud(
                             ) {
                                 DecoIcon(
                                     kind = DecoIconKind.LOCATION,
-                                    color = Color(0xFF8FB0FF),
+                                    // 压照片暗 scrim：亮香槟金定位印迹（替代旧克莱因蓝 #8FB0FF）
+                                    color = DecoGoldOnPhoto,
                                     iconSize = 14.dp
                                 )
                                 Text(
@@ -815,8 +818,13 @@ private fun LightboxBottomHud(
                     }
 
                     if (!photo.isVideo && zoomScale > 1.05f) {
-                        ObsidianGlassPill(
-                            modifier = Modifier.padding(start = 8.dp)
+                        // 变焦读数印签：画片语法——墨色底 + 金细线方角（替代旧玻璃胶囊 ObsidianGlassPill）
+                        Row(
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(DecoScrimInk.copy(alpha = 0.72f))
+                                .border(1.dp, DecoGoldOnPhoto.copy(alpha = 0.55f), RoundedCornerShape(2.dp))
                         ) {
                             Text(
                                 text = String.format(Locale.US, "%.1f×", zoomScale),
@@ -824,7 +832,7 @@ private fun LightboxBottomHud(
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.8.sp,
-                                color = Color.White,
+                                color = DecoGoldOnPhoto,
                                 modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
                             )
                         }

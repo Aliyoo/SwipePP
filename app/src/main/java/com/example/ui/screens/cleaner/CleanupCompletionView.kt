@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.CleanerEntrySource
@@ -74,7 +75,11 @@ internal fun DecoVermStripButton(
     badgeText: String? = null,
     leadingIconKind: DecoIconKind? = null,
     height: Dp = 52.dp,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    // 宽通栏（完成页/连拍主 CTA）保持 20sp/2sp 画报标题字；
+    // 三等分次级底栏（连拍「整组舍弃」）需收窄字号避免 4 字截断并与邻钮字号齐平
+    titleFontSize: TextUnit = 20.sp,
+    titleLetterSpacing: TextUnit = 2.sp
 ) {
     val palette = LocalFlipYearPalette.current
     val gold = palette.decoGold
@@ -129,11 +134,11 @@ internal fun DecoVermStripButton(
             }
             Text(
                 text = title,
-                fontSize = 20.sp,
+                fontSize = titleFontSize,
                 fontFamily = DecoDisplayFontFamily,
                 fontWeight = FontWeight.Bold,
                 color = DecoPaperCream,
-                letterSpacing = 2.sp,
+                letterSpacing = titleLetterSpacing,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
@@ -285,7 +290,7 @@ internal fun CleanupCompletedCelebration(
 
         if (isSingleDayFinishedWithMoreInMonth) {
             DecoVermStripButton(
-                title = "继续清理本月剩余",
+                title = "继续整理本月剩余",
                 badgeText = "$remainingInFullQueue 项",
                 leadingIconKind = DecoIconKind.CLEAN,
                 onClick = onContinueFullMonth,

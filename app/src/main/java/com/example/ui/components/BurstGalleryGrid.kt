@@ -1130,15 +1130,16 @@ internal fun ExpandedBurstStackTray(
         "${formatPhotoDateTime(firstTimestamp)} · ${burst.spanSeconds}秒内连拍 · ${formatStorageSize(burst.totalBytes)}"
     }
     val keepBestLabel = remember(burst.photos.size, burst.nonBestBytes) {
-        "仅保留最佳 · 清理其余 ${burst.photos.size - 1} 张 (${formatStorageSize(burst.nonBestBytes)})"
+        "仅保留最佳 · 舍弃其余 ${burst.photos.size - 1} 张 (${formatStorageSize(burst.nonBestBytes)})"
     }
 
-    // Keep enableAmbientBlur = false and minimal shadowElevation inside scrolling LazyGrid items
-    FrostedGlassCard(
+    // 画片纸托盘：mat 纸面 + 1dp 金细线（替代旧玻璃拟态 FrostedGlassCard 的冷白霜面与高光描边，
+    // 与灯箱底栏/选择 Sheet 同语法）；滚动列表项内保持零模糊、低阴影
+    Surface(
         shape = TrayShape,
-        borderAccent = LocalFlipYearPalette.current.decoGold,
+        color = LocalFlipYearPalette.current.decoMat,
+        border = BorderStroke(1.dp, LocalFlipYearPalette.current.decoGold.copy(alpha = 0.6f)),
         shadowElevation = 2.dp,
-        enableAmbientBlur = false,
         modifier = modifier
             .fillMaxWidth()
             .testTag("burst_expanded_tray_${burst.groupId}")

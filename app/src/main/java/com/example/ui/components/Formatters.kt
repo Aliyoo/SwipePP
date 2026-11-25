@@ -25,8 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.PhotoItemEntity
 import com.example.ui.theme.DecoDisplayFontFamily
-import com.example.ui.theme.EmeraldKeep
-import com.example.ui.theme.EmeraldSoft
+import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoMat
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -151,7 +151,8 @@ fun formatVaultStagedLabel(trashedAtMillis: Long?, nowMillis: Long = System.curr
 }
 
 /**
- * Clean, modern emerald completion seal badge for finished months (non-interactive status seal).
+ * 画报金色完成印章（方章画框语法）：整理完成月份的状态章，非交互。
+ * 旧玻璃拟态时代的 emerald 绿章已淘汰——Deco 语法中金色即「完成/珍藏」正向语义。
  */
 @Composable
 fun CleanedCompletionBadge(
@@ -184,9 +185,9 @@ fun CleanedCompletionBadge(
     }
 
     Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = EmeraldSoft,
-        border = BorderStroke(1.2.dp, EmeraldKeep.copy(alpha = 0.45f)),
+        shape = RoundedCornerShape(3.dp),
+        color = DecoMat,
+        border = BorderStroke(1.2.dp, DecoGold.copy(alpha = 0.75f)),
         shadowElevation = 2.dp,
         modifier = modifier
             .semantics(mergeDescendants = true) {
@@ -206,7 +207,7 @@ fun CleanedCompletionBadge(
         ) {
             DecoIcon(
                 kind = DecoIconKind.VERIFIED,
-                color = EmeraldKeep,
+                color = DecoGold,
                 iconSize = 20.dp
             )
             Column {
@@ -215,14 +216,14 @@ fun CleanedCompletionBadge(
                     fontFamily = DecoDisplayFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
-                    color = EmeraldKeep
+                    color = DecoGold
                 )
                 Text(
                     text = if (freedBytes > 0L) "释放 ${formatStorageSize(freedBytes)}" else "全部保留",
                     fontFamily = DecoDisplayFontFamily,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 10.sp,
-                    color = EmeraldKeep.copy(alpha = 0.85f)
+                    color = DecoGold.copy(alpha = 0.85f)
                 )
             }
         }

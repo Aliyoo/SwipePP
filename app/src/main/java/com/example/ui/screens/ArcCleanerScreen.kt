@@ -13,6 +13,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -62,7 +63,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -457,30 +460,36 @@ fun ArcCleanerScreen(
             // 金刻度进度：24 格金尺（已决=实金 / 未决=弱金）
             if (initialQueueCount > 0) {
                 val progressTarget = (1f - (displayedQueue.size.toFloat() / initialQueueCount.toFloat())).coerceIn(0.04f, 1f)
-                val animatedProgress by animateFloatAsState(
+                // State<Float> 不解构：动画值只在 Canvas 绘制期读取，弹簧推进期间 0 重组
+                // （此前 24 个 Box 随 animateFloatAsState 每帧整体重组）
+                val animatedProgressState = animateFloatAsState(
                     targetValue = if (displayedQueue.isEmpty()) 1f else progressTarget,
                     animationSpec = spring(stiffness = Spring.StiffnessLow),
                     label = "cleaner_progress"
                 )
-                val segmentCount = 24
-                val filledSegments = (animatedProgress * segmentCount).roundToInt().coerceIn(0, segmentCount)
-                Row(
+                val rulerGold = DecoGold
+                val queueDrained = displayedQueue.isEmpty()
+                Canvas(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp)
-                        .padding(bottom = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        .padding(bottom = 4.dp)
+                        .height(4.dp)
                 ) {
-                    repeat(segmentCount) { index ->
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(1.dp))
-                                .background(
-                                    if (index < filledSegments || displayedQueue.isEmpty()) DecoGold
-                                    else DecoGold.copy(alpha = 0.22f)
-                                )
+                    val segmentCount = 24
+                    val gapPx = 3.dp.toPx()
+                    val segmentWidth = (size.width - gapPx * (segmentCount - 1)) / segmentCount
+                    val corner = CornerRadius(1.dp.toPx())
+                    val filledSegments = (animatedProgressState.value * segmentCount)
+                        .roundToInt()
+                        .coerceIn(0, segmentCount)
+                    val dimGold = rulerGold.copy(alpha = 0.22f)
+                    for (index in 0 until segmentCount) {
+                        drawRoundRect(
+                            color = if (index < filledSegments || queueDrained) rulerGold else dimGold,
+                            topLeft = Offset(index * (segmentWidth + gapPx), 0f),
+                            size = Size(segmentWidth, size.height),
+                            cornerRadius = corner
                         )
                     }
                 }
@@ -951,8 +960,11 @@ fun ArcCleanerScreen(
                                         )
                                         DecoVermStripButton(
                                             title = "整组舍弃",
-                                            // 三钮等分下 24dp 图标会挤掉 4 字标题被省略，让位给文字
+                                            // 三钮等分下 24dp 图标会挤掉 4 字标题被省略，让位给文字；
+                                            // 字号/字距收窄与同排 IMMERSIVE 按钮齐平，避免窄格 4 字截断
                                             height = 48.dp,
+                                            titleFontSize = 14.sp,
+                                            titleLetterSpacing = 1.sp,
                                             onClick = {
                                                 haptics.swipeDeleteConfirm()
                                                 handleTrashEntireStack(current)
@@ -1094,6 +1106,8 @@ fun ArcCleanerScreen(
             onDismissRequest = { inspectingStack = null },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = DecoMat,
+            // 画片语法：全 App BottomSheet 统一 3dp 微圆角（此前漏传回落 M3 默认 28dp）
+            shape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp),
             dragHandle = { DecoSheetDragHandle() },
             modifier = Modifier.modalSheetTopClearance()
         ) {

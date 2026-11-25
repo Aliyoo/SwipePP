@@ -123,6 +123,20 @@ private val NocturnalMapTileColorFilter = ColorFilter.colorMatrix(
     )
 )
 
+// 亮色系「山河图」复古制图矩阵：Rec.709 去饱和 55%（s=0.45）后按行缩放 R×0.965 / G×0.94 / B×0.875，
+// 纸白瓦片底 → #F6F0DF 暖羊皮纸。现代冷蓝高饱瓦片直接放在暖纸金框里会造成跨页风格割裂；
+// 经此矩阵后水系呈钢青、绿地呈橄榄灰绿、道路呈琥珀，整体落入摩登画报色谱
+private val ParchmentMapTileColorFilter = ColorFilter.colorMatrix(
+    ColorMatrix(
+        floatArrayOf(
+            0.547f, 0.380f, 0.038f, 0f, 0f,
+            0.110f, 0.793f, 0.037f, 0f, 0f,
+            0.102f, 0.344f, 0.429f, 0f, 0f,
+            0f, 0f, 0f, 1f, 0f
+        )
+    )
+)
+
 fun lonToNormX(lon: Double): Double {
     val safeLon = if (lon.isFinite()) lon.coerceIn(-180.0, 180.0) else 0.0
     return (safeLon + 180.0) / 360.0
@@ -586,7 +600,7 @@ fun InteractiveSlippyMap(
     // 陆块：暗房用弱金晕染（山河图墨绿底上的淡金大陆），画廊用 mat 纸面
     val landFillColor = if (isDark) palette.decoGold.copy(alpha = 0.10f) else palette.decoMat
     val landStrokeColor = palette.decoGold.copy(alpha = if (isDark) 0.42f else 0.58f)
-    val tileColorFilter = if (isDark) NocturnalMapTileColorFilter else null
+    val tileColorFilter = if (isDark) NocturnalMapTileColorFilter else ParchmentMapTileColorFilter
 
     BoxWithConstraints(
         modifier = modifier

@@ -133,6 +133,7 @@ private fun galleryMonthRuleBrush(): Brush = Brush.horizontalGradient(
 )
 private val GalleryTileOutline = RoundedCornerShape(3.dp)
 private val GallerySealShape = RoundedCornerShape(3.dp)
+private const val DECO_FULL_ART_SHADOW_MIN_SP = 36f
 
 /**
  * 美术字标题：DecoDisplay Bold + artShadow 三层错位影（随字号等比：
@@ -162,30 +163,37 @@ private fun DecoArtTitle(
         fontSize = fontSize,
         letterSpacing = 0.8.sp
     )
+    // 三层错位影只给 ≥36sp 展示级大字；常规页眉仅保留一层清爽朱红错位（无黑影、无模糊），
+    // 避免浅色纸地上中小字号叠影发虚发脏
+    val fullArtShadow = fontSize.value >= DECO_FULL_ART_SHADOW_MIN_SP
     Box(modifier) {
         // 错位阴影层对无障碍隐藏，仅顶层正稿参与语义（同 VaultArtText）
+        if (fullArtShadow) {
+            Text(
+                text = text,
+                color = Color.Transparent,
+                style = baseStyle.copy(shadow = blurShadow),
+                modifier = Modifier.clearAndSetSemantics { }
+            )
+        }
         Text(
             text = text,
-            color = Color.Transparent,
-            style = baseStyle.copy(shadow = blurShadow),
-            modifier = Modifier.clearAndSetSemantics { }
-        )
-        Text(
-            text = text,
-            color = verm.copy(alpha = 0.60f),
+            color = verm.copy(alpha = if (fullArtShadow) 0.60f else 0.42f),
             style = baseStyle,
             modifier = Modifier
                 .offset(x = vermOffset, y = vermOffset)
                 .clearAndSetSemantics { }
         )
-        Text(
-            text = text,
-            color = Color.Black.copy(alpha = 0.55f),
-            style = baseStyle,
-            modifier = Modifier
-                .offset(x = inkOffset, y = inkOffset)
-                .clearAndSetSemantics { }
-        )
+        if (fullArtShadow) {
+            Text(
+                text = text,
+                color = Color.Black.copy(alpha = 0.55f),
+                style = baseStyle,
+                modifier = Modifier
+                    .offset(x = inkOffset, y = inkOffset)
+                    .clearAndSetSemantics { }
+            )
+        }
         Text(
             text = text,
             color = DecoInkOnGround,

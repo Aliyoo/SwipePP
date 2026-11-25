@@ -269,6 +269,10 @@ val ObsidianOverlayBorderStrong = Color(0xA6FFFFFF)// ~65% — hero play orb emp
 // Deco Poster Paper Materials — theme-invariant (摩登画报纸材，浅暗主题同值)
 // 纸黄 #EFE3C8：只压照片暗部 / 朱红底上的文字（可读性红线，不作地面文字）；IMMERSIVE 按钮画报纸面
 val DecoPaperCream = Color(0xFFEFE3C8)
+// 压照片暗部的亮香槟金：浅色主题下主题金 DecoGold(#7E6018) 是深古铜，压在暗部 scrim(#0D1814)
+// 上对比度仅 ~2.1:1 发糊；任何叠加在照片/暗 scrim 上的金色文字与图标一律改走此固定亮金，
+// 地面金线/金字仍走主题 DecoGold 令牌
+val DecoGoldOnPhoto = Color(0xFFD9B75E)
 // 深墨 #1A1D1B（日光画廊字色）：IMMERSIVE 按钮深墨字与墨色涟漪（浅暗主题同值）
 val DecoInkDeep = Color(0xFF1A1D1B)
 
