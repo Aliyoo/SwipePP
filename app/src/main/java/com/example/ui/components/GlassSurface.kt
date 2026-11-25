@@ -43,11 +43,14 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -647,7 +650,11 @@ fun DecoVermStrip(
                 .weight(leftFlex)
                 .fillMaxHeight()
                 .then(leftTestTag?.let { Modifier.testTag(it) } ?: Modifier)
-                .clickable(onClick = onLeft)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = ripple(color = cream),
+                    onClick = onLeft
+                )
         ) {
             Text(
                 text = leftLabel,
@@ -679,7 +686,11 @@ fun DecoVermStrip(
                 .weight(1f)
                 .fillMaxHeight()
                 .then(rightTestTag?.let { Modifier.testTag(it) } ?: Modifier)
-                .clickable(onClick = onRight)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = ripple(color = cream),
+                    onClick = onRight
+                )
         ) {
             Text(
                 text = rightLabel,
@@ -704,28 +715,39 @@ fun DecoPaperGround(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val ground = DecoGround
-    val groundDeep = DecoGroundDeep
-    val ink = DecoInkOnGround
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(ground, groundDeep)))
-            .drawBehind {
-                val step = 4.dp.toPx()
-                var y = 0f
-                while (y < size.height) {
-                    drawLine(
-                        color = ink.copy(alpha = 0.016f),
-                        start = Offset(0f, y),
-                        end = Offset(size.width, y),
-                        strokeWidth = 1f
-                    )
-                    y += step
-                }
-            },
+            .decoPaperGroundBackground(DecoGround, DecoGroundDeep, DecoInkOnGround),
         content = content
     )
+}
+
+/**
+ * 纸地渐变 + 纸纹横丝的共享绘制修饰符。drawWithCache：渐变画刷与合并后的单条纸纹 Path
+ * 只随尺寸/主题重建；此前 drawBehind 每次重绘逐条 drawLine（满屏 ~225 次）。
+ */
+fun Modifier.decoPaperGroundBackground(
+    ground: Color,
+    groundDeep: Color,
+    ink: Color
+): Modifier = this.drawWithCache {
+    val groundBrush = Brush.verticalGradient(listOf(ground, groundDeep))
+    val lineColor = ink.copy(alpha = 0.016f)
+    val step = 4.dp.toPx()
+    val paperGrainPath = Path().apply {
+        var y = 0f
+        while (y < size.height) {
+            moveTo(0f, y)
+            lineTo(size.width, y)
+            y += step
+        }
+    }
+    val grainStroke = Stroke(width = 1f)
+    onDrawBehind {
+        drawRect(brush = groundBrush)
+        drawPath(path = paperGrainPath, color = lineColor, style = grainStroke)
+    }
 }
 
 /**
@@ -841,7 +863,12 @@ fun DecoSealOrb(
     val hasHalo = tone == DecoOrbTone.GOLD_RING_HALO
     val totalSize = orbSize + if (hasHalo) 10.dp else 0.dp
     val ringColor = if (tone == DecoOrbTone.VERM_SOLID) cream.copy(alpha = 0.35f) else gold
-    val fillColor = if (tone == DecoOrbTone.VERM_SOLID) verm else ground.copy(alpha = 0.42f)
+    // 保留（金环余辉）是最高频正向动作：给淡金实底提升视觉重心，避免与朱红实印「舍弃」权重倒置
+    val fillColor = when (tone) {
+        DecoOrbTone.VERM_SOLID -> verm
+        DecoOrbTone.GOLD_RING_HALO -> gold.copy(alpha = 0.16f).compositeOver(ground)
+        DecoOrbTone.GOLD_RING -> ground.copy(alpha = 0.42f)
+    }
     val contentColor = if (tone == DecoOrbTone.VERM_SOLID) cream else gold
     // 原型字号：64dp 金环 15sp / 朱红实印 14sp；54dp 小章按比例收一档
     val labelSize = when {

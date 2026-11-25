@@ -317,7 +317,7 @@ fun YearbookCoverStudioSheet(
                         color = DecoInkOnGround
                     )
                     Surface(
-                        shape = CircleShape,
+                        shape = RoundedCornerShape(2.dp),
                         color = DecoMat,
                         border = BorderStroke(0.7.dp, DecoGold.copy(alpha = 0.22f))
                     ) {
@@ -433,7 +433,7 @@ fun YearbookCoverStudioSheet(
                 // Inline export feedback banner if user just exported HD image
                 AnimatedVisibility(visible = exportStatusNote != null) {
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(3.dp),
                         color = DecoGold.copy(alpha = 0.12f),
                         border = BorderStroke(0.8.dp, DecoGold.copy(alpha = 0.35f)),
                         modifier = Modifier.fillMaxWidth()
@@ -879,7 +879,7 @@ fun YearbookCoverStudioSheet(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(150.dp)
-                                    .clip(RoundedCornerShape(18.dp))
+                                    .clip(RoundedCornerShape(3.dp))
                                     .background(DecoMat),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -1318,12 +1318,12 @@ private fun SmartSlideCard(
     Column(
         modifier = Modifier
             .width(104.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(3.dp))
             .background(DecoMat)
             .border(
                 width = if (isHighlighted) 2.dp else 1.dp,
                 color = if (isHighlighted) DecoGold else DecoGold.copy(alpha = 0.45f),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(3.dp)
             )
             .clickable(onClick = onClick)
             .padding(6.dp)
@@ -1334,7 +1334,7 @@ private fun SmartSlideCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(0.82f)
-                .clip(RoundedCornerShape(11.dp))
+                .clip(RoundedCornerShape(3.dp))
         ) {
             PhotoArtwork(
                 photo = photo,
@@ -1396,11 +1396,11 @@ private fun CoverPickerGridTile(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(0.78f)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(3.dp))
             .border(
                 width = if (isSelected) 2.5.dp else 0.8.dp,
                 color = if (isSelected) DecoGold else DecoGold.copy(alpha = 0.45f),
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(3.dp)
             )
             .clickable(onClick = onClick)
             .testTag("cover_picker_tile_${photo.id}")

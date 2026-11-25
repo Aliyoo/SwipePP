@@ -47,11 +47,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -79,11 +75,13 @@ import com.example.ui.components.Adaptive3DBookshelfCarousel
 import com.example.ui.components.AppSettingsSheet
 import com.example.ui.components.DecoIcon
 import com.example.ui.components.DecoIconKind
+import com.example.ui.components.DecoVermStrip
 import com.example.ui.components.ArtisticGalleryBackdrop
 import com.example.ui.components.CollageTemplate
 import com.example.ui.components.formatStorageSize
 import com.example.ui.components.ThemeAppearanceSheet
 import com.example.ui.components.YearbookCoverStudioSheet
+import com.example.ui.components.decoPaperGroundBackground
 import com.example.ui.screens.bookshelf.BookshelfStorageLedgerSheet
 import com.example.ui.screens.bookshelf.EmptyLibraryPermissionCard
 import com.example.ui.screens.bookshelf.ModernYearbook3DCard
@@ -188,20 +186,7 @@ fun BookshelfScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(palette.decoGround, palette.decoGroundDeep)
-                )
-            )
-            .drawBehind {
-                val paperLineStep = 4.dp.toPx()
-                val paperLineColor = groundInk.copy(alpha = 0.016f)
-                var y = 0f
-                while (y < size.height) {
-                    drawLine(paperLineColor, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
-                    y += paperLineStep
-                }
-            }
+            .decoPaperGroundBackground(palette.decoGround, palette.decoGroundDeep, groundInk)
     ) {
         Column(
             modifier = Modifier
@@ -369,11 +354,13 @@ fun BookshelfScreen(
                             color = groundInk,
                             modifier = Modifier.weight(1f)
                         )
+                        // 朱红实底方章：纸黄字压朱红底（可读性红线允许组合；此前漏画底色导致浅底隐形）
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .heightIn(min = 48.dp)
                                 .clip(RoundedCornerShape(3.dp))
+                                .background(verm)
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = ripple(color = DecoPaperCream)
@@ -853,81 +840,16 @@ private fun DecoVermilionActionStrip(
     onStartCleanup: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val gold = DecoGold
-    val verm = DecoVerm
     val isCleanupMode = unreviewedCount > 0
-    val stripShape = RoundedCornerShape(3.dp)
-
-    Row(
-        modifier = modifier
-            .height(58.dp)
-            .shadow(
-                elevation = 12.dp,
-                shape = stripShape,
-                ambientColor = verm.copy(alpha = 0.45f),
-                spotColor = verm.copy(alpha = 0.45f)
-            )
-            .clip(stripShape)
-            .background(verm)
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .weight(1.35f)
-                .fillMaxSize()
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = ripple(color = DecoPaperCream)
-                ) { onBrowseMonths() }
-        ) {
-            Text(
-                text = "翻阅月历",
-                fontFamily = DecoDisplayFontFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 20.sp,
-                letterSpacing = 2.6.sp,
-                color = DecoPaperCream
-            )
-        }
-
-        // 中缝：1dp 金渐变（上透明 → 金 → 下透明）
-        Box(
-            modifier = Modifier
-                .width(1.dp)
-                .fillMaxSize()
-                .padding(vertical = 12.dp)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.Transparent,
-                            gold.copy(alpha = 0.80f),
-                            gold.copy(alpha = 0.80f),
-                            Color.Transparent
-                        )
-                    )
-                )
-        )
-
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxSize()
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = ripple(color = DecoPaperCream)
-                ) { onStartCleanup() }
-                .testTag("open_yearbook_button")
-        ) {
-            Text(
-                text = if (isCleanupMode) "进入整理" else "重温回忆",
-                fontFamily = DecoDisplayFontFamily,
-                fontWeight = FontWeight.Medium,
-                fontSize = 17.sp,
-                letterSpacing = 2.2.sp,
-                color = DecoPaperCream.copy(alpha = 0.88f),
-                maxLines = 1
-            )
-        }
-    }
+    // 统一走共享朱红通栏（顶缘纸黄受光边 + 朱红深影 + 金中缝），首页仅放大高度与主动作占比
+    DecoVermStrip(
+        leftLabel = "翻阅月历",
+        rightLabel = if (isCleanupMode) "进入整理" else "重温回忆",
+        onLeft = onBrowseMonths,
+        onRight = onStartCleanup,
+        modifier = modifier,
+        height = 58.dp,
+        leftFlex = 1.35f,
+        rightTestTag = "open_yearbook_button"
+    )
 }

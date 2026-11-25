@@ -135,7 +135,7 @@ import com.example.ui.theme.DecoGround
 import com.example.ui.theme.DecoGroundDeep
 import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Brush
-import com.example.ui.theme.StudioCanvas
+import com.example.ui.theme.DecoGround
 import com.example.ui.theme.ThemePreferences
 import kotlin.math.roundToInt
 import com.example.ui.theme.YearbookCoverStyle
@@ -377,7 +377,8 @@ fun FlipYearApp(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(StudioCanvas)
+            // 画报纸地墨绿作为 App 根底色：转场缝隙/overscroll 不再漏出旧 StudioCanvas 色
+            .background(DecoGround)
     ) {
         val useNavigationRail = maxWidth >= 640.dp
         val floatingDockInset = if (showTopLevelNav && !useNavigationRail) 82.dp else 0.dp
@@ -714,7 +715,8 @@ fun FlipYearApp(
                                 onRestorePhoto = viewModel::restoreFromVault,
                                 onRestoreAll = { targets -> viewModel.restoreAllFromVault(targets) },
                                 onConfirmPurgeTargets = confirmVaultPurgeTargets,
-                                onClearSessionFilter = { viewModel.setVaultSessionFilter(null) }
+                                onClearSessionFilter = { viewModel.setVaultSessionFilter(null) },
+                                onBrowseToOrganize = { navigateToTab(FlipYearRoutes.BOOKSHELF) }
                             )
                         }
 

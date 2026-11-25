@@ -35,7 +35,8 @@ import com.example.data.PhotoItemEntity
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.SurfaceMuted
 
-private val VideoBadgeShape = RoundedCornerShape(50)
+// 画片语法：方形/微圆角印章式徽标（不再沿用旧玻璃拟态胶囊），深色 scrim 墨底
+private val VideoBadgeShape = RoundedCornerShape(2.dp)
 private val VideoBadgeColor = Color(0xCC10131A)
 
 private val VariantSlightTilt = VariantStyle(

@@ -1,7 +1,8 @@
 package com.example.ui.screens.cleaner
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
@@ -32,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,9 +76,13 @@ import com.example.ui.theme.DecoInkDeep
 import com.example.ui.theme.DecoPaperCream
 import com.example.ui.theme.DecoScrimInk
 import com.example.ui.theme.LocalFlipYearPalette
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
+import java.util.concurrent.atomic.AtomicReference
+
+private const val COMMIT_UNMOUNT_GRACE_MS = 320L
 
 // 摩登画报 · 屏内一次性色彩（design-demos/deco-app.html 取材，浅暗主题同值）
 // 照片压暗 scrim / 深色徽章芯片的取色，永远不用于地面文字
@@ -100,7 +106,11 @@ internal fun ModernArcSwipeCard(
 ) {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val dragOffsetY = remember(item.stableKey) { Animatable(0f) }
+    // 拖拽位移：普通 MutableFloatState（仅 graphicsLayer/drawBehind 绘制期读取，拖拽帧零重组）。
+    // 指针事件直接同步写入，不再每个 move 事件 launch 一个 snapTo 协程（120Hz 下每秒上百个）；
+    // 松手回弹/飞出由可取消的 settleJob 用 animate() 驱动并继承手指速度
+    var dragOffsetY by remember(item.stableKey) { mutableFloatStateOf(0f) }
+    val settleJobRef = remember(item.stableKey) { AtomicReference<Job?>(null) }
     var crossedDirection by remember(item.stableKey) { mutableIntStateOf(0) }
     var isCommitting by remember(item.stableKey) { mutableStateOf(false) }
     var showFavoriteHeartBurst by remember(item.stableKey) { mutableStateOf(false) }
@@ -119,16 +129,24 @@ internal fun ModernArcSwipeCard(
         isCommitting = false
         crossedDirection = 0
         showFavoriteHeartBurst = false
-        if (dragOffsetY.value != 0f) {
-            dragOffsetY.snapTo(0f)
-        }
+        settleJobRef.getAndSet(null)?.cancel()
+        dragOffsetY = 0f
+    }
+
+    suspend fun animateDragTo(target: Float, initialVelocity: Float, spec: AnimationSpec<Float>) {
+        animate(
+            initialValue = dragOffsetY,
+            targetValue = target,
+            initialVelocity = initialVelocity,
+            animationSpec = spec
+        ) { value, _ -> dragOffsetY = value }
     }
 
     val showTrashOverlay by remember(item.stableKey, trashThresholdPx) {
-        derivedStateOf { (-dragOffsetY.value / trashThresholdPx) > 0.08f }
+        derivedStateOf { (-dragOffsetY / trashThresholdPx) > 0.08f }
     }
     val showKeepOverlay by remember(item.stableKey, keepThresholdPx) {
-        derivedStateOf { (dragOffsetY.value / keepThresholdPx) > 0.08f }
+        derivedStateOf { (dragOffsetY / keepThresholdPx) > 0.08f }
     }
 
     val palette = LocalFlipYearPalette.current
@@ -161,7 +179,7 @@ internal fun ModernArcSwipeCard(
                 val pageOffset = pageOffsetProvider()
                 val absOffset = pageOffset.absoluteValue.coerceIn(0f, 1.5f)
                 val clampedAbs = absOffset.coerceIn(0f, 1f)
-                val dragY = dragOffsetY.value
+                val dragY = dragOffsetY
                 val trashProgress = (-dragY / trashThresholdPx).coerceIn(0f, 1f)
 
                 val arcDropPx = (pageOffset * pageOffset) * arcDropBasePx
@@ -194,39 +212,44 @@ internal fun ModernArcSwipeCard(
                         if (!change.pressed) {
                             if (lockAxis == 1 && !isCommitting) {
                                 val velocityY = velocityTracker.calculateVelocity().y
-                                val currentY = dragOffsetY.value
+                                val currentY = dragOffsetY
                                 crossedDirection = 0
                                 val shouldTrash = currentY < -trashThresholdPx ||
                                     (velocityY < -flingVelocityPxPerSec && currentY < -flingMinDistancePx)
                                 val shouldKeep = currentY > keepThresholdPx ||
                                     (velocityY > flingVelocityPxPerSec && currentY > flingMinDistancePx)
-                                scope.launch {
+                                val settle = scope.launch {
                                     when {
                                         shouldTrash -> {
                                             isCommitting = true
                                             try {
-                                                dragOffsetY.animateTo(-exitUpPx, spring(stiffness = Spring.StiffnessMediumLow))
+                                                animateDragTo(-exitUpPx, velocityY, spring(stiffness = Spring.StiffnessMediumLow))
                                                 onSwipeUpTrash()
+                                                // 卡片随队列移除卸载（scope 取消）；此前提交后立即 snapTo(0f)
+                                                // 会在卸载前闪现 1 帧居中回弹。仅当宿主未移除该卡时才复位
+                                                delay(COMMIT_UNMOUNT_GRACE_MS)
+                                                dragOffsetY = 0f
                                             } finally {
-                                                dragOffsetY.snapTo(0f)
                                                 isCommitting = false
                                             }
                                         }
                                         shouldKeep -> {
                                             isCommitting = true
                                             try {
-                                                dragOffsetY.animateTo(exitDownPx, spring(stiffness = Spring.StiffnessMediumLow))
+                                                animateDragTo(exitDownPx, velocityY, spring(stiffness = Spring.StiffnessMediumLow))
                                                 onSwipeDownKeep()
+                                                delay(COMMIT_UNMOUNT_GRACE_MS)
+                                                dragOffsetY = 0f
                                             } finally {
-                                                dragOffsetY.snapTo(0f)
                                                 isCommitting = false
                                             }
                                         }
                                         else -> {
-                                            dragOffsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+                                            animateDragTo(0f, velocityY, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
                                         }
                                     }
                                 }
+                                settleJobRef.getAndSet(settle)?.cancel()
                             }
                             break
                         }
@@ -250,7 +273,7 @@ internal fun ModernArcSwipeCard(
                         if (lockAxis == 1 && !isCommitting) {
                             change.consume()
                             velocityTracker.addPosition(change.uptimeMillis, change.position)
-                            val next = (dragOffsetY.value + delta.y).coerceIn(-maxUpDragPx, maxDownDragPx)
+                            val next = (dragOffsetY + delta.y).coerceIn(-maxUpDragPx, maxDownDragPx)
                             val nextDir = when {
                                 next < -trashThresholdPx -> -1
                                 next > keepThresholdPx -> 1
@@ -260,7 +283,8 @@ internal fun ModernArcSwipeCard(
                                 haptics.swipeThresholdDetent(isTrash = nextDir == -1)
                             }
                             crossedDirection = nextDir
-                            scope.launch { dragOffsetY.snapTo(next) }
+                            settleJobRef.getAndSet(null)?.cancel()
+                            dragOffsetY = next
                         }
                     }
                 }
@@ -474,7 +498,7 @@ internal fun ModernArcSwipeCard(
                         modifier = Modifier
                             .fillMaxSize()
                             .drawBehind {
-                                val p = (-dragOffsetY.value / trashThresholdPx).coerceIn(0f, 1f)
+                                val p = (-dragOffsetY / trashThresholdPx).coerceIn(0f, 1f)
                                 drawRect(color = decoVerm.copy(alpha = p * 0.55f))
                             },
                         contentAlignment = Alignment.Center
@@ -512,7 +536,7 @@ internal fun ModernArcSwipeCard(
                         modifier = Modifier
                             .fillMaxSize()
                             .drawBehind {
-                                val p = (dragOffsetY.value / keepThresholdPx).coerceIn(0f, 1f)
+                                val p = (dragOffsetY / keepThresholdPx).coerceIn(0f, 1f)
                                 drawRect(color = decoGold.copy(alpha = p * 0.42f))
                             },
                         contentAlignment = Alignment.Center

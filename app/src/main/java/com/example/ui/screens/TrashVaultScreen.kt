@@ -20,9 +20,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -57,12 +60,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -95,6 +98,7 @@ import com.example.ui.components.PhotoDetailLightbox
 import com.example.ui.components.daysStagedInVault
 import com.example.ui.components.formatStorageSize
 import com.example.ui.components.formatVaultStagedLabel
+import com.example.ui.components.decoPaperGroundBackground
 import com.example.ui.components.isMachineGeneratedFilename
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoGround
@@ -145,6 +149,7 @@ fun TrashVaultScreen(
     onRestoreAll: (List<PhotoItemEntity>) -> Unit,
     onConfirmPurgeTargets: (List<PhotoItemEntity>) -> Unit,
     onClearSessionFilter: () -> Unit = {},
+    onBrowseToOrganize: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var showPurgeDialog by remember { mutableStateOf(false) }
@@ -232,7 +237,7 @@ fun TrashVaultScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "仅看本次清理（${displayedTrashed.size} 项）",
+                            text = "仅看本次舍弃（${displayedTrashed.size} 项）",
                             fontSize = 13.sp,
                             fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.SemiBold,
@@ -288,12 +293,21 @@ fun TrashVaultScreen(
 
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        Column(
+                        // 空态重心上移：内容组靠近汇总卡（顶部 ~18% 留白）而非整块剩余高度正中，
+                        // 消除汇总卡与盾徽之间的大段空白断层；矮窗（横屏）下可滚动，保证引导按钮可达
+                        BoxWithConstraints(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
-                                .padding(start = 32.dp, end = 32.dp, top = 32.dp, bottom = 32.dp + floatingDockInset + navBarBottom),
-                            verticalArrangement = Arrangement.Center,
+                        ) {
+                        val emptyViewportHeight = maxHeight
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .heightIn(min = emptyViewportHeight)
+                                .padding(start = 32.dp, end = 32.dp, top = 12.dp, bottom = 24.dp + floatingDockInset + navBarBottom),
+                            verticalArrangement = Arrangement.spacedBy(0.dp, BiasAlignment.Vertical(-0.45f)),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                     DecoIcon(
@@ -305,7 +319,7 @@ fun TrashVaultScreen(
                     Spacer(modifier = Modifier.height(14.dp))
                     VaultArtText(
                         text = if (sessionFilterIds != null && uiState.trashedPhotos.isNotEmpty()) {
-                            "本次清理项已全部处理"
+                            "本次舍弃项已全部处理"
                         } else {
                             "回收站很干净"
                         },
@@ -324,6 +338,32 @@ fun TrashVaultScreen(
                         color = DecoInkOnGround.copy(alpha = 0.66f),
                         textAlign = TextAlign.Center
                         )
+                        val showOrganizeCta = onBrowseToOrganize != null &&
+                            !(sessionFilterIds != null && uiState.trashedPhotos.isNotEmpty())
+                        if (showOrganizeCta) {
+                            Spacer(modifier = Modifier.height(20.dp))
+                            // 空态引导动作：金描边方章按钮回书架开始整理（避免空态成为死胡同）
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .heightIn(min = 48.dp)
+                                    .clip(VaultDecoShape)
+                                    .border(1.dp, DecoGold, VaultDecoShape)
+                                    .clickable { onBrowseToOrganize() }
+                                    .padding(horizontal = 22.dp)
+                                    .testTag("vault_empty_organize_button")
+                            ) {
+                                Text(
+                                    text = "去整理相册",
+                                    fontFamily = DecoDisplayFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp,
+                                    letterSpacing = 2.sp,
+                                    color = DecoGold
+                                )
+                            }
+                        }
+                        }
                         }
                     }
                 } else {
@@ -881,6 +921,8 @@ private fun VaultGoldFrame(
     }
 }
 
+private const val VAULT_FULL_ART_SHADOW_MIN_SP = 36f
+
 /** 美术字（DecoDisplay 小薇 Bold）/错位阴影随字号等比：黑 0.024em · 朱 0.049em · 模糊 0.073em（原型 82px 大年份 2/4/6px 的同比例） */
 @Composable
 private fun VaultArtText(
@@ -912,30 +954,36 @@ private fun VaultArtText(
             lineHeight = fontSize
         )
     }
+    // 三层错位影只给 ≥36sp 展示级大字（如释放空间大数字）；页眉/空态标题仅保留一层清爽朱红错位
+    val fullArtShadow = fontSize.value >= VAULT_FULL_ART_SHADOW_MIN_SP
     Box(modifier) {
         // 错位阴影层对无障碍隐藏，仅顶层正稿参与语义
+        if (fullArtShadow) {
+            Text(
+                text = text,
+                color = Color.Transparent,
+                style = style.copy(shadow = blurShadow),
+                modifier = Modifier.clearAndSetSemantics { }
+            )
+        }
         Text(
             text = text,
-            color = Color.Transparent,
-            style = style.copy(shadow = blurShadow),
-            modifier = Modifier.clearAndSetSemantics { }
-        )
-        Text(
-            text = text,
-            color = verm.copy(alpha = 0.60f),
+            color = verm.copy(alpha = if (fullArtShadow) 0.60f else 0.42f),
             style = style,
             modifier = Modifier
                 .offset(x = vermOffset, y = vermOffset)
                 .clearAndSetSemantics { }
         )
-        Text(
-            text = text,
-            color = VaultArtShadowBlack,
-            style = style,
-            modifier = Modifier
-                .offset(x = inkOffset, y = inkOffset)
-                .clearAndSetSemantics { }
-        )
+        if (fullArtShadow) {
+            Text(
+                text = text,
+                color = VaultArtShadowBlack,
+                style = style,
+                modifier = Modifier
+                    .offset(x = inkOffset, y = inkOffset)
+                    .clearAndSetSemantics { }
+            )
+        }
         Text(text = text, color = color, style = style)
     }
 }
@@ -968,39 +1016,19 @@ private fun VaultDecoGround(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val ground = DecoGround
-    val groundDeep = DecoGroundDeep
-    val ink = DecoInkOnGround
     Box(
         modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(ground, groundDeep)))
+            // 纸纹横线走共享缓存绘制（原型 repeating-linear-gradient 3px/4px，ink 0.016）
+            .decoPaperGroundBackground(DecoGround, DecoGroundDeep, DecoInkOnGround)
     ) {
-        // 纸纹横线（原型 repeating-linear-gradient 3px/4px，ink 0.016）
-        Spacer(
-            modifier = Modifier
-                .fillMaxSize()
-                .drawBehind {
-                    val step = 4.dp.toPx()
-                    val lineH = 1.dp.toPx()
-                    val lineColor = ink.copy(alpha = 0.016f)
-                    var y = 0f
-                    while (y < size.height) {
-                        drawRect(
-                            color = lineColor,
-                            topLeft = Offset(0f, y),
-                            size = Size(size.width, lineH)
-                        )
-                        y += step
-                    }
-                }
-        )
+        // 太阳纹收进报头装饰带：缩小并上移右移，下缘止于标题区，不再横穿汇总卡与空态
         VaultSunburst(
-            diameter = 240.dp,
-            alpha = 0.13f,
+            diameter = 176.dp,
+            alpha = 0.12f,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .offset(x = 34.dp, y = (-26).dp)
+                .offset(x = 58.dp, y = (-64).dp)
         )
         content()
     }

@@ -208,7 +208,7 @@ fun ArcTimeScaleScrubber(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(64.dp)
+            .height(74.dp)
             .padding(horizontal = 18.dp)
             .onSizeChanged { widthPx = it.width.coerceAtLeast(1) }
             .semantics {
@@ -270,8 +270,10 @@ fun ArcTimeScaleScrubber(
             val padX = 14.dp.toPx()
             val startX = padX
             val endX = (size.width - padX).coerceAtLeast(startX + 1f)
-            val baseY = size.height * 0.68f
-            val peakY = size.height * 0.22f
+            // 弧端上移：游标光晕（拖拽态半径 14dp）下沿必须与底部刻度标签保有净空，
+            // 此前 0.68f 下弧端光晕直接盖住首尾日期标签（10/24、10/18 被游标遮挡）
+            val baseY = size.height * 0.56f
+            val peakY = size.height * 0.14f
             val controlX = (startX + endX) * 0.5f
             // Quadratic Bézier control Y so midpoint (t = 0.5) lands at peakY
             val controlY = 2f * peakY - baseY

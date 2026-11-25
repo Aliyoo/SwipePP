@@ -8,77 +8,82 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
+// Material3 底层令牌全面映射到摩登画报（Modern Deco Pictorial）语法：
+// primary=金（正向/激活）、error=朱红（决断/危险）、surface/background=纸地墨绿、onX=画片墨。
+// 旧「克莱因蓝玻璃拟态」色板已淘汰——任何回落到 M3 默认着色的组件（对话框、焦点态、
+// 水波纹、Snackbar）都必须呈现画报纸金语法而非蓝色。
 private val FlipYearLightColorScheme = lightColorScheme(
-    primary = LightFlipYearPalette.cobaltPrimary,
-    onPrimary = Color.White,
-    primaryContainer = LightFlipYearPalette.cobaltSoft,
-    onPrimaryContainer = LightFlipYearPalette.cobaltDark,
-    secondary = LightFlipYearPalette.solarAmber,
-    onSecondary = LightFlipYearPalette.inkPrimary,
-    secondaryContainer = LightFlipYearPalette.solarAmberSoft,
-    onSecondaryContainer = LightFlipYearPalette.inkPrimary,
-    tertiary = LightFlipYearPalette.emeraldKeep,
-    onTertiary = Color.White,
-    tertiaryContainer = LightFlipYearPalette.emeraldSoft,
-    onTertiaryContainer = Color(0xFF065F46),
-    error = LightFlipYearPalette.coralDanger,
-    onError = Color.White,
-    errorContainer = LightFlipYearPalette.coralSoft,
-    onErrorContainer = LightFlipYearPalette.coralDanger,
-    background = LightFlipYearPalette.studioCanvas,
-    onBackground = LightFlipYearPalette.inkPrimary,
-    surface = LightFlipYearPalette.surfacePure,
-    onSurface = LightFlipYearPalette.inkPrimary,
-    surfaceVariant = LightFlipYearPalette.surfaceMuted,
+    primary = LightFlipYearPalette.decoGold,
+    onPrimary = DecoPaperCream,
+    primaryContainer = LightFlipYearPalette.decoMat,
+    onPrimaryContainer = LightFlipYearPalette.decoInkOnGround,
+    secondary = LightFlipYearPalette.decoGold,
+    onSecondary = DecoPaperCream,
+    secondaryContainer = LightFlipYearPalette.decoGroundDeep,
+    onSecondaryContainer = LightFlipYearPalette.decoInkOnGround,
+    tertiary = LightFlipYearPalette.decoVerm,
+    onTertiary = DecoPaperCream,
+    tertiaryContainer = LightFlipYearPalette.decoMat,
+    onTertiaryContainer = LightFlipYearPalette.decoVerm,
+    error = LightFlipYearPalette.decoVerm,
+    onError = DecoPaperCream,
+    errorContainer = LightFlipYearPalette.decoMat,
+    onErrorContainer = LightFlipYearPalette.decoVerm,
+    background = LightFlipYearPalette.decoGround,
+    onBackground = LightFlipYearPalette.decoInkOnGround,
+    surface = LightFlipYearPalette.decoGround,
+    onSurface = LightFlipYearPalette.decoInkOnGround,
+    surfaceVariant = LightFlipYearPalette.decoGroundDeep,
     onSurfaceVariant = LightFlipYearPalette.inkSecondary,
-    surfaceContainerLowest = LightFlipYearPalette.surfacePure,
-    surfaceContainerLow = LightFlipYearPalette.studioCanvas,
-    surfaceContainer = LightFlipYearPalette.surfaceMuted,
-    surfaceContainerHigh = LightFlipYearPalette.surfaceSubtle,
-    outline = LightFlipYearPalette.hairlineBorder,
-    outlineVariant = LightFlipYearPalette.surfaceSubtle
+    surfaceContainerLowest = LightFlipYearPalette.decoMat,
+    surfaceContainerLow = LightFlipYearPalette.decoGround,
+    surfaceContainer = LightFlipYearPalette.decoGroundDeep,
+    surfaceContainerHigh = LightFlipYearPalette.decoMat,
+    outline = LightFlipYearPalette.decoGold,
+    outlineVariant = LightFlipYearPalette.decoGold.copy(alpha = 0.4f)
 )
 
 private val FlipYearDarkColorScheme = darkColorScheme(
-    primary = DarkFlipYearPalette.cobaltPrimary,
-    onPrimary = Color(0xFF09132B),
-    primaryContainer = DarkFlipYearPalette.cobaltSoft,
-    onPrimaryContainer = DarkFlipYearPalette.cobaltDark,
-    secondary = DarkFlipYearPalette.solarAmber,
-    onSecondary = Color(0xFF1F1606),
-    secondaryContainer = DarkFlipYearPalette.solarAmberSoft,
-    onSecondaryContainer = DarkFlipYearPalette.solarAmber,
-    tertiary = DarkFlipYearPalette.emeraldKeep,
-    onTertiary = Color(0xFF042218),
-    tertiaryContainer = DarkFlipYearPalette.emeraldSoft,
-    onTertiaryContainer = DarkFlipYearPalette.emeraldKeep,
-    error = DarkFlipYearPalette.coralDanger,
-    onError = Color(0xFF2A060C),
-    errorContainer = DarkFlipYearPalette.coralSoft,
-    onErrorContainer = DarkFlipYearPalette.coralDanger,
-    background = DarkFlipYearPalette.studioCanvas,
-    onBackground = DarkFlipYearPalette.inkPrimary,
-    surface = DarkFlipYearPalette.surfacePure,
-    onSurface = DarkFlipYearPalette.inkPrimary,
-    surfaceVariant = DarkFlipYearPalette.surfaceMuted,
+    primary = DarkFlipYearPalette.decoGold,
+    onPrimary = DecoInkDeep,
+    primaryContainer = DarkFlipYearPalette.decoGroundDeep,
+    onPrimaryContainer = DarkFlipYearPalette.decoInkOnGround,
+    secondary = DarkFlipYearPalette.decoGold,
+    onSecondary = DecoInkDeep,
+    secondaryContainer = DarkFlipYearPalette.decoGroundDeep,
+    onSecondaryContainer = DarkFlipYearPalette.decoInkOnGround,
+    tertiary = DarkFlipYearPalette.decoVermInk,
+    onTertiary = DecoInkDeep,
+    tertiaryContainer = DarkFlipYearPalette.decoGroundDeep,
+    onTertiaryContainer = DarkFlipYearPalette.decoVermInk,
+    error = DarkFlipYearPalette.decoVermInk,
+    onError = DecoInkDeep,
+    errorContainer = DarkFlipYearPalette.decoVerm,
+    onErrorContainer = DecoPaperCream,
+    background = DarkFlipYearPalette.decoGround,
+    onBackground = DarkFlipYearPalette.decoInkOnGround,
+    surface = DarkFlipYearPalette.decoGround,
+    onSurface = DarkFlipYearPalette.decoInkOnGround,
+    surfaceVariant = DarkFlipYearPalette.decoGroundDeep,
     onSurfaceVariant = DarkFlipYearPalette.inkSecondary,
-    surfaceContainerLowest = DarkFlipYearPalette.studioCanvasBottom,
-    surfaceContainerLow = DarkFlipYearPalette.studioCanvas,
-    surfaceContainer = DarkFlipYearPalette.surfacePure,
-    surfaceContainerHigh = DarkFlipYearPalette.surfaceMuted,
-    outline = DarkFlipYearPalette.hairlineBorder,
-    outlineVariant = DarkFlipYearPalette.surfaceSubtle
+    surfaceContainerLowest = DarkFlipYearPalette.decoGroundDeep,
+    surfaceContainerLow = DarkFlipYearPalette.decoGround,
+    surfaceContainer = DarkFlipYearPalette.decoGroundDeep,
+    surfaceContainerHigh = DarkFlipYearPalette.decoMat,
+    outline = DarkFlipYearPalette.decoGold,
+    outlineVariant = DarkFlipYearPalette.decoGold.copy(alpha = 0.4f)
 )
 
+// 画片方角语法：2~4dp 微圆角（design-demos/deco-app.html GoldFrame radius=2），
+// 覆盖全部 M3 形状令牌，杜绝旧玻璃拟态时代 18~30dp 大圆角从默认槽位漏出
 val FlipYearShapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(18.dp),
-    large = RoundedCornerShape(24.dp),
-    extraLarge = RoundedCornerShape(30.dp)
+    extraSmall = RoundedCornerShape(2.dp),
+    small = RoundedCornerShape(3.dp),
+    medium = RoundedCornerShape(4.dp),
+    large = RoundedCornerShape(6.dp),
+    extraLarge = RoundedCornerShape(8.dp)
 )
 
 @Composable

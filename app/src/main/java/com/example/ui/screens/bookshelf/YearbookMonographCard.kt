@@ -7,7 +7,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -64,6 +64,7 @@ import com.example.ui.components.PhotoArtwork
 import com.example.ui.components.YearbookCollageCanvas
 import com.example.ui.components.YearbookCollageTemplates
 import com.example.ui.theme.DecoGold
+import com.example.ui.theme.DecoGoldOnPhoto
 import com.example.ui.theme.DecoGround
 import com.example.ui.theme.DecoArtShadowVerm
 import com.example.ui.theme.DecoDisplayFontFamily
@@ -249,71 +250,65 @@ internal fun ModernYearbook3DCard(
                 Box(modifier = Modifier.fillMaxSize().background(ground))
             }
 
-            // 放射太阳纹：24 扇形（每 15° 一瓣、瓣宽 6.5°），金色 alpha 0.12~0.16，压在画片左下角
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val sunburstSize = size.width * 0.92f
-                val radius = sunburstSize / 2f
-                val center = Offset(-sunburstSize * 0.10f, size.height + sunburstSize * 0.07f)
-                val wedgeColor = gold.copy(alpha = 0.14f)
-                val wedgeRect = Rect(
-                    left = center.x - radius,
-                    top = center.y - radius,
-                    right = center.x + radius,
-                    bottom = center.y + radius
-                )
-                var angleDeg = 0f
-                repeat(24) {
-                    val startRad = Math.toRadians(angleDeg.toDouble())
-                    val wedgePath = Path().apply {
-                        moveTo(center.x, center.y)
-                        lineTo(
-                            center.x + (radius * kotlin.math.cos(startRad)).toFloat(),
-                            center.y + (radius * kotlin.math.sin(startRad)).toFloat()
+            // 放射太阳纹：24 扇形（每 15° 一瓣、瓣宽 6.5°），金色 alpha 0.12~0.16，压在画片左下角。
+            // drawWithCache：合并后的单条 Path 与两个径向 wash 画刷只随尺寸重建一次，
+            // 此前 Canvas 每次重绘分配 24 个 Path + Rect，Ken Burns/3D 翻页期间持续触发 GC 抖动
+            Spacer(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .drawWithCache {
+                        val sunburstSize = size.width * 0.92f
+                        val radius = sunburstSize / 2f
+                        val center = Offset(-sunburstSize * 0.10f, size.height + sunburstSize * 0.07f)
+                        val wedgeColor = gold.copy(alpha = 0.14f)
+                        val wedgeRect = Rect(
+                            left = center.x - radius,
+                            top = center.y - radius,
+                            right = center.x + radius,
+                            bottom = center.y + radius
                         )
-                        arcTo(
-                            rect = wedgeRect,
-                            startAngleDegrees = angleDeg,
-                            sweepAngleDegrees = 6.5f,
-                            forceMoveTo = false
-                        )
-                        close()
-                    }
-                    drawPath(path = wedgePath, color = wedgeColor)
-                    angleDeg += 15f
-                }
-            }
+                        val mergedSunburstPath = Path()
+                        var angleDeg = 0f
+                        repeat(24) {
+                            val startRad = Math.toRadians(angleDeg.toDouble())
+                            mergedSunburstPath.moveTo(center.x, center.y)
+                            mergedSunburstPath.lineTo(
+                                center.x + (radius * kotlin.math.cos(startRad)).toFloat(),
+                                center.y + (radius * kotlin.math.sin(startRad)).toFloat()
+                            )
+                            mergedSunburstPath.arcTo(
+                                rect = wedgeRect,
+                                startAngleDegrees = angleDeg,
+                                sweepAngleDegrees = 6.5f,
+                                forceMoveTo = false
+                            )
+                            mergedSunburstPath.close()
+                            angleDeg += 15f
+                        }
 
-            // 金色柔光 wash（demo soft-light 径向，中心 50%/30%）+ 暗角（像素坐标，随画片尺寸缩放）
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .drawBehind {
-                        drawRect(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    gold.copy(alpha = 0.16f),
-                                    Color.Transparent
-                                ),
-                                center = Offset(size.width * 0.50f, size.height * 0.30f),
-                                radius = size.width * 0.85f
-                            )
+                        // 金色柔光 wash + 暗角：径向画刷随尺寸预建（原 drawBehind 每帧重建）
+                        val goldWashBrush = Brush.radialGradient(
+                            colors = listOf(
+                                gold.copy(alpha = 0.16f),
+                                Color.Transparent
+                            ),
+                            center = Offset(size.width * 0.50f, size.height * 0.30f),
+                            radius = size.width * 0.85f
                         )
-                    }
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .drawBehind {
-                        drawRect(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    DecoScrimInk.copy(alpha = 0.36f)
-                                ),
-                                center = Offset(size.width * 0.50f, size.height * 0.42f),
-                                radius = size.width * 0.95f
-                            )
+                        val vignetteBrush = Brush.radialGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                DecoScrimInk.copy(alpha = 0.36f)
+                            ),
+                            center = Offset(size.width * 0.50f, size.height * 0.42f),
+                            radius = size.width * 0.95f
                         )
+
+                        onDrawBehind {
+                            drawPath(path = mergedSunburstPath, color = wedgeColor)
+                            drawRect(brush = goldWashBrush)
+                            drawRect(brush = vignetteBrush)
+                        }
                     }
             )
 
@@ -506,7 +501,8 @@ internal fun ModernYearbook3DCard(
                             fontFamily = DecoDisplayFontFamily,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 20.sp,
-                            color = gold,
+                            // 压照片暗部：亮香槟金固定值（浅色主题下主题金深古铜在暗 scrim 上发糊）
+                            color = DecoGoldOnPhoto,
                             style = androidx.compose.ui.text.TextStyle(
                                 shadow = Shadow(
                                     color = Color.Black.copy(alpha = 0.45f),
@@ -552,7 +548,7 @@ internal fun ModernYearbook3DCard(
                             ) {
                                 DecoIcon(
                                     kind = DecoIconKind.VIDEOCAM,
-                                    color = gold,
+                                    color = DecoGoldOnPhoto,
                                     iconSize = 11.dp
                                 )
                                 Text(
