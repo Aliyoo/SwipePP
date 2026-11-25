@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CleanupStatsEntity::class,
         YearbookCoverConfigEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class FlipYearDatabase : RoomDatabase() {
@@ -71,6 +71,21 @@ abstract class FlipYearDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE photos ADD COLUMN mimeType TEXT")
+                db.execSQL("ALTER TABLE photos ADD COLUMN imageFormat TEXT NOT NULL DEFAULT 'UNKNOWN'")
+                db.execSQL("ALTER TABLE photos ADD COLUMN mediaSubtype TEXT NOT NULL DEFAULT 'STANDARD'")
+                db.execSQL("ALTER TABLE photos ADD COLUMN isAnimated INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE photos ADD COLUMN motionPhotoType TEXT NOT NULL DEFAULT 'NONE'")
+                db.execSQL("ALTER TABLE photos ADD COLUMN motionVideoUri TEXT")
+                db.execSQL("ALTER TABLE photos ADD COLUMN motionVideoDurationMs INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE photos ADD COLUMN motionVideoOffset INTEGER")
+                db.execSQL("ALTER TABLE photos ADD COLUMN motionVideoLength INTEGER")
+                db.execSQL("ALTER TABLE photos ADD COLUMN pairedMediaStoreKey TEXT")
+            }
+        }
+
         fun getInstance(context: Context): FlipYearDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -78,7 +93,7 @@ abstract class FlipYearDatabase : RoomDatabase() {
                     FlipYearDatabase::class.java,
                     "flipyear_cleaner.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                     .also { INSTANCE = it }

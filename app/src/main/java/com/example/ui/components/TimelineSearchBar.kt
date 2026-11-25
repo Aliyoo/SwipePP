@@ -87,7 +87,11 @@ enum class GallerySmartFilter(val label: String) {
     ALL("全部"),
     BURSTS("连拍组"),
     LARGE_PHOTOS("大图省空间"),
-    MISSING_LOCATION("缺定位")
+    MISSING_LOCATION("缺定位"),
+    LIVE_PHOTOS("Live 图"),
+    ANIMATED_IMAGES("动图"),
+    SCREENSHOTS("截图/录屏"),
+    SPECIAL_FORMATS("HEIC/RAW")
 }
 
 /* ---- 摩登画报 · 搜索与筛选装饰（design-demos/deco-app.html 金边跳签 / 金双线画框） ---- */
@@ -323,6 +327,10 @@ fun TimelineGlobalSearchBar(
                                 GallerySmartFilter.BURSTS -> DecoIconKind.BURST
                                 GallerySmartFilter.LARGE_PHOTOS -> DecoIconKind.COMPRESS
                                 GallerySmartFilter.MISSING_LOCATION -> DecoIconKind.LOCATION_OFF
+                                GallerySmartFilter.LIVE_PHOTOS -> DecoIconKind.PLAY
+                                GallerySmartFilter.ANIMATED_IMAGES -> DecoIconKind.BOLT
+                                GallerySmartFilter.SCREENSHOTS -> DecoIconKind.PHONE
+                                GallerySmartFilter.SPECIAL_FORMATS -> DecoIconKind.PHOTO
                                 GallerySmartFilter.ALL -> DecoIconKind.FILTER
                             },
                             iconTint = DecoGold,
@@ -512,6 +520,10 @@ fun TimelineSearchFilterSheet(
     burstCount: Int = 0,
     largePhotoCount: Int = 0,
     missingLocationCount: Int = 0,
+    livePhotoCount: Int = 0,
+    animatedImageCount: Int = 0,
+    screenshotCount: Int = 0,
+    specialFormatCount: Int = 0,
     allBurstsExpanded: Boolean = false,
     onSelectSmartFilter: (GallerySmartFilter) -> Unit = {},
     onSelectAlbum: (String?) -> Unit = {},
@@ -691,6 +703,10 @@ fun TimelineSearchFilterSheet(
                         if (burstCount > 0) add(GallerySmartFilter.BURSTS to "连拍组 ($burstCount)")
                         if (largePhotoCount > 0) add(GallerySmartFilter.LARGE_PHOTOS to "大图省空间 ($largePhotoCount)")
                         if (missingLocationCount > 0) add(GallerySmartFilter.MISSING_LOCATION to "缺定位 ($missingLocationCount)")
+                        if (livePhotoCount > 0) add(GallerySmartFilter.LIVE_PHOTOS to "Live 图 ($livePhotoCount)")
+                        if (animatedImageCount > 0) add(GallerySmartFilter.ANIMATED_IMAGES to "动图 ($animatedImageCount)")
+                        if (screenshotCount > 0) add(GallerySmartFilter.SCREENSHOTS to "截图/录屏 ($screenshotCount)")
+                        if (specialFormatCount > 0) add(GallerySmartFilter.SPECIAL_FORMATS to "HEIC/RAW ($specialFormatCount)")
                     }
                     smartChoices.forEach { (filterOption, textLabel) ->
                         val selected = draftSmartFilter == filterOption

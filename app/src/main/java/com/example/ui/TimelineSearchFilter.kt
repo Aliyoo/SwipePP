@@ -1,6 +1,8 @@
 package com.example.ui
 
 import androidx.compose.runtime.Immutable
+import com.example.data.ImageFormat
+import com.example.data.MediaSubtype
 import com.example.data.PhotoItemEntity
 import com.example.data.PhotoStatus
 import java.util.Calendar
@@ -122,11 +124,22 @@ enum class DescriptiveTag(
     val searchAliases: List<String>
 ) {
     FAVORITE("精选收藏", listOf("收藏", "精选", "喜欢", "favorite", "star")),
-    VIDEO("视频 / 4K", listOf("视频", "4k", "video", "航拍", "慢动作", "实拍")),
+    VIDEO("视频", listOf("视频", "video", "mv", "mov", "mp4")),
+    UHD_VIDEO("4K 视频", listOf("4k", "uhd", "超清视频")),
+    LIVE_PHOTO("Live 图", listOf("live", "live图", "live photo", "动态照片", "motion", "motion photo")),
+    ANIMATED_IMAGE("动图", listOf("动图", "gif", "animated", "webp")),
     BURST("连拍组", listOf("连拍", "burst", "相似")),
-    HIGH_QUALITY("高清佳作", listOf("高清", "佳作", "最佳", "清晰", "crisp", "hd")),
-    LANDSCAPE("横屏风光", listOf("横屏", "风光", "风景", "全景", "landscape")),
-    PORTRAIT("竖屏画面", listOf("竖屏", "人像", "portrait")),
+    SCREENSHOT("截图", listOf("截图", "截屏", "screenshot")),
+    LONG_SCREENSHOT("长截图", listOf("长截图", "长图", "scrollshot")),
+    SCREEN_RECORD("录屏", listOf("录屏", "screenrecord", "screen record")),
+    DOCUMENT("文档 / 票据", listOf("文档", "扫描", "票据", "发票", "二维码", "document", "scan", "receipt")),
+    CHAT_SAVE("聊天保存", listOf("聊天保存", "微信", "wechat", "qq", "telegram", "whatsapp")),
+    CAMERA("相机原片", listOf("相机", "原片", "camera", "dcim")),
+    HEIC_IMAGE("HEIC", listOf("heic", "heif")),
+    RAW_IMAGE("RAW", listOf("raw", "dng", "cr2", "nef", "arw")),
+    HIGH_QUALITY("高分辨率候选", listOf("高清", "佳作", "最佳", "清晰", "crisp", "hd")),
+    LANDSCAPE("横屏构图", listOf("横屏", "宽幅", "全景构图", "landscape")),
+    PORTRAIT("竖屏构图", listOf("竖屏", "竖构图", "portrait")),
     WARM_TONE("黄昏 / 暖调", listOf("暖调", "胶片", "黄昏", "晚霞", "落日", "日出", "film", "sunset")),
     NEEDS_REVIEW("待整理", listOf("待整理", "未整理", "unreviewed")),
     EXPOSURE_OR_TILT("瑕疵 / 曝光", listOf("过曝", "欠曝", "偏暗", "倾斜", "瑕疵", "模糊", "blur")),
@@ -135,7 +148,18 @@ enum class DescriptiveTag(
     fun matches(photo: PhotoItemEntity): Boolean = when (this) {
         FAVORITE -> photo.isFavorite
         VIDEO -> photo.isVideo
+        UHD_VIDEO -> photo.isVideo && photo.heightPx >= 2160
+        LIVE_PHOTO -> photo.isLivePhoto
+        ANIMATED_IMAGE -> photo.isAnimated
         BURST -> !photo.burstGroupId.isNullOrBlank()
+        SCREENSHOT -> photo.mediaSubtypeKind == MediaSubtype.SCREENSHOT
+        LONG_SCREENSHOT -> photo.mediaSubtypeKind == MediaSubtype.LONG_SCREENSHOT
+        SCREEN_RECORD -> photo.mediaSubtypeKind == MediaSubtype.SCREEN_RECORD
+        DOCUMENT -> photo.mediaSubtypeKind == MediaSubtype.DOCUMENT
+        CHAT_SAVE -> photo.mediaSubtypeKind == MediaSubtype.CHAT_SAVE
+        CAMERA -> photo.mediaSubtypeKind == MediaSubtype.CAMERA
+        HEIC_IMAGE -> photo.imageFormatKind == ImageFormat.HEIC
+        RAW_IMAGE -> photo.imageFormatKind == ImageFormat.RAW
         HIGH_QUALITY -> photo.qualityScore >= 90 || photo.isBestInStack
         LANDSCAPE -> photo.widthPx > photo.heightPx
         PORTRAIT -> photo.heightPx > photo.widthPx

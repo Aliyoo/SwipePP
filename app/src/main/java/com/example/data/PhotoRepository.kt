@@ -72,30 +72,33 @@ class PhotoRepository(
 
     suspend fun syncLocalDeviceMedia(): MediaSyncResult = withContext(Dispatchers.IO) {
         val scanned = scanner.scanAllLocalPhotosAndVideos()
-        // Lightweight key-only projection avoids deserializing 10,000+ full Room rows on startup
-        val existingDeviceKeys = dao.getAllDeviceMediaKeysSync()
-        val existingKeySet = HashSet<String>(existingDeviceKeys.size * 2)
-        existingDeviceKeys.forEach { row ->
-            row.mediaStoreKey?.let { existingKeySet.add(it) }
+        val existingRows = dao.getAllDeviceMediaSyncRowsSync()
+        val existingByKey = HashMap<String, DeviceMediaSyncRow>(existingRows.size * 2)
+        existingRows.forEach { row ->
+            row.mediaStoreKey?.let { existingByKey[it] = row }
         }
 
         val scannedKeys = HashSet<String>(scanned.size * 2)
         var imageCount = 0
         var videoCount = 0
         val newItems = ArrayList<PhotoItemEntity>()
+        val metadataUpdates = ArrayList<PhotoItemEntity>()
         for (item in scanned) {
             if (item.isVideo) videoCount++ else imageCount++
             val key = item.mediaStoreKey
             if (key != null) {
                 scannedKeys.add(key)
-                if (key !in existingKeySet) {
+                val existing = existingByKey[key]
+                if (existing == null) {
                     newItems.add(item)
+                } else if (deviceMediaMetadataDiffers(existing, item)) {
+                    metadataUpdates.add(item)
                 }
             }
         }
 
         val vanishedIds = ArrayList<Long>()
-        for (row in existingDeviceKeys) {
+        for (row in existingRows) {
             val key = row.mediaStoreKey
             if (key != null && key !in scannedKeys) {
                 vanishedIds.add(row.id)
@@ -105,13 +108,14 @@ class PhotoRepository(
         val shouldDeleteSamples = scanned.isNotEmpty() && dao.getSamplePhotoCount() > 0
 
         // Only write to SQLite if there is an actual diff -> zero wasted Room Flow invalidations on warm start!
-        if (vanishedIds.isNotEmpty() || newItems.isNotEmpty() || shouldDeleteSamples) {
-            val invalidateKeys = newItems.map { yearMonthKey(it.year, it.month) }.distinct()
+        if (vanishedIds.isNotEmpty() || newItems.isNotEmpty() || shouldDeleteSamples || metadataUpdates.isNotEmpty()) {
+            val invalidateKeys = (newItems + metadataUpdates).map { yearMonthKey(it.year, it.month) }.distinct()
             dao.syncDeviceMediaBatch(
                 vanishedIds = vanishedIds,
                 newItems = newItems,
                 invalidateMonthKeys = invalidateKeys,
-                deleteSamples = shouldDeleteSamples
+                deleteSamples = shouldDeleteSamples,
+                metadataUpdates = metadataUpdates
             )
         }
 
@@ -313,8 +317,11 @@ class PhotoRepository(
 
     fun buildSystemTrashIntent(photos: List<PhotoItemEntity>): PendingIntent? {
         val realMediaUris = photos
-            .filter { !it.isSample && !it.contentUri.isNullOrBlank() && it.contentUri.startsWith("content://") }
-            .map { Uri.parse(it.contentUri) }
+            .filter { !it.isSample }
+            .flatMap { it.physicalMediaUris }
+            .filter { it.startsWith("content://") }
+            .distinct()
+            .map { Uri.parse(it) }
         return scanner.buildSystemTrashPendingIntent(realMediaUris)
     }
 
@@ -427,6 +434,25 @@ class PhotoRepository(
             dao.deleteMonthStamp(key)
             false
         }
+    }
+
+    private fun deviceMediaMetadataDiffers(existing: DeviceMediaSyncRow, scanned: PhotoItemEntity): Boolean {
+        return existing.durationMs != scanned.durationMs ||
+            existing.mimeType != scanned.mimeType ||
+            existing.imageFormat != scanned.imageFormat ||
+            existing.mediaSubtype != scanned.mediaSubtype ||
+            existing.isAnimated != scanned.isAnimated ||
+            existing.motionPhotoType != scanned.motionPhotoType ||
+            existing.motionVideoUri != scanned.motionVideoUri ||
+            existing.motionVideoDurationMs != scanned.motionVideoDurationMs ||
+            existing.motionVideoOffset != scanned.motionVideoOffset ||
+            existing.motionVideoLength != scanned.motionVideoLength ||
+            existing.pairedMediaStoreKey != scanned.pairedMediaStoreKey ||
+            existing.fileSizeBytes != scanned.fileSizeBytes ||
+            existing.widthPx != scanned.widthPx ||
+            existing.heightPx != scanned.heightPx ||
+            existing.caption != scanned.caption ||
+            existing.bucketName != scanned.bucketName
     }
 
     companion object {

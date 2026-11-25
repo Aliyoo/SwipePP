@@ -6,7 +6,10 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
 import coil.ImageLoader
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
 import coil.decode.VideoFrameDecoder
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
@@ -149,6 +152,11 @@ object FlipYearImageLoaders {
                 ImageLoader.Builder(appCtx)
                     .components {
                         add(VideoFrameDecoder.Factory())
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            add(ImageDecoderDecoder.Factory())
+                        } else {
+                            add(GifDecoder.Factory())
+                        }
                     }
                     .memoryCache {
                         MemoryCache.Builder(appCtx)

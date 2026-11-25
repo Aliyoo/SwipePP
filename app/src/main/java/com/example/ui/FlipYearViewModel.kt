@@ -25,6 +25,7 @@ import com.example.data.CollageSlotTransform
 import com.example.data.YearbookCollageExporter
 import com.example.data.YearbookCoverConfigEntity
 import com.example.data.YearbookCoverMode
+import com.example.data.isSafelyCompressibleImage
 import com.example.ui.components.CollageTemplate
 import com.example.ui.components.buildTimelineClusterLayout
 import com.example.ui.domain.LibraryDerivationEngine
@@ -1022,7 +1023,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             return
         }
         viewModelScope.launch {
-            val imageCount = photos.count { !it.isVideo }
+            val imageCount = photos.count { !it.isVideo && isSafelyCompressibleImage(it) }
             batchTaskProgress.value = BatchTaskProgress(
                 message = "正在批量压缩 (0/$imageCount)",
                 processed = 0,
@@ -1047,7 +1048,12 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                         if (result.skippedAlreadyOptimalCount > 0) {
                             append("（${result.skippedAlreadyOptimalCount} 张已是最优跳过）")
                         }
+                        if (result.skippedProtectedCount > 0) {
+                            append("；已保护 ${result.skippedProtectedCount} 个 Live/特殊格式")
+                        }
                     }
+                    result.skippedProtectedCount > 0 ->
+                        "已保护 ${result.skippedProtectedCount} 个 Live/特殊格式，未进行破坏性压缩"
                     result.skippedAlreadyOptimalCount > 0 ->
                         "所选 ${result.skippedAlreadyOptimalCount} 张照片体积已最优，无需重复压缩"
                     else ->
