@@ -382,7 +382,7 @@ internal fun ModernYearbook3DCard(
                             ) {
                                 DecoIcon(
                                     kind = DecoIconKind.CHECK,
-                                    color = DecoGoldOnPhoto,
+                                    color = gold,
                                     iconSize = 14.dp,
                                     contentDescription = "年度已整理"
                                 )
@@ -415,7 +415,7 @@ internal fun ModernYearbook3DCard(
                                     }
                                     .clip(RoundedCornerShape(4.dp))
                                     .background(ground.copy(alpha = 0.62f))
-                                    .border(1.5.dp, DecoGoldOnPhoto, RoundedCornerShape(4.dp))
+                                    .border(1.5.dp, gold, RoundedCornerShape(4.dp))
                                     .clickable(
                                         interactionSource = coverOrbInteraction,
                                         indication = androidx.compose.material3.ripple(color = gold),
@@ -431,7 +431,7 @@ internal fun ModernYearbook3DCard(
                                         lineHeight = 14.sp,
                                         fontFamily = DecoDisplayFontFamily,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = DecoGoldOnPhoto
+                                        color = gold
                                     )
                                     Text(
                                         text = "面",
@@ -439,7 +439,7 @@ internal fun ModernYearbook3DCard(
                                         lineHeight = 14.sp,
                                         fontFamily = DecoDisplayFontFamily,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = DecoGoldOnPhoto
+                                        color = gold
                                     )
                                 }
                             }
