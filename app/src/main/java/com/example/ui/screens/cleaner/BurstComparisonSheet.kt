@@ -117,7 +117,7 @@ internal fun BurstComparisonSheet(
             // 金边跳签放大钮（未选中金描边透明底，同画廊跳签语法）
             Surface(
                 onClick = { onInspectPhoto(selectedPhoto) },
-                shape = RoundedCornerShape(50),
+                shape = RoundedCornerShape(3.dp),
                 color = Color.Transparent,
                 border = BorderStroke(1.dp, decoGold.copy(alpha = 0.55f)),
                 modifier = Modifier.testTag("burst_inspect_selected_button")

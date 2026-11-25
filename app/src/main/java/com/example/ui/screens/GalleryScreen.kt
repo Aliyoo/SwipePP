@@ -204,7 +204,7 @@ private fun GalleryDecoJumpTag(
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(50),
+        shape = RoundedCornerShape(3.dp),
         color = if (selected) DecoGold else Color.Transparent,
         border = BorderStroke(
             width = 1.dp,

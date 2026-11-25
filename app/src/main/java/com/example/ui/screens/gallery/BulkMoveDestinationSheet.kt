@@ -64,7 +64,7 @@ private val CURATED_ALBUM_PRESETS = listOf("精选珍藏", "旅行日记", "家�
 /* ---- 摩登画报 · 纸面弹层装饰（deco-app.html 金边跳签 / 金双线画框） ---- */
 private val MoveSheetShape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)
 private val MoveFrameShape = RoundedCornerShape(3.dp)
-private val MoveTagShape = RoundedCornerShape(50)
+private val MoveTagShape = RoundedCornerShape(3.dp)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

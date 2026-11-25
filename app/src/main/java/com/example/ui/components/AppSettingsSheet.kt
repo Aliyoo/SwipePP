@@ -294,7 +294,7 @@ fun AppSettingsSheet(
                     )
 
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(3.dp),
                         color = DecoMat,
                         border = BorderStroke(0.75.dp, DecoGold.copy(alpha = 0.3f)),
                         modifier = Modifier.fillMaxWidth()

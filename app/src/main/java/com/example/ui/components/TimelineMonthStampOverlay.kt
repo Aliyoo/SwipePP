@@ -92,7 +92,7 @@ import kotlin.math.roundToInt
 // 仅朱红小签的纸黄受光边为浅暗同值不变量（纸黄只压照片暗部 / 朱红底 —— 可读性红线）。
 // =====================================================================
 private val StampOverlayShape = RoundedCornerShape(3.dp)
-private val JumpChipShape = RoundedCornerShape(50)
+private val JumpChipShape = RoundedCornerShape(3.dp)
 private val ScrollFlagShape = RoundedCornerShape(3.dp)
 
 // 朱红小签的纸黄受光边（原型朱红徽语法 border 1px rgba(239,227,200,0.25)）

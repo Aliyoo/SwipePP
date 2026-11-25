@@ -92,7 +92,7 @@ enum class GallerySmartFilter(val label: String) {
 
 /* ---- 摩登画报 · 搜索与筛选装饰（design-demos/deco-app.html 金边跳签 / 金双线画框） ---- */
 private val SearchRowShape = RoundedCornerShape(3.dp)
-private val SearchTagShape = RoundedCornerShape(50)
+private val SearchTagShape = RoundedCornerShape(3.dp)
 
 /** 金边跳签：选中金底 + 内衬字，未选中金描边透明底 */
 @Composable

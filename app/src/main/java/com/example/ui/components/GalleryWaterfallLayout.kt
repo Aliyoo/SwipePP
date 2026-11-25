@@ -895,16 +895,16 @@ fun GalleryZoomTierIconButton(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .size(48.dp)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(3.dp))
             .clickable(onClick = onClick)
     ) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(visualSize)
-                .clip(CircleShape)
+                .clip(RoundedCornerShape(3.dp))
                 .background(containerColor)
-                .border(width = 0.95.dp, color = borderColor, shape = CircleShape)
+                .border(width = 0.95.dp, color = borderColor, shape = RoundedCornerShape(3.dp))
         ) {
             AnimatedContent(
                 targetState = currentTier,

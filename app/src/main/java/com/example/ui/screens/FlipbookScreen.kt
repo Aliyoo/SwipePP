@@ -1370,27 +1370,30 @@ private fun CalendarDaySlot(
             )
         }
 
-        Text(
-            text = day.toString(),
-            fontFamily = JetBrainsMonoFontFamily,
-            fontSize = 12.sp,
-            fontWeight = if (hasPhoto) FontWeight.Bold else FontWeight.Normal,
-            color = if (hasPhoto) DecoPaperCream else DecoInkOnGround.copy(alpha = 0.62f),
-            style = if (hasPhoto) {
-                TextStyle(
-                    shadow = Shadow(
-                        color = Color.Black.copy(alpha = 0.80f),
-                        offset = Offset(1f, 1f),
-                        blurRadius = 2f
-                    )
-                )
-            } else {
-                TextStyle.Default
-            },
+        // 有照片时日号垫墨色小签（与右下计数签同语法），避免压在杂乱画面上不可读
+        Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(4.dp)
-        )
+                .padding(3.dp)
+                .then(
+                    if (hasPhoto) {
+                        Modifier
+                            .clip(RoundedCornerShape(1.dp))
+                            .background(DecoScrimInk.copy(alpha = 0.62f))
+                    } else {
+                        Modifier
+                    }
+                )
+                .padding(horizontal = if (hasPhoto) 3.dp else 1.dp, vertical = 1.dp)
+        ) {
+            Text(
+                text = day.toString(),
+                fontFamily = JetBrainsMonoFontFamily,
+                fontSize = 12.sp,
+                fontWeight = if (hasPhoto) FontWeight.Bold else FontWeight.Normal,
+                color = if (hasPhoto) DecoPaperCream else DecoInkOnGround.copy(alpha = 0.62f)
+            )
+        }
 
         if (hasVideo && !isCleanedStar) {
             DecoIcon(

@@ -288,7 +288,7 @@ internal fun GallerySelectionTopBar(
             // 金边跳签（全选 / 取消全选）
             Surface(
                 onClick = onToggleSelectAll,
-                shape = RoundedCornerShape(50),
+                shape = RoundedCornerShape(3.dp),
                 color = if (allSelected) DecoGold else Color.Transparent,
                 border = BorderStroke(1.dp, DecoGold.copy(alpha = 0.55f)),
                 modifier = Modifier
