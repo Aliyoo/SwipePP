@@ -877,7 +877,7 @@ private fun LightboxBottomHud(
                                     if (onTrash != null) {
                                         // 入站：朱红实印
                                         DecoSealOrb(
-                                            label = "回收",
+                                            label = "舍弃",
                                             orbSize = 64.dp,
                                             tone = DecoOrbTone.VERM_SOLID,
                                             onClick = onTrash,

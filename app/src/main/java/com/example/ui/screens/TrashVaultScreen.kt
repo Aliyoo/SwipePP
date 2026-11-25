@@ -189,7 +189,7 @@ fun TrashVaultScreen(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     VaultArtText(
-                        text = "清理回收站",
+                        text = "废弃回收站",
                         fontSize = 28.sp,
                         modifier = Modifier.align(Alignment.CenterVertically)
                     )

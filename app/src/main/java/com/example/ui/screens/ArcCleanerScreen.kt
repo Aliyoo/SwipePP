@@ -950,7 +950,7 @@ fun ArcCleanerScreen(
                                                 .testTag("compare_burst_button")
                                         )
                                         DecoVermStripButton(
-                                            title = "整组回收",
+                                            title = "整组舍弃",
                                             // 三钮等分下 24dp 图标会挤掉 4 字标题被省略，让位给文字
                                             height = 48.dp,
                                             onClick = {
@@ -975,7 +975,7 @@ fun ArcCleanerScreen(
                                 ) {
                                     // 入站：朱红实印
                                     DecoSealOrb(
-                                        label = "回收",
+                                        label = "舍弃",
                                         orbSize = 64.dp,
                                         tone = DecoOrbTone.VERM_SOLID,
                                         onClick = {
@@ -1030,7 +1030,7 @@ fun ArcCleanerScreen(
                             color = DecoGold,
                             iconSize = 13.dp
                         )
-                        DecoHintSpan(text = "上滑回收", color = vermInk)
+                        DecoHintSpan(text = "上滑舍弃", color = vermInk)
                         Text(text = "·", fontSize = 12.5.sp, color = DecoInkOnGround.copy(alpha = 0.5f))
                         DecoHintSpan(text = "下滑保留", color = DecoGold)
                         Text(text = "·", fontSize = 12.5.sp, color = DecoInkOnGround.copy(alpha = 0.5f))
