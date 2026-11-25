@@ -20,9 +20,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -291,11 +294,18 @@ fun TrashVaultScreen(
                         Spacer(modifier = Modifier.height(14.dp))
 
                         // 空态重心上移：内容组靠近汇总卡（顶部 ~18% 留白）而非整块剩余高度正中，
-                        // 消除汇总卡与盾徽之间的大段空白断层
-                        Column(
+                        // 消除汇总卡与盾徽之间的大段空白断层；矮窗（横屏）下可滚动，保证引导按钮可达
+                        BoxWithConstraints(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
+                        ) {
+                        val emptyViewportHeight = maxHeight
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .heightIn(min = emptyViewportHeight)
                                 .padding(start = 32.dp, end = 32.dp, top = 12.dp, bottom = 24.dp + floatingDockInset + navBarBottom),
                             verticalArrangement = Arrangement.spacedBy(0.dp, BiasAlignment.Vertical(-0.45f)),
                             horizontalAlignment = Alignment.CenterHorizontally
@@ -352,6 +362,7 @@ fun TrashVaultScreen(
                                     color = DecoGold
                                 )
                             }
+                        }
                         }
                         }
                     }
