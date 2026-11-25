@@ -44,8 +44,7 @@ internal fun pairLivePhotoItems(
             video.mediaStoreKey !in consumedVideoKeys &&
                 video.durationMs in 1L..MAX_LIVE_VIDEO_DURATION_MS &&
                 bucketMatches(image.bucketName, video.bucketName) &&
-                abs(video.takenAtMillis - image.takenAtMillis) <= MAX_LIVE_PAIR_TIME_DELTA_MS &&
-                aspectRatioMatches(image, video)
+                abs(video.takenAtMillis - image.takenAtMillis) <= MAX_LIVE_PAIR_TIME_DELTA_MS
         }
         val pairedVideo = candidates.minByOrNull {
             abs(it.photo.takenAtMillis - image.takenAtMillis)
@@ -73,13 +72,6 @@ internal fun pairLivePhotoItems(
     )
 }
 
-private fun aspectRatioMatches(image: PhotoItemEntity, video: PhotoItemEntity): Boolean {
-    if (image.widthPx <= 0 || image.heightPx <= 0 || video.widthPx <= 0 || video.heightPx <= 0) return false
-    val a = image.widthPx.toFloat() / image.heightPx
-    val b = video.widthPx.toFloat() / video.heightPx
-    return abs(a - b) / a < 0.03f
-}
-
 private fun bucketMatches(imageBucket: String?, videoBucket: String?): Boolean {
     val image = imageBucket?.trim().orEmpty()
     val video = videoBucket?.trim().orEmpty()
@@ -93,5 +85,5 @@ private val LIVE_STILL_FORMATS = setOf(
     ImageFormat.PNG
 )
 
-private const val MAX_LIVE_PAIR_TIME_DELTA_MS = 5_000L
-private const val MAX_LIVE_VIDEO_DURATION_MS = 8_000L
+private const val MAX_LIVE_PAIR_TIME_DELTA_MS = 1_000L
+private const val MAX_LIVE_VIDEO_DURATION_MS = 4_000L
