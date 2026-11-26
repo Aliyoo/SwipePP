@@ -476,12 +476,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         val trimmed = keyword.trim()
         if (trimmed.isBlank()) return emptySet()
         return try {
-            val queryVec = smartTagAnalyzer.encodeText(trimmed) ?: run {
-                android.util.Log.w("FlipYearViewModel", "semantic: encodeText returned null for '$trimmed'")
-                return emptySet()
-            }
+            val queryVec = smartTagAnalyzer.encodeText(trimmed) ?: return emptySet()
             val rows = database.flipYearDao().getAllEmbeddings()
-            android.util.Log.d("FlipYearViewModel", "semantic: query len=${trimmed.length} embRows=${rows.size}")
             if (rows.isEmpty()) return emptySet()
             val scored = ArrayList<Pair<Long, Float>>(rows.size)
             for (row in rows) {
@@ -507,8 +503,6 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             val std = kotlin.math.sqrt(variance)
             if (std <= 1e-6f) return emptySet()
             val floor = (mean + SEMANTIC_Z_THRESHOLD * std).coerceAtLeast(SEMANTIC_ABSOLUTE_FLOOR)
-            val topSims = scored.sortedByDescending { it.second }.take(4).joinToString { "%.4f".format(it.second) }
-            android.util.Log.d("FlipYearViewModel", "semantic: mean=%.4f std=%.4f floor=%.4f top=$topSims".format(mean, std, floor))
             scored.filter { it.second >= floor }
                 .sortedByDescending { it.second }
                 .take(SEMANTIC_MATCH_CAP)
