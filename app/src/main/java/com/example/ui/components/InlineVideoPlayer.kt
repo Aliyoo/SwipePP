@@ -164,7 +164,7 @@ fun InlineVideoPlayer(
                     val actualDur = exoPlayer.duration
                     if (actualDur > 0L) durationMs = actualDur
                 }
-                if (state == Player.STATE_ENDED && pauseAfterCompletion) {
+                if (state == Player.STATE_ENDED && pauseAfterCompletion && exoPlayer.playWhenReady) {
                     exoPlayer.pause()
                     exoPlayer.seekTo(0L)
                     positionMs = 0L
