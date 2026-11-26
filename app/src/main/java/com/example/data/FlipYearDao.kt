@@ -99,7 +99,8 @@ interface FlipYearDao {
     @Query("SELECT * FROM photo_embeddings WHERE photoId IN (:ids)")
     suspend fun getEmbeddingsForIds(ids: List<Long>): List<PhotoEmbeddingEntity>
 
-    @Query("SELECT * FROM photo_embeddings")
+    // Excludes trashed/purged photos so semantic search only scores visible media
+    @Query("SELECT e.* FROM photo_embeddings e INNER JOIN photos p ON e.photoId = p.id WHERE p.status NOT IN ('TRASHED', 'PURGED')")
     suspend fun getAllEmbeddings(): List<PhotoEmbeddingEntity>
 
     @Transaction
