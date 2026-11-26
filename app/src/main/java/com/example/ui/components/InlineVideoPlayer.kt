@@ -165,7 +165,6 @@ fun InlineVideoPlayer(
                     if (actualDur > 0L) durationMs = actualDur
                 }
                 if (state == Player.STATE_ENDED && pauseAfterCompletion && exoPlayer.playWhenReady) {
-                    exoPlayer.pause()
                     positionMs = exoPlayer.duration.coerceAtLeast(exoPlayer.currentPosition).coerceAtLeast(0L)
                     isPlaying = false
                 }
