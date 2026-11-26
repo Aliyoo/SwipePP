@@ -263,7 +263,7 @@ class ClipEmbedder(private val context: Context) {
         const val VISION_INPUT_NAME = "image"
         const val TEXT_INPUT_NAME = "text"
         const val VISION_MODEL_ASSET = "cnclip_vision_fp16.onnx"
-        const val TEXT_MODEL_ASSET = "cnclip_text_fp16.onnx"
+        const val TEXT_MODEL_ASSET = "cnclip_text_int8.onnx"
         const val CATEGORY_TABLE_ASSET = "clip_categories.bin"
         private val CHANNEL_MEAN = floatArrayOf(0.48145466f, 0.4578275f, 0.40821073f)
         private val CHANNEL_STD = floatArrayOf(0.26862954f, 0.26130258f, 0.27577711f)
