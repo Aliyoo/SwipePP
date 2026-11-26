@@ -493,7 +493,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     scored.add(row.photoId to dot / kotlin.math.sqrt(norm))
                 }
             }
-            if (scored.size < 3) return emptySet()
+            if (scored.isEmpty()) return emptySet()
             var mean = 0f
             for ((_, s) in scored) mean += s
             mean /= scored.size
@@ -501,8 +501,9 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             for ((_, s) in scored) variance += (s - mean) * (s - mean)
             variance /= scored.size
             val std = kotlin.math.sqrt(variance)
-            if (std <= 1e-6f) return emptySet()
-            val floor = (mean + SEMANTIC_Z_THRESHOLD * std).coerceAtLeast(SEMANTIC_ABSOLUTE_FLOOR)
+            // z-score needs a meaningful sample; tiny or uniform libraries fall back to the absolute floor only
+            val zFloor = if (scored.size >= 3 && std > 1e-6f) mean + SEMANTIC_Z_THRESHOLD * std else 0f
+            val floor = zFloor.coerceAtLeast(SEMANTIC_ABSOLUTE_FLOOR)
             scored.filter { it.second >= floor }
                 .sortedByDescending { it.second }
                 .take(SEMANTIC_MATCH_CAP)
