@@ -96,6 +96,7 @@ fun InlineVideoPlayer(
     showChrome: Boolean = true,
     onToggleChrome: (() -> Unit)? = null,
     onOpenFullscreen: (() -> Unit)? = null,
+    pauseAfterCompletion: Boolean = false,
     bottomDockOverlay: (@Composable (scrubberContent: @Composable () -> Unit) -> Unit)? = null
 ) {
     val contentUri = photo.contentUri?.takeIf { it.isNotBlank() }
@@ -130,7 +131,7 @@ fun InlineVideoPlayer(
 
     val exoPlayer = remember(contentUri) {
         ExoPlayer.Builder(context).build().apply {
-            repeatMode = Player.REPEAT_MODE_ONE
+            repeatMode = if (pauseAfterCompletion) Player.REPEAT_MODE_OFF else Player.REPEAT_MODE_ONE
             volume = if (initialMuted) 0f else 1f
             setMediaItem(MediaItem.fromUri(Uri.parse(contentUri)))
             this.playWhenReady = playWhenReady
@@ -162,6 +163,12 @@ fun InlineVideoPlayer(
                     playbackError = null
                     val actualDur = exoPlayer.duration
                     if (actualDur > 0L) durationMs = actualDur
+                }
+                if (state == Player.STATE_ENDED && pauseAfterCompletion) {
+                    exoPlayer.pause()
+                    exoPlayer.seekTo(0L)
+                    positionMs = 0L
+                    isPlaying = false
                 }
             }
 
@@ -216,6 +223,9 @@ fun InlineVideoPlayer(
             exoPlayer.pause()
             isPlaying = false
         } else {
+            if (pauseAfterCompletion && exoPlayer.playbackState == Player.STATE_ENDED) {
+                exoPlayer.seekTo(0L)
+            }
             exoPlayer.play()
             isPlaying = true
         }

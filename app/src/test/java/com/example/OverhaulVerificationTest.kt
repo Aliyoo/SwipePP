@@ -22,6 +22,7 @@ import com.example.ui.components.GallerySmartFilter
 import com.example.ui.components.TimelineSearchFilterSheet
 import com.example.ui.components.daysStagedInVault
 import com.example.ui.components.formatVaultStagedLabel
+import com.example.ui.components.formatVideoDuration
 import com.example.ui.components.monthEnglishName
 import com.example.ui.filterGalleryEntriesBySearch
 import com.example.ui.screens.ArcCleanerScreen
@@ -81,6 +82,8 @@ class OverhaulVerificationTest {
         assertTrue(CompressionPreset.COMPACT.subtitle.contains("1920px"))
         assertEquals("一月", monthEnglishName(1))
         assertEquals("十二月", monthEnglishName(12))
+        assertEquals("00:00", formatVideoDuration(0L))
+        assertEquals("00:01", formatVideoDuration(1_000L))
         assertEquals("日光画廊", AppThemeMode.LIGHT.label)
         assertEquals("暗夜暗房", AppThemeMode.DARK.label)
 

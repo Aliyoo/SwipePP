@@ -925,7 +925,7 @@ fun GalleryScreen(
                                         smartFilter == GallerySmartFilter.BURSTS -> DecoIconKind.BURST
                                         smartFilter == GallerySmartFilter.LARGE_PHOTOS -> DecoIconKind.COMPRESS
                                         smartFilter == GallerySmartFilter.MISSING_LOCATION -> DecoIconKind.LOCATION_OFF
-                                        smartFilter == GallerySmartFilter.LIVE_PHOTOS -> DecoIconKind.PLAY
+                                        smartFilter == GallerySmartFilter.LIVE_PHOTOS -> DecoIconKind.LIVE
                                         smartFilter == GallerySmartFilter.ANIMATED_IMAGES -> DecoIconKind.BOLT
                                         smartFilter == GallerySmartFilter.SCREENSHOTS -> DecoIconKind.PHONE
                                         smartFilter == GallerySmartFilter.SPECIAL_FORMATS -> DecoIconKind.PHOTO

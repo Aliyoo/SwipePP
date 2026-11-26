@@ -51,7 +51,7 @@ enum class DecoIconKind {
     FAVORITE, STAR, SHIELD, VERIFIED,
 
     // 媒体
-    PHOTO, PHOTO_LIBRARY, VIDEOCAM, BURST, PLAY, PAUSE, VOLUME, VOLUME_OFF, FULLSCREEN, CENTER_FOCUS,
+    PHOTO, PHOTO_LIBRARY, VIDEOCAM, BURST, LIVE, PLAY, PAUSE, VOLUME, VOLUME_OFF, FULLSCREEN, CENTER_FOCUS,
 
     // 结构/容器
     CALENDAR, LABEL, FOLDER, FOLDER_OPEN, FOLDER_MOVE, LAYERS, INVENTORY,
@@ -154,6 +154,7 @@ private fun DrawScope.drawDecoIcon(kind: DecoIconKind, color: Color, selected: B
         DecoIconKind.PHOTO_LIBRARY -> drawPhotoLibrary(color, selected, strokeStyle)
         DecoIconKind.VIDEOCAM -> drawVideocam(color, strokeStyle)
         DecoIconKind.BURST -> drawBurst(color, strokeStyle)
+        DecoIconKind.LIVE -> drawLivePhoto(color, strokeStyle)
         DecoIconKind.PLAY -> drawPlay(color, strokeStyle)
         DecoIconKind.PAUSE -> drawPause(color)
         DecoIconKind.VOLUME -> drawVolume(color, muted = false, strokeStyle)
@@ -797,6 +798,12 @@ private fun DrawScope.drawBurst(color: Color, strokeStyle: Stroke) {
         cornerRadius = CornerRadius(1.5f),
         style = strokeStyle
     )
+}
+
+private fun DrawScope.drawLivePhoto(color: Color, strokeStyle: Stroke) {
+    drawCircle(color = color, radius = 7f, center = Offset(10f, 10f), style = strokeStyle)
+    drawCircle(color = color.copy(alpha = 0.58f), radius = 4.3f, center = Offset(10f, 10f), style = strokeStyle)
+    drawCircle(color = color, radius = 1.5f, center = Offset(10f, 10f))
 }
 
 private fun DrawScope.drawPlay(color: Color, strokeStyle: Stroke) {

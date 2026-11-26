@@ -45,7 +45,7 @@ fun formatStorageSize(bytes: Long): String {
 }
 
 fun formatVideoDuration(durationMs: Long): String {
-    val totalSec = (durationMs / 1000L).coerceAtLeast(1L)
+    val totalSec = (durationMs / 1000L).coerceAtLeast(0L)
     val mins = totalSec / 60L
     val secs = totalSec % 60L
     return String.format(Locale.US, "%02d:%02d", mins, secs)
