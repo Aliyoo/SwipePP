@@ -78,7 +78,8 @@ class ClipEmbedder(private val context: Context) {
     }
 
     private fun modelFileForAsset(asset: String): java.io.File {
-        val dir = java.io.File(context.filesDir, "onnx_models").apply { mkdirs() }
+        // noBackupFilesDir: 150MB+ 的模型副本会撑爆 25MB 云备份配额，导致应用数据备份被整体跳过
+        val dir = java.io.File(context.noBackupFilesDir, "onnx_models").apply { mkdirs() }
         val out = java.io.File(dir, asset)
         val assetLen = try {
             context.assets.openFd(asset).use { it.length }
