@@ -479,19 +479,22 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             val queryVec = smartTagAnalyzer.encodeText(trimmed) ?: return emptySet()
             val rows = database.flipYearDao().getAllEmbeddings()
             if (rows.isEmpty()) return emptySet()
-            val scored = ArrayList<Pair<Long, Float>>(rows.size)
-            for (row in rows) {
-                val v = com.example.data.smarttag.decodeEmbeddingFp16(row.embeddingFp16)
-                if (v.size != queryVec.size) continue
-                var dot = 0f
-                var norm = 0f
-                for (i in v.indices) {
-                    dot += queryVec[i] * v[i]
-                    norm += v[i] * v[i]
+            val scored = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                val out = ArrayList<Pair<Long, Float>>(rows.size)
+                for (row in rows) {
+                    val v = com.example.data.smarttag.decodeEmbeddingFp16(row.embeddingFp16)
+                    if (v.size != queryVec.size) continue
+                    var dot = 0f
+                    var norm = 0f
+                    for (i in v.indices) {
+                        dot += queryVec[i] * v[i]
+                        norm += v[i] * v[i]
+                    }
+                    if (norm > 0f) {
+                        out.add(row.photoId to dot / kotlin.math.sqrt(norm))
+                    }
                 }
-                if (norm > 0f) {
-                    scored.add(row.photoId to dot / kotlin.math.sqrt(norm))
-                }
+                out
             }
             if (scored.isEmpty()) return emptySet()
             var mean = 0f
