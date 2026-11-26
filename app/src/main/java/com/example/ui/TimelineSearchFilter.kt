@@ -224,7 +224,7 @@ private fun smartContentMatchesToken(photo: PhotoItemEntity, token: String): Boo
     for (cat in photo.smartCategories()) {
         // Reverse containment is limited to multi-char aliases: a one-char alias like "海"
         // must not match an unrelated token like "上海".
-        if (cat.zhLabel.contains(token) || cat.searchAliases.any {
+        if (cat.zhLabel.contains(token) || cat.exactAliases.any { it == token } || cat.searchAliases.any {
                 it.contains(token) || (it.length >= 2 && token.contains(it))
             }
         ) {

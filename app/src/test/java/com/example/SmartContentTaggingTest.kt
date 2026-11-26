@@ -102,6 +102,8 @@ class SmartContentTaggingTest {
         assertEquals(1, cats.size)
         val dogs = filterGalleryEntriesBySearch(entries, TimelineSearchQuery(keyword = "狗狗"))
         assertEquals(1, dogs.size)
+        val kitten = filterGalleryEntriesBySearch(entries, TimelineSearchQuery(keyword = "小猫"))
+        assertEquals(1, kitten.size)
     }
 
     @Test

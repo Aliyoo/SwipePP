@@ -13,7 +13,11 @@ enum class SmartCategory(
     val key: String,
     val zhLabel: String,
     val mlKitLabelHints: List<String>,
-    val searchAliases: List<String>
+    val searchAliases: List<String>,
+    // Matched only when the search token equals them exactly: these terms are embedded in
+    // unrelated longer words (小猫 in 小猫熊 = red panda), so substring matching is wrong for them,
+    // yet users typing them verbatim expect hits.
+    val exactAliases: List<String> = emptyList()
 ) {
     PERSON(
         "PERSON", "人物",
@@ -33,7 +37,8 @@ enum class SmartCategory(
     PET(
         "PET", "宠物",
         listOf("dog", "cat", "pet", "puppy", "kitten"),
-        listOf("宠物", "猫", "狗", "喵", "汪", "猫咪", "狗狗", "猫猫")
+        listOf("宠物", "猫", "狗", "喵", "汪", "猫咪", "狗狗", "猫猫"),
+        exactAliases = listOf("小猫", "小狗")
     ),
     ANIMAL(
         "ANIMAL", "动物",
