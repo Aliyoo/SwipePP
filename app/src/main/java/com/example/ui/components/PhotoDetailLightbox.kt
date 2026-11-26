@@ -517,6 +517,7 @@ private fun PhotoDetailLightboxContent(
                         showFullControls = true,
                         showChrome = showChrome,
                         onToggleChrome = { showChrome = !showChrome },
+                        pauseAfterCompletion = pagePhoto.isLivePhoto,
                         bottomDockOverlay = { scrubberContent ->
                             renderUnifiedBottomHud(pagePhoto, scrubberContent)
                         },
@@ -693,33 +694,72 @@ private fun PhotoDetailLightboxContent(
                     )
                 }
 
-                // Quality Score Badge with explicit "画质" label (Stage 4)
-                Surface(
-                    shape = RoundedCornerShape(3.dp),
-                    color = DecoVerm,
-                    border = BorderStroke(1.dp, DecoPaperCream.copy(alpha = 0.28f))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    if (currentPhoto.isLivePhoto) {
+                        LivePhotoDetailBadge()
+                    }
+
+                    // Quality Score Badge with explicit "画质" label (Stage 4)
+                    Surface(
+                        shape = RoundedCornerShape(3.dp),
+                        color = DecoVerm,
+                        border = BorderStroke(1.dp, DecoPaperCream.copy(alpha = 0.28f))
                     ) {
-                        DecoIcon(
-                            kind = DecoIconKind.STAR,
-                            color = DecoPaperCream,
-                            iconSize = 13.dp
-                        )
-                        Text(
-                            text = "画质 ${currentPhoto.qualityScore}",
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.8.sp,
-                            color = DecoPaperCream
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            DecoIcon(
+                                kind = DecoIconKind.STAR,
+                                color = DecoPaperCream,
+                                iconSize = 13.dp
+                            )
+                            Text(
+                                text = "画质 ${currentPhoto.qualityScore}",
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.8.sp,
+                                color = DecoPaperCream
+                            )
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun LivePhotoDetailBadge() {
+    Surface(
+        shape = RoundedCornerShape(3.dp),
+        color = DecoScrimInk.copy(alpha = 0.78f),
+        border = BorderStroke(1.dp, DecoGoldOnPhoto.copy(alpha = 0.62f)),
+        modifier = Modifier.testTag("lightbox_live_badge")
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            DecoIcon(
+                kind = DecoIconKind.LIVE,
+                color = DecoGoldOnPhoto,
+                iconSize = 12.dp
+            )
+            Text(
+                text = "LIVE",
+                fontFamily = JetBrainsMonoFontFamily,
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.9.sp,
+                color = DecoGoldOnPhoto
+            )
         }
     }
 }

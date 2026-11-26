@@ -327,7 +327,7 @@ fun TimelineGlobalSearchBar(
                                 GallerySmartFilter.BURSTS -> DecoIconKind.BURST
                                 GallerySmartFilter.LARGE_PHOTOS -> DecoIconKind.COMPRESS
                                 GallerySmartFilter.MISSING_LOCATION -> DecoIconKind.LOCATION_OFF
-                                GallerySmartFilter.LIVE_PHOTOS -> DecoIconKind.PLAY
+                                GallerySmartFilter.LIVE_PHOTOS -> DecoIconKind.LIVE
                                 GallerySmartFilter.ANIMATED_IMAGES -> DecoIconKind.BOLT
                                 GallerySmartFilter.SCREENSHOTS -> DecoIconKind.PHONE
                                 GallerySmartFilter.SPECIAL_FORMATS -> DecoIconKind.PHOTO
