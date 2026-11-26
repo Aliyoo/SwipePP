@@ -78,6 +78,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     private val customCleanerSession = MutableStateFlow<CustomCleanerSession?>(null)
     private var gpsBackfillJob: Job? = null
     private var smartTagJob: Job? = null
+    @Volatile private var smartTagRerunRequested = false
     private val smartTagAnalyzerLazy = lazy { SmartTagAnalyzer(application) }
     private val smartTagAnalyzer by smartTagAnalyzerLazy
     private val smartTagPipeline by lazy {
@@ -433,14 +434,23 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
      * are processed, so repeated calls after incremental syncs are cheap.
      */
     fun startSmartTagBackfill() {
-        if (smartTagJob?.isActive == true) return
+        if (smartTagJob?.isActive == true) {
+            // The pipeline caps a run at the pending count sampled when it started; media scanned
+            // mid-run would otherwise wait for the next launch. Remember the follow-up request
+            // and re-run when the active job finishes.
+            smartTagRerunRequested = true
+            return
+        }
         smartTagJob = viewModelScope.launch {
             try {
-                val processed = smartTagPipeline.runPending()
-                if (processed > 0 && !smartTagIndexedOnce) {
-                    showBanner("智能标签索引完成，可在筛选中按内容标签查找")
-                }
-                if (processed > 0) smartTagIndexedOnce = true
+                do {
+                    smartTagRerunRequested = false
+                    val processed = smartTagPipeline.runPending()
+                    if (processed > 0 && !smartTagIndexedOnce) {
+                        showBanner("智能标签索引完成，可在筛选中按内容标签查找")
+                    }
+                    if (processed > 0) smartTagIndexedOnce = true
+                } while (smartTagRerunRequested)
             } catch (t: Throwable) {
                 if (t !is kotlinx.coroutines.CancellationException) {
                     android.util.Log.w("FlipYearViewModel", "smart tag backfill failed", t)
