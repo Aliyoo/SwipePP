@@ -362,6 +362,7 @@ internal fun ModernArcSwipeCard(
                         contentDescription = stringResource(R.string.cd_photo_card),
                         downsampleTier = ImageDownsampleTier.HERO_CARD,
                         targetSizePx = 960,
+                        badgeBottomPadding = 42.dp,
                         modifier = Modifier.fillMaxSize()
                     )
 

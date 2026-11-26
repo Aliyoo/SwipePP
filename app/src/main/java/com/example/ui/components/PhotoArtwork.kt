@@ -25,6 +25,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -102,7 +103,8 @@ fun PhotoArtwork(
     showVideoBadge: Boolean = true,
     downsampleTier: ImageDownsampleTier = ImageDownsampleTier.PREVIEW_CARD,
     targetSizePx: Int? = null,
-    enableCrossfade: Boolean = false
+    enableCrossfade: Boolean = false,
+    badgeBottomPadding: Dp = 6.dp
 ) {
     val variant: VariantStyle? = when (photo.visualVariant) {
         "CRISP" -> null
@@ -210,7 +212,7 @@ fun PhotoArtwork(
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(6.dp)
+                    .padding(end = 6.dp, bottom = badgeBottomPadding)
                     .clip(VideoBadgeShape)
                     .background(VideoBadgeColor)
                     .padding(horizontal = 7.dp, vertical = 3.dp),
@@ -236,7 +238,7 @@ fun PhotoArtwork(
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(6.dp)
+                    .padding(start = 6.dp, bottom = badgeBottomPadding)
                     .clip(VideoBadgeShape)
                     .background(VideoBadgeColor)
                     .padding(horizontal = 7.dp, vertical = 3.dp),
@@ -245,7 +247,7 @@ fun PhotoArtwork(
             ) {
                 if (photo.isLivePhoto || photo.isAnimated) {
                     DecoIcon(
-                        kind = if (photo.isLivePhoto) DecoIconKind.PLAY else DecoIconKind.BOLT,
+                        kind = if (photo.isLivePhoto) DecoIconKind.LIVE else DecoIconKind.BOLT,
                         color = Color.White,
                         iconSize = 11.dp
                     )

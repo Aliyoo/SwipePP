@@ -21,10 +21,12 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,6 +66,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -72,6 +75,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.util.lerp
 import kotlin.math.absoluteValue
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -528,20 +532,36 @@ private fun PhotoDetailLightboxContent(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .fillMaxSize()
+                            // Single-finger drags stay unconsumed at 1x so HorizontalPager can page.
                             .pointerInput(pagePhoto.id) {
-                                detectTransformGestures { _, pan, zoom, _ ->
-                                    if (!isCurrentPage) return@detectTransformGestures
-                                    val newScale = (scale * zoom).coerceIn(1f, 4.5f)
-                                    scale = newScale
-                                    if (newScale > 1.02f) {
-                                        val maxShiftX = (size.width * (newScale - 1f)) / 2f
-                                        val maxShiftY = (size.height * (newScale - 1f)) / 2f
-                                        offset = Offset(
-                                            x = (offset.x + pan.x).coerceIn(-maxShiftX, maxShiftX),
-                                            y = (offset.y + pan.y).coerceIn(-maxShiftY, maxShiftY)
-                                        )
-                                    } else {
-                                        offset = Offset.Zero
+                                awaitEachGesture {
+                                    awaitFirstDown(requireUnconsumed = false)
+                                    var sawMultiTouch = false
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        val pressedCount = event.changes.count { it.pressed }
+                                        if (pressedCount == 0) break
+                                        if (pressedCount >= 2) sawMultiTouch = true
+
+                                        if (isCurrentPage && (sawMultiTouch || scale > 1.02f)) {
+                                            val zoom = event.calculateZoom()
+                                            val pan = event.calculatePan()
+                                            val newScale = (scale * zoom).coerceIn(1f, 4.5f)
+                                            scale = newScale
+                                            if (newScale > 1.02f) {
+                                                val maxShiftX = (size.width * (newScale - 1f)) / 2f
+                                                val maxShiftY = (size.height * (newScale - 1f)) / 2f
+                                                offset = Offset(
+                                                    x = (offset.x + pan.x).coerceIn(-maxShiftX, maxShiftX),
+                                                    y = (offset.y + pan.y).coerceIn(-maxShiftY, maxShiftY)
+                                                )
+                                            } else {
+                                                offset = Offset.Zero
+                                            }
+                                            event.changes.forEach { change ->
+                                                if (change.positionChanged()) change.consume()
+                                            }
+                                        }
                                     }
                                 }
                             }
