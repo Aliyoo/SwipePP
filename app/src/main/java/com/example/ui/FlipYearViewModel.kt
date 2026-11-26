@@ -78,7 +78,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     private val customCleanerSession = MutableStateFlow<CustomCleanerSession?>(null)
     private var gpsBackfillJob: Job? = null
     private var smartTagJob: Job? = null
-    private val smartTagAnalyzer by lazy { SmartTagAnalyzer(application) }
+    private val smartTagAnalyzerLazy = lazy { SmartTagAnalyzer(application) }
+    private val smartTagAnalyzer by smartTagAnalyzerLazy
     private val smartTagPipeline by lazy {
         SmartTaggingPipeline(
             dao = database.flipYearDao(),
@@ -335,6 +336,17 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 scanDeviceMedia(silent = true)
             }
         }
+        // Index whatever rows already exist (cached device media or a previously loaded demo
+        // archive) even when media permission is missing; the pipeline is idempotent and cheap
+        // when there is nothing pending.
+        startSmartTagBackfill()
+    }
+
+    override fun onCleared() {
+        if (smartTagAnalyzerLazy.isInitialized()) {
+            smartTagAnalyzer.close()
+        }
+        super.onCleared()
     }
 
     fun requiredMediaPermissions(): Array<String> = repository.requiredMediaPermissions()
