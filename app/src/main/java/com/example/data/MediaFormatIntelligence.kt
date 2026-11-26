@@ -2,6 +2,7 @@ package com.example.data
 
 import android.content.Context
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
@@ -104,10 +105,10 @@ fun isMotionPhotoFilenameCandidate(displayName: String?): Boolean {
 
 internal fun xmpIndicatesMotionPhoto(xmpText: String): Boolean {
     val attributeForm = Regex(
-        "(?i)(?:Camera|GCamera):MotionPhoto\\s*=\\s*['\"]1['\"]"
+        "(?i)(?:[A-Za-z0-9]+:)?(?:MotionPhoto|MicroVideo)\\s*=\\s*['\"]1['\"]"
     )
     val elementForm = Regex(
-        "(?i)<\\s*(?:Camera|GCamera):MotionPhoto\\s*>\\s*1\\s*<\\s*/\\s*(?:Camera|GCamera):MotionPhoto\\s*>"
+        "(?i)<\\s*(?:[A-Za-z0-9]+:)?(?:MotionPhoto|MicroVideo)\\s*>\\s*1\\s*<\\s*/\\s*(?:[A-Za-z0-9]+:)?(?:MotionPhoto|MicroVideo)\\s*>"
     )
     return attributeForm.containsMatchIn(xmpText) || elementForm.containsMatchIn(xmpText)
 }
@@ -147,6 +148,159 @@ private fun readBigEndianInt(bytes: ByteArray, offset: Int): Int {
         (bytes[offset + 3].toInt() and 0xff)
 }
 
+private fun readLittleEndianInt(bytes: ByteArray, offset: Int): Int {
+    return (bytes[offset].toInt() and 0xff) or
+        ((bytes[offset + 1].toInt() and 0xff) shl 8) or
+        ((bytes[offset + 2].toInt() and 0xff) shl 16) or
+        ((bytes[offset + 3].toInt() and 0xff) shl 24)
+}
+
+private fun indexOfAscii(bytes: ByteArray, needle: String, startIndex: Int): Int {
+    val target = needle.encodeToByteArray()
+    if (target.isEmpty() || startIndex >= bytes.size) return -1
+    var i = startIndex.coerceAtLeast(0)
+    while (i <= bytes.size - target.size) {
+        var matched = true
+        for (j in target.indices) {
+            if (bytes[i + j] != target[j]) {
+                matched = false
+                break
+            }
+        }
+        if (matched) return i
+        i++
+    }
+    return -1
+}
+
+private fun lastIndexOfAscii(bytes: ByteArray, needle: String): Int {
+    val target = needle.encodeToByteArray()
+    if (target.isEmpty() || bytes.size < target.size) return -1
+    var i = bytes.size - target.size
+    while (i >= 0) {
+        var matched = true
+        for (j in target.indices) {
+            if (bytes[i + j] != target[j]) {
+                matched = false
+                break
+            }
+        }
+        if (matched) return i
+        i--
+    }
+    return -1
+}
+
+/**
+ * Parses Samsung's SEF footer from the last few KB. This is the important cheap
+ * detection path for One UI files: their camera filenames do not carry Google's
+ * *MP.jpg hint, and the `MotionPhoto_Data` marker may be several megabytes before EOF.
+ */
+internal fun scanSamsungFooterInfo(
+    tailBytes: ByteArray,
+    fileSizeBytes: Long,
+    rangeReader: (Long, Int) -> ByteArray? = { _, _ -> null }
+): EmbeddedMotionInfo? {
+    if (tailBytes.size < 32 || fileSizeBytes < tailBytes.size) return null
+    if (String(tailBytes.copyOfRange(tailBytes.size - 4, tailBytes.size), Charsets.US_ASCII) != "SEFT") return null
+
+    val indexLength = readLittleEndianInt(tailBytes, tailBytes.size - 8)
+    if (indexLength < 16 || indexLength + 8 > tailBytes.size) return null
+    val footerStartInTail = tailBytes.size - indexLength - 8
+    if (footerStartInTail < 0 || footerStartInTail + 12 > tailBytes.size) return null
+    if (String(tailBytes.copyOfRange(footerStartInTail, footerStartInTail + 4), Charsets.US_ASCII) != "SEFH") return null
+
+    val footerAbsoluteStart = fileSizeBytes - tailBytes.size + footerStartInTail
+    val fieldCount = readLittleEndianInt(tailBytes, footerStartInTail + 8)
+    if (fieldCount <= 0 || fieldCount > 32) return null
+    var entryOffset = footerStartInTail + 12
+    repeat(fieldCount) {
+        if (entryOffset + 12 > tailBytes.size) return null
+        val isMotionData = tailBytes[entryOffset] == 0x00.toByte() &&
+            tailBytes[entryOffset + 1] == 0x00.toByte() &&
+            tailBytes[entryOffset + 2] == 0x30.toByte() &&
+            tailBytes[entryOffset + 3] == 0x0a.toByte()
+        if (isMotionData) {
+            val offsetBack = readLittleEndianInt(tailBytes, entryOffset + 4).toLong()
+            val blockLength = readLittleEndianInt(tailBytes, entryOffset + 8).toLong()
+            val blockStart = footerAbsoluteStart - offsetBack
+            val headerLength = 8L + "MotionPhoto_Data".encodeToByteArray().size
+            val payloadStart = blockStart + headerLength
+            val payloadLength = blockLength - headerLength
+            val tailAbsoluteStart = fileSizeBytes - tailBytes.size
+            val payloadStartInTail = payloadStart - tailAbsoluteStart
+
+            if (payloadLength == 12L) {
+                val pointerBytes = if (payloadStartInTail >= 0L && payloadStartInTail + 12L <= tailBytes.size) {
+                    val pointerOffset = payloadStartInTail.toInt()
+                    tailBytes.copyOfRange(pointerOffset, pointerOffset + 12)
+                } else {
+                    rangeReader(payloadStart, 12)
+                }
+                if (pointerBytes?.size == 12 &&
+                    pointerBytes[0] == 'm'.code.toByte() &&
+                    pointerBytes[1] == 'p'.code.toByte() &&
+                    pointerBytes[2] == 'v'.code.toByte() &&
+                    pointerBytes[3] == '2'.code.toByte()
+                ) {
+                    val videoOffset = readBigEndianInt(pointerBytes, 4).toLong() and 0xffffffffL
+                    val videoLength = readBigEndianInt(pointerBytes, 8).toLong() and 0xffffffffL
+                    if (videoOffset > 0L && videoLength >= 32L && videoOffset + videoLength <= fileSizeBytes) {
+                        return EmbeddedMotionInfo(videoOffset = videoOffset, videoLength = videoLength)
+                    }
+                }
+            }
+
+            if (blockStart >= 0L && payloadLength >= 32L && payloadStart + payloadLength <= fileSizeBytes) {
+                return EmbeddedMotionInfo(videoOffset = payloadStart, videoLength = payloadLength)
+            }
+        }
+        entryOffset += 12
+    }
+    return null
+}
+
+/**
+ * Locates Samsung's proprietary JPEG trailer. Samsung writes a `MotionPhoto_Data`
+ * field followed by the raw MP4 payload, then an `SEFH` validation block. Unlike
+ * Google's concatenated format, relying on XMP lengths is unreliable on newer One UI versions.
+ */
+internal fun scanSamsungMotionPhotoInfo(tailBytes: ByteArray, fileSizeBytes: Long): EmbeddedMotionInfo? {
+    if (tailBytes.size < 2_048 || fileSizeBytes < tailBytes.size) return null
+    val markerIndex = lastIndexOfAscii(tailBytes, "MotionPhoto_Data")
+    if (markerIndex < 0) return null
+
+    val payloadStart = markerIndex + "MotionPhoto_Data".encodeToByteArray().size
+    val searchEnd = minOf(payloadStart + 96, tailBytes.size - 4)
+    var videoStart = -1
+    var i = payloadStart
+    while (i < searchEnd) {
+        if (tailBytes[i] == 'f'.code.toByte() &&
+            tailBytes[i + 1] == 't'.code.toByte() &&
+            tailBytes[i + 2] == 'y'.code.toByte() &&
+            tailBytes[i + 3] == 'p'.code.toByte()
+        ) {
+            videoStart = i - 4
+            break
+        }
+        i++
+    }
+    if (videoStart < payloadStart || videoStart + 16 >= tailBytes.size) return null
+
+    val sefIndex = indexOfAscii(tailBytes, "SEFH", videoStart + 16)
+    if (sefIndex <= videoStart) return null
+    val length = sefIndex - videoStart
+    if (length < 32) return null
+    val declaredSize = readBigEndianInt(tailBytes, videoStart)
+    if (declaredSize !in 8..length) return null
+
+    val tailAbsoluteStart = fileSizeBytes - tailBytes.size
+    return EmbeddedMotionInfo(
+        videoOffset = tailAbsoluteStart + videoStart,
+        videoLength = length.toLong()
+    )
+}
+
 data class EmbeddedMotionInfo(
     val videoOffset: Long,
     val videoLength: Long
@@ -162,30 +316,155 @@ class EmbeddedMotionPhotoDetector(private val context: Context) {
     ): EmbeddedMotionInfo? {
         val format = resolveImageFormat(mimeType, displayName)
         if (format !in setOf(ImageFormat.JPEG, ImageFormat.HEIC, ImageFormat.AVIF)) return null
-        if (!isMotionPhotoFilenameCandidate(displayName)) return null
         if (fileSizeBytes <= 0L || fileSizeBytes > MAX_MOTION_CONTAINER_BYTES) return null
 
+        val strictMotionFilename = isMotionPhotoFilenameCandidate(displayName)
         val uri = runCatching { Uri.parse(contentUri) }.getOrNull() ?: return null
-        val bytes = runCatching {
-            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-        }.getOrNull() ?: return null
-        if (bytes.isEmpty()) return null
+        readTailBytes(uri, fileSizeBytes, FOOTER_SCAN_BYTES)?.let { footerBytes ->
+            scanSamsungFooterInfo(footerBytes, fileSizeBytes) { offset, length ->
+                readRangeBytes(uri, offset, length)
+            }?.let { info ->
+                if (hasMp4HeaderAt(uri, info.videoOffset)) return info
+            }
+        }
 
-        val xmpText = String(bytes.copyOfRange(0, minOf(bytes.size, 256 * 1024)), Charsets.UTF_8)
-        val xmpConfirmed = xmpIndicatesMotionPhoto(xmpText) && xmpDeclaresVideoItem(xmpText)
-        val offset = scanEmbeddedVideoOffset(bytes) ?: return null
-        val length = bytes.size - offset
-        if (length < 32L) return null
+        val headBytes = readPrefixBytes(uri, XMP_SCAN_BYTES) ?: return null
+        if (headBytes.isEmpty()) return null
+        val xmpText = String(headBytes, Charsets.UTF_8)
+        val xmpIndicatesMotion = xmpIndicatesMotionPhoto(xmpText)
 
-        // Official readers may use the strict *MP.jpg filename pattern, but XMP can be absent on
-        // older Samsung/Xiaomi files. Accept positive XMP or the strict filename plus a confirmed trailing MP4 box.
-        val strictMotionFilename = displayName.orEmpty().substringBeforeLast('.').lowercase(Locale.ROOT).endsWith("mp")
-        if (!xmpConfirmed && !strictMotionFilename) return null
+        // Samsung's normal camera filenames (for example 20251126_091500.jpg) do not
+        // follow the official *MP.jpg hint, so positive XMP must be enough to scan the trailer.
+        if (!xmpIndicatesMotion && !strictMotionFilename) return null
+
+        val tailBytes = readTailBytes(uri, fileSizeBytes, TAIL_SCAN_BYTES) ?: return null
+        if (format == ImageFormat.JPEG) {
+            scanSamsungMotionPhotoInfo(tailBytes, fileSizeBytes)?.let { return it }
+        }
+
+        val relativeOffset = scanEmbeddedVideoOffset(tailBytes)
+        val tailAbsoluteStart = fileSizeBytes - tailBytes.size
+        val offset = relativeOffset?.let { tailAbsoluteStart + it }
+            ?: scanEmbeddedVideoOffsetForward(uri, fileSizeBytes)
+            ?: return null
+        val length = fileSizeBytes - offset
+        if (offset <= 0L || length < 32L) return null
         return EmbeddedMotionInfo(videoOffset = offset, videoLength = length)
+    }
+
+    private fun readPrefixBytes(uri: Uri, maxBytes: Int): ByteArray? {
+        return runCatching {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                val out = ByteArray(maxBytes)
+                var offset = 0
+                while (offset < maxBytes) {
+                    val count = input.read(out, offset, maxBytes - offset)
+                    if (count < 0) break
+                    if (count == 0) continue
+                    offset += count
+                }
+                if (offset == 0) byteArrayOf() else out.copyOf(offset)
+            }
+        }.getOrNull()
+    }
+
+    private fun scanEmbeddedVideoOffsetForward(uri: Uri, fileSizeBytes: Long): Long? {
+        return runCatching {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                val chunk = ByteArray(256 * 1024)
+                var bytesRead = 0L
+                var carry = byteArrayOf()
+                while (true) {
+                    val count = input.read(chunk)
+                    if (count < 0) break
+                    if (count == 0) continue
+                    val combined = carry + chunk.copyOf(count)
+                    val combinedStart = bytesRead - carry.size
+                    var index = 0
+                    while (index < combined.size - 12) {
+                        if (combined[index] == 'f'.code.toByte() &&
+                            combined[index + 1] == 't'.code.toByte() &&
+                            combined[index + 2] == 'y'.code.toByte() &&
+                            combined[index + 3] == 'p'.code.toByte() &&
+                            index >= 4
+                        ) {
+                            val boxStart = index - 4
+                            val absoluteBoxStart = combinedStart + boxStart
+                            if (absoluteBoxStart >= 1_024L) {
+                                val declaredSize = readBigEndianInt(combined, boxStart).toLong() and 0xffffffffL
+                                val remaining = fileSizeBytes - absoluteBoxStart
+                                if (declaredSize in 8L..remaining) {
+                                    return@use absoluteBoxStart
+                                }
+                            }
+                        }
+                        index++
+                    }
+                    carry = combined.copyOfRange((combined.size - 16).coerceAtLeast(0), combined.size)
+                    bytesRead += count
+                }
+                null
+            }
+        }.getOrNull()
+    }
+
+    private fun hasMp4HeaderAt(uri: Uri, offset: Long): Boolean {
+        val bytes = readRangeBytes(uri, offset, 16) ?: return false
+        return bytes.size >= 8 &&
+            bytes[4] == 'f'.code.toByte() &&
+            bytes[5] == 't'.code.toByte() &&
+            bytes[6] == 'y'.code.toByte() &&
+            bytes[7] == 'p'.code.toByte()
+    }
+
+    private fun readRangeBytes(uri: Uri, offset: Long, length: Int): ByteArray? {
+        return runCatching {
+            val descriptor = context.contentResolver.openFileDescriptor(uri, "r") ?: return@runCatching null
+            ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input ->
+                val channel = input.channel
+                channel.position(offset)
+                val buffer = java.nio.ByteBuffer.allocate(length)
+                while (buffer.hasRemaining()) {
+                    val count = channel.read(buffer)
+                    if (count < 0) break
+                    if (count == 0) continue
+                }
+                buffer.flip()
+                val bytes = ByteArray(buffer.remaining())
+                buffer.get(bytes)
+                bytes
+            }
+        }.getOrNull()
+    }
+
+    private fun readTailBytes(uri: Uri, fileSizeBytes: Long, maxBytes: Long): ByteArray? {
+        return runCatching {
+            val length = minOf(fileSizeBytes, maxBytes).toInt()
+            if (length <= 0) return@runCatching null
+            val start = fileSizeBytes - length
+            val descriptor = context.contentResolver.openFileDescriptor(uri, "r") ?: return@runCatching null
+            ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input ->
+                val channel = input.channel
+                channel.position(start)
+                val buffer = java.nio.ByteBuffer.allocate(length)
+                while (buffer.hasRemaining()) {
+                    val count = channel.read(buffer)
+                    if (count < 0) break
+                    if (count == 0) continue
+                }
+                buffer.flip()
+                val bytes = ByteArray(buffer.remaining())
+                buffer.get(bytes)
+                bytes
+            }
+        }.getOrNull()
     }
 
     companion object {
         private const val MAX_MOTION_CONTAINER_BYTES = 96L * 1024L * 1024L
+        private const val XMP_SCAN_BYTES = 256 * 1024
+        private const val FOOTER_SCAN_BYTES = 8L * 1024L
+        private const val TAIL_SCAN_BYTES = 48L * 1024L * 1024L
     }
 }
 
