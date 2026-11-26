@@ -91,11 +91,13 @@ fun InlineVideoPlayer(
     modifier: Modifier = Modifier,
     playWhenReady: Boolean = true,
     initialMuted: Boolean = false,
+    initialPositionMs: Long = 0L,
     fillCrop: Boolean = false,
     showFullControls: Boolean = true,
     showChrome: Boolean = true,
     onToggleChrome: (() -> Unit)? = null,
     onOpenFullscreen: (() -> Unit)? = null,
+    onFullscreenPlaybackState: ((positionMs: Long, isMuted: Boolean) -> Unit)? = null,
     pauseAfterCompletion: Boolean = false,
     bottomDockOverlay: (@Composable (scrubberContent: @Composable () -> Unit) -> Unit)? = null
 ) {
@@ -133,7 +135,7 @@ fun InlineVideoPlayer(
         ExoPlayer.Builder(context).build().apply {
             repeatMode = if (pauseAfterCompletion) Player.REPEAT_MODE_OFF else Player.REPEAT_MODE_ONE
             volume = if (initialMuted) 0f else 1f
-            setMediaItem(MediaItem.fromUri(Uri.parse(contentUri)))
+            setMediaItem(MediaItem.fromUri(Uri.parse(contentUri)), initialPositionMs.coerceAtLeast(0L))
             this.playWhenReady = playWhenReady
             prepare()
         }
@@ -504,6 +506,7 @@ fun InlineVideoPlayer(
                             iconKind = DecoIconKind.FULLSCREEN,
                             contentDescription = "全屏播放",
                             onClick = {
+                                onFullscreenPlaybackState?.invoke(exoPlayer.currentPosition.coerceAtLeast(0L), isMuted)
                                 exoPlayer.pause()
                                 exoPlayer.stop()
                                 onOpenFullscreen()

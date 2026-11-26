@@ -35,6 +35,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -114,6 +115,8 @@ internal fun ModernArcSwipeCard(
     var crossedDirection by remember(item.stableKey) { mutableIntStateOf(0) }
     var isCommitting by remember(item.stableKey) { mutableStateOf(false) }
     var showFavoriteHeartBurst by remember(item.stableKey) { mutableStateOf(false) }
+    var videoResumePositionMs by remember(item.stableKey) { mutableLongStateOf(0L) }
+    var videoMuted by remember(item.stableKey) { mutableStateOf(true) }
 
     val arcDropBasePx = with(density) { 42.dp.toPx() }
     val trashThresholdPx = with(density) { 104.dp.toPx() }
@@ -350,10 +353,15 @@ internal fun ModernArcSwipeCard(
                     InlineVideoPlayer(
                         photo = item.primaryPhoto,
                         playWhenReady = isVideoPlaybackActive,
-                        initialMuted = true,
+                        initialMuted = videoMuted,
+                        initialPositionMs = videoResumePositionMs,
                         fillCrop = true,
                         showFullControls = false,
                         onOpenFullscreen = { onOpenFullscreen(item.primaryPhoto) },
+                        onFullscreenPlaybackState = { positionMs, muted ->
+                            videoResumePositionMs = positionMs
+                            videoMuted = muted
+                        },
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
