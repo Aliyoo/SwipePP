@@ -152,7 +152,10 @@ class SmartTagAnalyzer(context: Context) {
     private fun decodeSampledImageLegacy(uri: Uri): Bitmap? {
         val resolver = appContext.contentResolver
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
+        val boundsStream = resolver.openInputStream(uri) ?: return null
+        // decodeStream always returns null in inJustDecodeBounds mode even on success;
+        // the dimensions land in `bounds`, so the null result must not be treated as failure.
+        boundsStream.use { BitmapFactory.decodeStream(it, null, bounds) }
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
         var sample = 1
         val maxDim = maxOf(bounds.outWidth, bounds.outHeight)
