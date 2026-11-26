@@ -227,7 +227,7 @@ fun InlineVideoPlayer(
                     (durationMs > 1L && positionMs >= durationMs)
                 )
             if (replayFromEnd) {
-                exoPlayer.stop()
+                exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(contentUri)), 0L)
                 exoPlayer.prepare()
             }
             exoPlayer.playWhenReady = true
