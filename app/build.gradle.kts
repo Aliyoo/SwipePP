@@ -22,6 +22,12 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    ndk {
+      // ONNX Runtime ships native libs for 4 ABIs; legacy 32-bit targets are irrelevant for
+      // this app and dropping them halves the ML footprint in the APK.
+      abiFilters += listOf("arm64-v8a", "x86_64")
+    }
   }
 
   // Do not remove or modify these signingConfigs. They are necessary for building, installing,
@@ -111,6 +117,7 @@ dependencies {
   implementation(libs.coil.compose)
   implementation(libs.coil.video)
   implementation(libs.coil.gif)
+  implementation(libs.onnxruntime.android)
   implementation(libs.androidx.media3.exoplayer)
   implementation(libs.androidx.media3.ui)
   // implementation(libs.maps.compose)

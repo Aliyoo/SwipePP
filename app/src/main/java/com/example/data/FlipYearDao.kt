@@ -81,6 +81,38 @@ interface FlipYearDao {
     @Query("SELECT * FROM photos WHERE year = :year AND month = :month AND status != 'PURGED'")
     suspend fun getPhotosForMonth(year: Int, month: Int): List<PhotoItemEntity>
 
+    @Query(
+        "SELECT * FROM photos WHERE contentLabelVersion < :version AND status != 'PURGED' " +
+            "ORDER BY takenAtMillis DESC LIMIT :limit"
+    )
+    suspend fun getPhotosPendingSmartTagging(version: Int, limit: Int): List<PhotoItemEntity>
+
+    @Query("SELECT COUNT(*) FROM photos WHERE contentLabelVersion < :version AND status != 'PURGED'")
+    suspend fun countPhotosPendingSmartTagging(version: Int): Int
+
+    @Query("UPDATE photos SET contentLabels = :labels, contentLabelVersion = :version WHERE id = :id")
+    suspend fun updatePhotoContentLabels(id: Long, labels: String, version: Int)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertEmbeddings(embeddings: List<PhotoEmbeddingEntity>)
+
+    @Query("SELECT * FROM photo_embeddings WHERE photoId IN (:ids)")
+    suspend fun getEmbeddingsForIds(ids: List<Long>): List<PhotoEmbeddingEntity>
+
+    @Transaction
+    suspend fun applySmartTagBatch(
+        updates: List<SmartTagBatchUpdate>,
+        embeddings: List<PhotoEmbeddingEntity>,
+        version: Int
+    ) {
+        for (u in updates) {
+            updatePhotoContentLabels(u.id, u.labelsCsv, version)
+        }
+        if (embeddings.isNotEmpty()) {
+            upsertEmbeddings(embeddings)
+        }
+    }
+
     @Query("SELECT * FROM photos WHERE id IN (:ids)")
     suspend fun getPhotosByIds(ids: List<Long>): List<PhotoItemEntity>
 

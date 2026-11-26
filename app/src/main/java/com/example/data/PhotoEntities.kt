@@ -93,7 +93,9 @@ data class PhotoItemEntity(
     val longitude: Double? = null,
     val trashedAtMillis: Long? = null,
     val isSample: Boolean = true,
-    val gpsScanned: Boolean = false
+    val gpsScanned: Boolean = false,
+    val contentLabels: String = "",
+    val contentLabelVersion: Int = 0
 ) {
     // Zero-allocation fast lookup (avoids PhotoStatus.valueOf + runCatching overhead across 10k+ rows)
     val photoStatus: PhotoStatus
@@ -128,6 +130,23 @@ data class PhotoItemEntity(
             }
         }
 }
+
+@Entity(tableName = "photo_embeddings")
+data class PhotoEmbeddingEntity(
+    @PrimaryKey val photoId: Long,
+    val embeddingFp16: ByteArray,
+    val updatedAtMillis: Long
+) {
+    override fun equals(other: Any?): Boolean =
+        other is PhotoEmbeddingEntity && other.photoId == photoId
+
+    override fun hashCode(): Int = photoId.hashCode()
+}
+
+data class SmartTagBatchUpdate(
+    val id: Long,
+    val labelsCsv: String
+)
 
 data class DeviceMediaKeyRow(
     val id: Long,
