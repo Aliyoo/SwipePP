@@ -165,7 +165,32 @@ class SmartTagAnalyzer(context: Context) {
             inSampleSize = sample
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
-        return resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+        val decoded = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+            ?: return null
+        // BitmapFactory ignores EXIF orientation; camera photos would otherwise be embedded sideways.
+        return applyExifRotation(uri, decoded)
+    }
+
+    private fun applyExifRotation(uri: Uri, bitmap: Bitmap): Bitmap {
+        val rotation = try {
+            val exif = openExif(uri) ?: return bitmap
+            when (exif.getAttributeInt(androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION, androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL)) {
+                androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                else -> return bitmap
+            }
+        } catch (_: Throwable) {
+            return bitmap
+        }
+        val matrix = android.graphics.Matrix().apply { postRotate(rotation) }
+        val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        return if (rotated === bitmap) bitmap else rotated
+    }
+
+    private fun openExif(uri: Uri): androidx.exifinterface.media.ExifInterface? {
+        val stream = appContext.contentResolver.openInputStream(uri) ?: return null
+        return stream.use { androidx.exifinterface.media.ExifInterface(it) }
     }
 
     fun close() {
