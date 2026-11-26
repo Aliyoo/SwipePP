@@ -222,7 +222,12 @@ private val MONTH_ENGLISH_SHORT = arrayOf(
 private fun smartContentMatchesToken(photo: PhotoItemEntity, token: String): Boolean {
     if (photo.contentLabels.isBlank()) return false
     for (cat in photo.smartCategories()) {
-        if (cat.zhLabel.contains(token) || cat.searchAliases.any { it.contains(token) || token.contains(it) }) {
+        // Reverse containment is limited to multi-char aliases: a one-char alias like "海"
+        // must not match an unrelated token like "上海".
+        if (cat.zhLabel.contains(token) || cat.searchAliases.any {
+                it.contains(token) || (it.length >= 2 && token.contains(it))
+            }
+        ) {
             return true
         }
     }

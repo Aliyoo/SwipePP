@@ -78,6 +78,21 @@ class SmartContentTaggingTest {
     }
 
     @Test
+    fun placeNameTokenDoesNotHitShortAliases() {
+        val entries = listOf(
+            GalleryEntry.Single(photo(1, labels = "WATER", caption = "")),
+            GalleryEntry.Single(photo(2, labels = "CITY", caption = ""))
+        )
+        // "上海" must not match WATER through its single-char alias "海".
+        val filtered = filterGalleryEntriesBySearch(entries, TimelineSearchQuery(keyword = "上海"))
+        assertTrue(filtered.isEmpty())
+        // Multi-char aliases still match by containment.
+        val beach = filterGalleryEntriesBySearch(entries, TimelineSearchQuery(keyword = "海滩"))
+        assertEquals(1, beach.size)
+        assertEquals(1L, (beach.first() as GalleryEntry.Single).photo.id)
+    }
+
+    @Test
     fun extractionSurfacesSmartCategoriesByFrequency() {
         val entries = listOf(
             GalleryEntry.Single(photo(1, labels = "FOOD", caption = "")),
