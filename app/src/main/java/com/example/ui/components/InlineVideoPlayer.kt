@@ -91,11 +91,14 @@ fun InlineVideoPlayer(
     modifier: Modifier = Modifier,
     playWhenReady: Boolean = true,
     initialMuted: Boolean = false,
+    initialPositionMs: Long = 0L,
     fillCrop: Boolean = false,
     showFullControls: Boolean = true,
     showChrome: Boolean = true,
     onToggleChrome: (() -> Unit)? = null,
     onOpenFullscreen: (() -> Unit)? = null,
+    onFullscreenPlaybackState: ((positionMs: Long, isMuted: Boolean) -> Unit)? = null,
+    onPlaybackCheckpoint: ((positionMs: Long, isMuted: Boolean) -> Unit)? = null,
     pauseAfterCompletion: Boolean = false,
     bottomDockOverlay: (@Composable (scrubberContent: @Composable () -> Unit) -> Unit)? = null
 ) {
@@ -127,13 +130,14 @@ fun InlineVideoPlayer(
     var positionMs by remember(contentUri) { mutableLongStateOf(0L) }
     var durationMs by remember(contentUri) { mutableLongStateOf(photo.durationMs.coerceAtLeast(1L)) }
     var isScrubbing by remember(contentUri) { mutableStateOf(false) }
+    var openingFullscreen by remember(contentUri) { mutableStateOf(false) }
     var scrubFraction by remember(contentUri) { mutableFloatStateOf(0f) }
 
     val exoPlayer = remember(contentUri) {
         ExoPlayer.Builder(context).build().apply {
             repeatMode = if (pauseAfterCompletion) Player.REPEAT_MODE_OFF else Player.REPEAT_MODE_ONE
             volume = if (initialMuted) 0f else 1f
-            setMediaItem(MediaItem.fromUri(Uri.parse(contentUri)))
+            setMediaItem(MediaItem.fromUri(Uri.parse(contentUri)), initialPositionMs.coerceAtLeast(0L))
             this.playWhenReady = playWhenReady
             prepare()
         }
@@ -141,6 +145,9 @@ fun InlineVideoPlayer(
 
     // Sync external playWhenReady (e.g. when Arc Cleaner card scrolls in/out of focus)
     LaunchedEffect(exoPlayer, playWhenReady) {
+        if (playWhenReady && exoPlayer.playbackState == Player.STATE_IDLE) {
+            exoPlayer.prepare()
+        }
         exoPlayer.playWhenReady = playWhenReady
         if (!playWhenReady) {
             exoPlayer.pause()
@@ -193,6 +200,9 @@ fun InlineVideoPlayer(
         lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
 
         onDispose {
+            if (!openingFullscreen) {
+                onPlaybackCheckpoint?.invoke(exoPlayer.currentPosition.coerceAtLeast(0L), exoPlayer.volume <= 0f)
+            }
             lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
             exoPlayer.removeListener(listener)
             exoPlayer.release()
@@ -500,7 +510,13 @@ fun InlineVideoPlayer(
                         DecoVideoInkOrb(
                             iconKind = DecoIconKind.FULLSCREEN,
                             contentDescription = "全屏播放",
-                            onClick = onOpenFullscreen,
+                            onClick = {
+                                openingFullscreen = true
+                                onFullscreenPlaybackState?.invoke(exoPlayer.currentPosition.coerceAtLeast(0L), exoPlayer.volume <= 0f)
+                                exoPlayer.pause()
+                                exoPlayer.stop()
+                                onOpenFullscreen()
+                            },
                             size = 44.dp,
                             iconSize = 18.dp,
                             modifier = Modifier.testTag("card_video_fullscreen_button")
