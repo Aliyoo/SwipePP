@@ -67,13 +67,34 @@ class ClipEmbedder(private val context: Context) {
         }
     }
 
+    // Loads via a file path so ORT memory-maps the weights instead of the Java heap
+    // holding a full copy (plus the readBytes copy) — required on small-heap devices.
     private fun createSession(env: OrtEnvironment, asset: String): OrtSession {
-        val bytes = context.assets.open(asset).use { it.readBytes() }
         val opts = OrtSession.SessionOptions().apply {
             setIntraOpNumThreads(2)
             setInterOpNumThreads(1)
         }
-        return env.createSession(bytes, opts)
+        return env.createSession(modelFileForAsset(asset).absolutePath, opts)
+    }
+
+    private fun modelFileForAsset(asset: String): java.io.File {
+        val dir = java.io.File(context.filesDir, "onnx_models").apply { mkdirs() }
+        val out = java.io.File(dir, asset)
+        val assetLen = try {
+            context.assets.openFd(asset).use { it.length }
+        } catch (t: Throwable) {
+            -1L
+        }
+        val upToDate = out.exists() && assetLen >= 0 && out.length() == assetLen
+        if (!upToDate) {
+            val tmp = java.io.File(dir, "$asset.tmp")
+            context.assets.open(asset).use { input ->
+                tmp.outputStream().use { output -> input.copyTo(output, bufferSize = 256 * 1024) }
+            }
+            if (out.exists()) out.delete()
+            tmp.renameTo(out)
+        }
+        return out
     }
 
     private fun loadCategoryTable(): List<Pair<SmartCategory, FloatArray>> {
