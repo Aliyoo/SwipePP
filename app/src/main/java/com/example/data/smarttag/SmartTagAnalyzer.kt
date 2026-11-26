@@ -81,30 +81,31 @@ class SmartTagAnalyzer(context: Context) {
         withContext(Dispatchers.IO) {
             try {
                 if (photo.isVideo) {
-                    decodeVideoFrame(photo)
+                    // Demo videos carry no playable content Uri; fall back to their bundled artwork.
+                    decodeVideoFrame(photo) ?: decodeDrawableArtwork(photo, drawableResolver)
                 } else if (!photo.contentUri.isNullOrBlank()) {
                     decodeSampledImage(photo.contentUri)
-                } else if (!photo.drawableName.isNullOrBlank()) {
-                    val resId = drawableResolver(photo.drawableName)
-                    if (resId != null && resId != 0) {
-                        val drawable = appContext.resources.getDrawable(resId, null)
-                        if (drawable is BitmapDrawable) {
-                            drawable.bitmap
-                        } else {
-                            @Suppress("UseKtx")
-                            drawable.toBitmap(width = 512, height = 512)
-                        }
-                    } else {
-                        null
-                    }
                 } else {
-                    null
+                    decodeDrawableArtwork(photo, drawableResolver)
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "decode failed for photo ${photo.id}", t)
                 null
             }
         }
+
+    private fun decodeDrawableArtwork(photo: PhotoItemEntity, drawableResolver: (String?) -> Int?): Bitmap? {
+        if (photo.drawableName.isNullOrBlank()) return null
+        val resId = drawableResolver(photo.drawableName)
+        if (resId == null || resId == 0) return null
+        val drawable = appContext.resources.getDrawable(resId, null)
+        return if (drawable is BitmapDrawable) {
+            drawable.bitmap
+        } else {
+            @Suppress("UseKtx")
+            drawable.toBitmap(width = 512, height = 512)
+        }
+    }
 
     private fun decodeVideoFrame(photo: PhotoItemEntity): Bitmap? {
         val uriStr = photo.contentUri ?: return null
