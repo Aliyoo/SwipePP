@@ -437,7 +437,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         smartTagJob = viewModelScope.launch {
             try {
                 val processed = smartTagPipeline.runPending()
-                if (processed >= 24 && !smartTagIndexedOnce) {
+                if (processed > 0 && !smartTagIndexedOnce) {
                     showBanner("智能标签索引完成，可在筛选中按内容标签查找")
                 }
                 if (processed > 0) smartTagIndexedOnce = true

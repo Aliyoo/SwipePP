@@ -124,6 +124,11 @@ enum class SmartCategory(
         "PRODUCT", "静物商品",
         listOf("product", "bottle", "package", "box", "object"),
         listOf("商品", "静物", "物品", "开箱")
+    ),
+    GROUP(
+        "GROUP", "合影",
+        listOf("group", "crowd", "team", "family", "audience"),
+        listOf("合影", "合照", "多人", "团体", "全家福")
     );
 
     fun matchesMlKitLabel(label: String): Boolean {
@@ -154,7 +159,7 @@ object SmartTagHeuristics {
     const val CLIP_MIN_SIMILARITY = 0.16f
     const val CLIP_TIE_MARGIN = 0.02f
     const val MAX_TAGS_PER_PHOTO = 4
-    const val CONTENT_LABEL_VERSION = 2
+    const val CONTENT_LABEL_VERSION = 3
 }
 
 fun PhotoItemEntity.smartCategories(): List<SmartCategory> = SmartCategory.keysInCsv(contentLabels)
