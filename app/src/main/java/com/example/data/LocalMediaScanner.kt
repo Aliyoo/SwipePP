@@ -112,7 +112,10 @@ class LocalMediaScanner(private val context: Context) {
         val rawImages = queryImages()
         val rawVideos = queryVideos()
         val pairing = pairLivePhotoItems(rawImages, rawVideos)
-        val motionAwareImages = detectEmbeddedMotionPhotos(pairing.images)
+        val imageDisplayNames = rawImages.mapNotNull { item ->
+            item.photo.mediaStoreKey?.let { it to item.displayName }
+        }.toMap()
+        val motionAwareImages = detectEmbeddedMotionPhotos(pairing.images, imageDisplayNames)
 
         val groupedImages = assignBurstGroups(motionAwareImages)
         val visibleVideos = rawVideos.map { it.photo }.filter { video ->
@@ -121,7 +124,10 @@ class LocalMediaScanner(private val context: Context) {
         (groupedImages + visibleVideos).sortedByDescending { it.takenAtMillis }
     }
 
-    private fun detectEmbeddedMotionPhotos(images: List<PhotoItemEntity>): List<PhotoItemEntity> {
+    private fun detectEmbeddedMotionPhotos(
+        images: List<PhotoItemEntity>,
+        displayNames: Map<String, String>
+    ): List<PhotoItemEntity> {
         val detector = EmbeddedMotionPhotoDetector(context)
         return images.map { image ->
             if (image.motionPhotoKind != MotionPhotoType.NONE) {
@@ -130,7 +136,7 @@ class LocalMediaScanner(private val context: Context) {
                 val info = detector.detect(
                     contentUri = image.contentUri.orEmpty(),
                     mimeType = image.mimeType,
-                    displayName = image.caption + ".jpg",
+                    displayName = image.mediaStoreKey?.let(displayNames::get) ?: image.caption,
                     fileSizeBytes = image.fileSizeBytes
                 )
                 if (info == null) {
