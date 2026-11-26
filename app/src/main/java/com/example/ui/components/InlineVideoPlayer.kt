@@ -165,6 +165,7 @@ fun InlineVideoPlayer(
                     if (actualDur > 0L) durationMs = actualDur
                 }
                 if (state == Player.STATE_ENDED && pauseAfterCompletion && exoPlayer.playWhenReady) {
+                    exoPlayer.pause()
                     positionMs = exoPlayer.duration.coerceAtLeast(exoPlayer.currentPosition).coerceAtLeast(0L)
                     isPlaying = false
                 }
@@ -221,10 +222,14 @@ fun InlineVideoPlayer(
             exoPlayer.pause()
             isPlaying = false
         } else {
-            if (pauseAfterCompletion && exoPlayer.playbackState == Player.STATE_ENDED) {
+            val replayFromEnd = pauseAfterCompletion && (
+                exoPlayer.playbackState == Player.STATE_ENDED ||
+                    (durationMs > 1L && positionMs >= durationMs)
+                )
+            if (replayFromEnd) {
                 exoPlayer.seekTo(0L)
             }
-            exoPlayer.play()
+            exoPlayer.playWhenReady = true
             isPlaying = true
         }
     }
