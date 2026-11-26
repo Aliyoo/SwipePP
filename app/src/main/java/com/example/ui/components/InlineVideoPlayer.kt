@@ -201,7 +201,7 @@ fun InlineVideoPlayer(
 
         onDispose {
             if (!openingFullscreen) {
-                onPlaybackCheckpoint?.invoke(exoPlayer.currentPosition.coerceAtLeast(0L), isMuted)
+                onPlaybackCheckpoint?.invoke(exoPlayer.currentPosition.coerceAtLeast(0L), exoPlayer.volume <= 0f)
             }
             lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
             exoPlayer.removeListener(listener)
@@ -512,7 +512,7 @@ fun InlineVideoPlayer(
                             contentDescription = "全屏播放",
                             onClick = {
                                 openingFullscreen = true
-                                onFullscreenPlaybackState?.invoke(exoPlayer.currentPosition.coerceAtLeast(0L), isMuted)
+                                onFullscreenPlaybackState?.invoke(exoPlayer.currentPosition.coerceAtLeast(0L), exoPlayer.volume <= 0f)
                                 exoPlayer.pause()
                                 exoPlayer.stop()
                                 onOpenFullscreen()
