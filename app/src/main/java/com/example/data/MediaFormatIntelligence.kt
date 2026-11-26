@@ -330,9 +330,11 @@ class EmbeddedMotionPhotoDetector(private val context: Context) {
             scanSamsungMotionPhotoInfo(tailBytes, fileSizeBytes)?.let { return it }
         }
 
-        val relativeOffset = scanEmbeddedVideoOffset(tailBytes) ?: return null
+        val relativeOffset = scanEmbeddedVideoOffset(tailBytes)
         val tailAbsoluteStart = fileSizeBytes - tailBytes.size
-        val offset = tailAbsoluteStart + relativeOffset
+        val offset = relativeOffset?.let { tailAbsoluteStart + it }
+            ?: scanEmbeddedVideoOffsetForward(uri, fileSizeBytes)
+            ?: return null
         val length = fileSizeBytes - offset
         if (offset <= 0L || length < 32L) return null
         return EmbeddedMotionInfo(videoOffset = offset, videoLength = length)
@@ -350,6 +352,46 @@ class EmbeddedMotionPhotoDetector(private val context: Context) {
                     offset += count
                 }
                 if (offset == 0) byteArrayOf() else out.copyOf(offset)
+            }
+        }.getOrNull()
+    }
+
+    private fun scanEmbeddedVideoOffsetForward(uri: Uri, fileSizeBytes: Long): Long? {
+        return runCatching {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                val chunk = ByteArray(256 * 1024)
+                var bytesRead = 0L
+                var carry = byteArrayOf()
+                while (true) {
+                    val count = input.read(chunk)
+                    if (count < 0) break
+                    if (count == 0) continue
+                    val combined = carry + chunk.copyOf(count)
+                    val combinedStart = bytesRead - carry.size
+                    var index = 0
+                    while (index < combined.size - 12) {
+                        if (combined[index] == 'f'.code.toByte() &&
+                            combined[index + 1] == 't'.code.toByte() &&
+                            combined[index + 2] == 'y'.code.toByte() &&
+                            combined[index + 3] == 'p'.code.toByte() &&
+                            index >= 4
+                        ) {
+                            val boxStart = index - 4
+                            val absoluteBoxStart = combinedStart + boxStart
+                            if (absoluteBoxStart >= 1_024L) {
+                                val declaredSize = readBigEndianInt(combined, boxStart).toLong() and 0xffffffffL
+                                val remaining = fileSizeBytes - absoluteBoxStart
+                                if (declaredSize in 8L..remaining) {
+                                    return@use absoluteBoxStart
+                                }
+                            }
+                        }
+                        index++
+                    }
+                    carry = combined.copyOfRange((combined.size - 16).coerceAtLeast(0), combined.size)
+                    bytesRead += count
+                }
+                null
             }
         }.getOrNull()
     }
