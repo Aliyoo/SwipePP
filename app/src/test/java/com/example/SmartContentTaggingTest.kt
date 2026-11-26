@@ -105,6 +105,16 @@ class SmartContentTaggingTest {
     }
 
     @Test
+    fun redPandaQueryDoesNotHitPetTags() {
+        val entries = listOf(
+            GalleryEntry.Single(photo(1, labels = "PET", caption = "")),
+        )
+        // 小猫熊 (red panda, Taiwanese usage) must not match pet photos through an embedded alias.
+        val filtered = filterGalleryEntriesBySearch(entries, TimelineSearchQuery(keyword = "小猫熊"))
+        assertTrue(filtered.isEmpty())
+    }
+
+    @Test
     fun extractionSurfacesSmartCategoriesByFrequency() {
         val entries = listOf(
             GalleryEntry.Single(photo(1, labels = "FOOD", caption = "")),
