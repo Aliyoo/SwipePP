@@ -26,6 +26,9 @@ import com.example.data.YearbookCollageExporter
 import com.example.data.YearbookCoverConfigEntity
 import com.example.data.YearbookCoverMode
 import com.example.data.isSafelyCompressibleImage
+import com.example.data.smarttag.SmartTagAnalyzer
+import com.example.data.smarttag.SmartTaggingPipeline
+import com.example.ui.components.resolveSampleDrawable
 import com.example.ui.components.CollageTemplate
 import com.example.ui.components.buildTimelineClusterLayout
 import com.example.ui.domain.LibraryDerivationEngine
@@ -74,6 +77,18 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     private val vaultSessionFilterIds = MutableStateFlow<Set<Long>?>(null)
     private val customCleanerSession = MutableStateFlow<CustomCleanerSession?>(null)
     private var gpsBackfillJob: Job? = null
+    private var smartTagJob: Job? = null
+    @Volatile private var smartTagRerunRequested = false
+    private val smartTagAnalyzerLazy = lazy { SmartTagAnalyzer(application) }
+    private val smartTagAnalyzer by smartTagAnalyzerLazy
+    private val smartTagPipeline by lazy {
+        SmartTaggingPipeline(
+            dao = database.flipYearDao(),
+            analyzer = smartTagAnalyzer,
+            drawableResolver = { name -> resolveSampleDrawable(name).takeIf { it != 0 } }
+        )
+    }
+    private var smartTagIndexedOnce = false
     private var snackbarDismissJob: Job? = null
     private var pendingBatchWriteTask: PendingBatchWriteTask? = null
     private var pendingLegacyRetryPhotos: List<PhotoItemEntity> = emptyList()
@@ -322,6 +337,17 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 scanDeviceMedia(silent = true)
             }
         }
+        // Index whatever rows already exist (cached device media or a previously loaded demo
+        // archive) even when media permission is missing; the pipeline is idempotent and cheap
+        // when there is nothing pending.
+        startSmartTagBackfill()
+    }
+
+    override fun onCleared() {
+        if (smartTagAnalyzerLazy.isInitialized()) {
+            smartTagAnalyzer.close()
+        }
+        super.onCleared()
     }
 
     fun requiredMediaPermissions(): Array<String> = repository.requiredMediaPermissions()
@@ -358,6 +384,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                         forceRescan = forceRescanGps
                     )
                 }
+                startSmartTagBackfill()
             } finally {
                 isScanningDevice.value = false
             }
@@ -401,12 +428,44 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    /**
+     * Background ML content tagging (ML Kit object/scene labels + on-device MobileCLIP
+     * zero-shot categories). Idempotent: only rows behind the current taxonomy version
+     * are processed, so repeated calls after incremental syncs are cheap.
+     */
+    fun startSmartTagBackfill() {
+        if (smartTagJob?.isActive == true) {
+            // The pipeline caps a run at the pending count sampled when it started; media scanned
+            // mid-run would otherwise wait for the next launch. Remember the follow-up request
+            // and re-run when the active job finishes.
+            smartTagRerunRequested = true
+            return
+        }
+        smartTagJob = viewModelScope.launch {
+            try {
+                do {
+                    smartTagRerunRequested = false
+                    val processed = smartTagPipeline.runPending()
+                    if (processed > 0 && !smartTagIndexedOnce) {
+                        showBanner("智能标签索引完成，可在筛选中按内容标签查找")
+                    }
+                    if (processed > 0) smartTagIndexedOnce = true
+                } while (smartTagRerunRequested)
+            } catch (t: Throwable) {
+                if (t !is kotlinx.coroutines.CancellationException) {
+                    android.util.Log.w("FlipYearViewModel", "smart tag backfill failed", t)
+                }
+            }
+        }
+    }
+
     fun loadDemoArchive() {
         viewModelScope.launch {
             undoStack.value = emptyList()
             cleanerSessionUndoStack.value = emptyList()
             repository.loadDemoArchive()
             showSnackbar("已加载示例照片与 4K 视频影集")
+            startSmartTagBackfill()
         }
     }
 

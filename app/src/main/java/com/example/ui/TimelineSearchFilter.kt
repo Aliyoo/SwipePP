@@ -5,6 +5,9 @@ import com.example.data.ImageFormat
 import com.example.data.MediaSubtype
 import com.example.data.PhotoItemEntity
 import com.example.data.PhotoStatus
+import com.example.data.smarttag.SmartCategory
+import com.example.data.smarttag.hasSmartContentFor
+import com.example.data.smarttag.smartCategories
 import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
@@ -155,7 +158,8 @@ enum class DescriptiveTag(
         SCREENSHOT -> photo.mediaSubtypeKind == MediaSubtype.SCREENSHOT
         LONG_SCREENSHOT -> photo.mediaSubtypeKind == MediaSubtype.LONG_SCREENSHOT
         SCREEN_RECORD -> photo.mediaSubtypeKind == MediaSubtype.SCREEN_RECORD
-        DOCUMENT -> photo.mediaSubtypeKind == MediaSubtype.DOCUMENT
+        DOCUMENT -> photo.mediaSubtypeKind == MediaSubtype.DOCUMENT ||
+            photo.hasSmartContentFor(SmartCategory.DOCUMENT.key)
         CHAT_SAVE -> photo.mediaSubtypeKind == MediaSubtype.CHAT_SAVE
         CAMERA -> photo.mediaSubtypeKind == MediaSubtype.CAMERA
         HEIC_IMAGE -> photo.imageFormatKind == ImageFormat.HEIC
@@ -215,9 +219,26 @@ private val MONTH_ENGLISH_SHORT = arrayOf(
     "jul", "aug", "sep", "oct", "nov", "dec"
 )
 
+private fun smartContentMatchesToken(photo: PhotoItemEntity, token: String): Boolean {
+    if (photo.contentLabels.isBlank()) return false
+    for (cat in photo.smartCategories()) {
+        // Reverse containment is limited to multi-char aliases: a one-char alias like "海"
+        // must not match an unrelated token like "上海".
+        if (cat.zhLabel.contains(token) || cat.exactAliases.any { it == token } || cat.searchAliases.any {
+                it.contains(token) || (it.length >= 2 && token.contains(it))
+            }
+        ) {
+            return true
+        }
+    }
+    return false
+}
+
 /**
  * Extracts real descriptive scene keywords present in the user's library (captions & albums)
  * sorted by frequency so tag chips always reflect actual photos in the timeline.
+ * Smart ML content categories present in the library are surfaced with a "#"-style count too,
+ * so the chips stay truthful to what the indexer actually tagged.
  */
 fun extractDescriptiveKeywordTags(
     entries: List<GalleryEntry>,
@@ -234,6 +255,9 @@ fun extractDescriptiveKeywordTags(
                     counts[word] = (counts[word] ?: 0) + 1
                 }
             }
+        }
+        for (cat in photo.smartCategories()) {
+            counts[cat.zhLabel] = (counts[cat.zhLabel] ?: 0) + 1
         }
     }
 
@@ -307,7 +331,8 @@ fun filterGalleryEntriesBySearch(
         if (selectedKeywordTags.isNotEmpty()) {
             for (kw in selectedKeywordTags) {
                 val hit = photo.caption.contains(kw, ignoreCase = true) ||
-                    (photo.bucketName?.contains(kw, ignoreCase = true) == true)
+                    (photo.bucketName?.contains(kw, ignoreCase = true) == true) ||
+                    photo.hasSmartContentFor(kw)
                 if (!hit) return false
             }
         }
@@ -321,10 +346,11 @@ fun filterGalleryEntriesBySearch(
                 val hitBucket = photo.bucketName?.lowercase(Locale.ROOT)?.contains(token) == true
                 val hitDate = matchesDateToken(photo.year, photo.month, photo.day, token)
                 val hitTagAlias = tokenMatchedTags[i].any { it.matches(photo) }
+                val hitSmartContent = smartContentMatchesToken(photo, token)
                 val hitUnlocatedKeyword = (token == "无定位" || token == "缺定位") &&
                     (photo.locationName.isNullOrBlank() || photo.latitude == null || photo.longitude == null)
 
-                if (!hitLocation && !hitCaption && !hitBucket && !hitDate && !hitTagAlias && !hitUnlocatedKeyword) {
+                if (!hitLocation && !hitCaption && !hitBucket && !hitDate && !hitTagAlias && !hitUnlocatedKeyword && !hitSmartContent) {
                     return false
                 }
             }

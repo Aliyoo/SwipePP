@@ -10,11 +10,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 @Database(
     entities = [
         PhotoItemEntity::class,
+        PhotoEmbeddingEntity::class,
         MonthStampEntity::class,
         CleanupStatsEntity::class,
         YearbookCoverConfigEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class FlipYearDatabase : RoomDatabase() {
@@ -71,6 +72,20 @@ abstract class FlipYearDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE photos ADD COLUMN contentLabels TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE photos ADD COLUMN contentLabelVersion INTEGER NOT NULL DEFAULT 0")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `photo_embeddings` (" +
+                        "`photoId` INTEGER NOT NULL, " +
+                        "`embeddingFp16` BLOB NOT NULL, " +
+                        "`updatedAtMillis` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`photoId`))"
+                )
+            }
+        }
+
         private val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE photos ADD COLUMN mimeType TEXT")
@@ -93,7 +108,7 @@ abstract class FlipYearDatabase : RoomDatabase() {
                     FlipYearDatabase::class.java,
                     "flipyear_cleaner.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                     .also { INSTANCE = it }
