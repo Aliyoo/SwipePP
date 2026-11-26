@@ -98,6 +98,7 @@ fun InlineVideoPlayer(
     onToggleChrome: (() -> Unit)? = null,
     onOpenFullscreen: (() -> Unit)? = null,
     onFullscreenPlaybackState: ((positionMs: Long, isMuted: Boolean) -> Unit)? = null,
+    onPlaybackCheckpoint: ((positionMs: Long, isMuted: Boolean) -> Unit)? = null,
     pauseAfterCompletion: Boolean = false,
     bottomDockOverlay: (@Composable (scrubberContent: @Composable () -> Unit) -> Unit)? = null
 ) {
@@ -129,6 +130,7 @@ fun InlineVideoPlayer(
     var positionMs by remember(contentUri) { mutableLongStateOf(0L) }
     var durationMs by remember(contentUri) { mutableLongStateOf(photo.durationMs.coerceAtLeast(1L)) }
     var isScrubbing by remember(contentUri) { mutableStateOf(false) }
+    var openingFullscreen by remember(contentUri) { mutableStateOf(false) }
     var scrubFraction by remember(contentUri) { mutableFloatStateOf(0f) }
 
     val exoPlayer = remember(contentUri) {
@@ -198,6 +200,9 @@ fun InlineVideoPlayer(
         lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
 
         onDispose {
+            if (!openingFullscreen) {
+                onPlaybackCheckpoint?.invoke(exoPlayer.currentPosition.coerceAtLeast(0L), isMuted)
+            }
             lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
             exoPlayer.removeListener(listener)
             exoPlayer.release()
@@ -506,6 +511,7 @@ fun InlineVideoPlayer(
                             iconKind = DecoIconKind.FULLSCREEN,
                             contentDescription = "全屏播放",
                             onClick = {
+                                openingFullscreen = true
                                 onFullscreenPlaybackState?.invoke(exoPlayer.currentPosition.coerceAtLeast(0L), isMuted)
                                 exoPlayer.pause()
                                 exoPlayer.stop()

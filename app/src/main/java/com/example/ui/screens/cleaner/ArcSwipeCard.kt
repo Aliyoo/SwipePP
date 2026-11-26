@@ -35,7 +35,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -85,6 +84,12 @@ import java.util.concurrent.atomic.AtomicReference
 
 private const val COMMIT_UNMOUNT_GRACE_MS = 320L
 
+private class CleanerVideoPlaybackMemory {
+    var positionMs: Long = 0L
+    var isMuted: Boolean = true
+}
+
+
 // 摩登画报 · 屏内一次性色彩（design-demos/deco-app.html 取材，浅暗主题同值）
 // 照片压暗 scrim / 深色徽章芯片的取色，永远不用于地面文字
 // 压照片 scrim 基墨收敛到 theme/Color.kt 共享常量 DecoScrimInk（原型 rgba(13,24,20,*)
@@ -115,8 +120,7 @@ internal fun ModernArcSwipeCard(
     var crossedDirection by remember(item.stableKey) { mutableIntStateOf(0) }
     var isCommitting by remember(item.stableKey) { mutableStateOf(false) }
     var showFavoriteHeartBurst by remember(item.stableKey) { mutableStateOf(false) }
-    var videoResumePositionMs by remember(item.stableKey) { mutableLongStateOf(0L) }
-    var videoMuted by remember(item.stableKey) { mutableStateOf(true) }
+    val videoPlaybackMemory = remember(item.stableKey) { CleanerVideoPlaybackMemory() }
 
     val arcDropBasePx = with(density) { 42.dp.toPx() }
     val trashThresholdPx = with(density) { 104.dp.toPx() }
@@ -353,14 +357,18 @@ internal fun ModernArcSwipeCard(
                     InlineVideoPlayer(
                         photo = item.primaryPhoto,
                         playWhenReady = isVideoPlaybackActive,
-                        initialMuted = videoMuted,
-                        initialPositionMs = videoResumePositionMs,
+                        initialMuted = videoPlaybackMemory.isMuted,
+                        initialPositionMs = videoPlaybackMemory.positionMs,
                         fillCrop = true,
                         showFullControls = false,
                         onOpenFullscreen = { onOpenFullscreen(item.primaryPhoto) },
                         onFullscreenPlaybackState = { positionMs, muted ->
-                            videoResumePositionMs = positionMs
-                            videoMuted = muted
+                            videoPlaybackMemory.positionMs = positionMs
+                            videoPlaybackMemory.isMuted = muted
+                        },
+                        onPlaybackCheckpoint = { positionMs, muted ->
+                            videoPlaybackMemory.positionMs = positionMs
+                            videoPlaybackMemory.isMuted = muted
                         },
                         modifier = Modifier.fillMaxSize()
                     )
