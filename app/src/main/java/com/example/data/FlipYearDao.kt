@@ -37,6 +37,41 @@ interface FlipYearDao {
     @Query("SELECT id, mediaStoreKey FROM photos WHERE isSample = 0")
     suspend fun getAllDeviceMediaKeysSync(): List<DeviceMediaKeyRow>
 
+    @Query(
+        "SELECT id, mediaStoreKey, durationMs, mimeType, imageFormat, mediaSubtype, isAnimated, " +
+            "motionPhotoType, motionVideoUri, motionVideoDurationMs, motionVideoOffset, motionVideoLength, " +
+            "pairedMediaStoreKey, fileSizeBytes, widthPx, heightPx, caption, bucketName " +
+            "FROM photos WHERE isSample = 0"
+    )
+    suspend fun getAllDeviceMediaSyncRowsSync(): List<DeviceMediaSyncRow>
+
+    @Query(
+        "UPDATE photos SET durationMs = :durationMs, mimeType = :mimeType, imageFormat = :imageFormat, " +
+            "mediaSubtype = :mediaSubtype, isAnimated = :isAnimated, motionPhotoType = :motionPhotoType, " +
+            "motionVideoUri = :motionVideoUri, motionVideoDurationMs = :motionVideoDurationMs, " +
+            "motionVideoOffset = :motionVideoOffset, motionVideoLength = :motionVideoLength, " +
+            "pairedMediaStoreKey = :pairedMediaStoreKey, fileSizeBytes = :fileSizeBytes, " +
+            "widthPx = :widthPx, heightPx = :heightPx " +
+            "WHERE mediaStoreKey = :mediaStoreKey AND isSample = 0"
+    )
+    suspend fun updateDeviceMediaMetadata(
+        mediaStoreKey: String,
+        durationMs: Long,
+        mimeType: String?,
+        imageFormat: String,
+        mediaSubtype: String,
+        isAnimated: Boolean,
+        motionPhotoType: String,
+        motionVideoUri: String?,
+        motionVideoDurationMs: Long,
+        motionVideoOffset: Long?,
+        motionVideoLength: Long?,
+        pairedMediaStoreKey: String?,
+        fileSizeBytes: Long,
+        widthPx: Int,
+        heightPx: Int,
+    )
+
     @Query("SELECT * FROM photos WHERE isSample = 0 AND gpsScanned = 0 AND status != 'PURGED' AND (latitude IS NULL OR longitude IS NULL OR locationName IS NULL OR locationName = '') ORDER BY takenAtMillis DESC")
     suspend fun getDeviceMediaMissingLocationSync(): List<PhotoItemEntity>
 
@@ -155,12 +190,40 @@ interface FlipYearDao {
      * at most ONE Flow invalidation instead of hundreds, and safely chunks IN(...) clauses under 999 params.
      */
     @Transaction
+    suspend fun updateDeviceMediaMetadataBatch(items: List<PhotoItemEntity>) {
+        for (item in items) {
+            val key = item.mediaStoreKey ?: continue
+            updateDeviceMediaMetadata(
+                mediaStoreKey = key,
+                durationMs = item.durationMs,
+                mimeType = item.mimeType,
+                imageFormat = item.imageFormat,
+                mediaSubtype = item.mediaSubtype,
+                isAnimated = item.isAnimated,
+                motionPhotoType = item.motionPhotoType,
+                motionVideoUri = item.motionVideoUri,
+                motionVideoDurationMs = item.motionVideoDurationMs,
+                motionVideoOffset = item.motionVideoOffset,
+                motionVideoLength = item.motionVideoLength,
+                pairedMediaStoreKey = item.pairedMediaStoreKey,
+                fileSizeBytes = item.fileSizeBytes,
+                widthPx = item.widthPx,
+                heightPx = item.heightPx,
+            )
+        }
+    }
+
+    @Transaction
     suspend fun syncDeviceMediaBatch(
         vanishedIds: List<Long>,
         newItems: List<PhotoItemEntity>,
         invalidateMonthKeys: List<String>,
-        deleteSamples: Boolean
+        deleteSamples: Boolean,
+        metadataUpdates: List<PhotoItemEntity> = emptyList()
     ) {
+        if (metadataUpdates.isNotEmpty()) {
+            updateDeviceMediaMetadataBatch(metadataUpdates)
+        }
         if (vanishedIds.isNotEmpty()) {
             vanishedIds.chunked(SQLITE_BIND_CHUNK).forEach { chunk ->
                 deletePhotosByIds(chunk)

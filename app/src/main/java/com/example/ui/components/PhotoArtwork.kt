@@ -113,7 +113,15 @@ fun PhotoArtwork(
         else -> null
     }
 
-    val needsOverlayBox = (showVideoBadge && photo.isVideo) || variant != null
+    val mediaBadgeLabel = when {
+        photo.isLivePhoto -> "LIVE"
+        photo.isAnimated -> if (photo.imageFormatKind == com.example.data.ImageFormat.WEBP) "WEBP" else "GIF"
+        photo.imageFormatKind == com.example.data.ImageFormat.HEIC -> "HEIC"
+        photo.imageFormatKind == com.example.data.ImageFormat.AVIF -> "AVIF"
+        photo.imageFormatKind == com.example.data.ImageFormat.RAW -> "RAW"
+        else -> null
+    }
+    val needsOverlayBox = (showVideoBadge && photo.isVideo) || mediaBadgeLabel != null || variant != null
     val contentUri = photo.contentUri
 
     if (!needsOverlayBox) {
@@ -219,6 +227,34 @@ fun PhotoArtwork(
                     fontFamily = JetBrainsMonoFontFamily,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+            }
+        }
+
+        if (!photo.isVideo && mediaBadgeLabel != null) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(6.dp)
+                    .clip(VideoBadgeShape)
+                    .background(VideoBadgeColor)
+                    .padding(horizontal = 7.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                if (photo.isLivePhoto || photo.isAnimated) {
+                    DecoIcon(
+                        kind = if (photo.isLivePhoto) DecoIconKind.PLAY else DecoIconKind.BOLT,
+                        color = Color.White,
+                        iconSize = 11.dp
+                    )
+                }
+                Text(
+                    text = mediaBadgeLabel,
+                    fontFamily = JetBrainsMonoFontFamily,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
             }

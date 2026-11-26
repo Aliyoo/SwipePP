@@ -54,6 +54,7 @@ import com.example.data.LocationPreset
 import com.example.data.PhotoItemEntity
 import com.example.data.ResolvedGeoLocation
 import com.example.data.SameDayLocationMatch
+import com.example.data.isSafelyCompressibleImage
 import com.example.ui.LocationCluster
 import com.example.ui.theme.DecoGold
 import com.example.ui.theme.DecoMat
@@ -78,8 +79,9 @@ fun BatchCompressBottomSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var selectedPreset by remember { mutableStateOf(CompressionPreset.NEAR_LOSSLESS) }
 
-    val imageTargets = remember(selectedPhotos) { selectedPhotos.filter { !it.isVideo } }
-    val skippedVideoCount = selectedPhotos.size - imageTargets.size
+    val imageTargets = remember(selectedPhotos) { selectedPhotos.filter { !it.isVideo && isSafelyCompressibleImage(it) } }
+    val skippedVideoCount = selectedPhotos.count { it.isVideo }
+    val protectedCount = selectedPhotos.count { !it.isVideo && !isSafelyCompressibleImage(it) }
     val totalImageBytes = remember(imageTargets) { imageTargets.sumOf { it.fileSizeBytes } }
     val estimatedSavedBytes = (totalImageBytes * selectedPreset.estimatedSavingsRatio).toLong()
     val estimatedAfterBytes = (totalImageBytes - estimatedSavedBytes).coerceAtLeast(0L)
@@ -117,10 +119,11 @@ fun BatchCompressBottomSheet(
                         color = InkPrimary
                     )
                     Text(
-                        text = if (skippedVideoCount > 0) {
-                            "${imageTargets.size} 张可压缩照片 · 自动跳过 $skippedVideoCount 个视频"
-                        } else {
-                            "已选 ${imageTargets.size} 张照片 · 当前共 ${formatStorageSize(totalImageBytes)}"
+                        text = buildString {
+                            append("${imageTargets.size} 张可压缩照片")
+                            if (skippedVideoCount > 0) append(" · 跳过 $skippedVideoCount 个视频")
+                            if (protectedCount > 0) append(" · 保护 $protectedCount 个 Live/特殊格式")
+                            if (skippedVideoCount == 0 && protectedCount == 0) append(" · 当前共 ${formatStorageSize(totalImageBytes)}")
                         },
                         fontFamily = JetBrainsMonoFontFamily,
                         fontSize = 12.sp,

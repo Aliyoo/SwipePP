@@ -17,6 +17,34 @@ enum class MediaType {
     VIDEO
 }
 
+enum class ImageFormat {
+    JPEG,
+    PNG,
+    GIF,
+    WEBP,
+    HEIC,
+    AVIF,
+    RAW,
+    UNKNOWN
+}
+
+enum class MediaSubtype {
+    STANDARD,
+    CAMERA,
+    SCREENSHOT,
+    LONG_SCREENSHOT,
+    SCREEN_RECORD,
+    DOCUMENT,
+    CHAT_SAVE,
+    DOWNLOAD
+}
+
+enum class MotionPhotoType {
+    NONE,
+    EMBEDDED,
+    PAIRED
+}
+
 @Immutable
 @Entity(
     tableName = "photos",
@@ -33,6 +61,16 @@ data class PhotoItemEntity(
     val mediaStoreKey: String? = null, // e.g. "img_1024" or "vid_2048" for idempotent MediaStore sync
     val mediaType: String = MediaType.IMAGE.name,
     val durationMs: Long = 0L,
+    val mimeType: String? = null,
+    val imageFormat: String = ImageFormat.UNKNOWN.name,
+    val mediaSubtype: String = MediaSubtype.STANDARD.name,
+    val isAnimated: Boolean = false,
+    val motionPhotoType: String = MotionPhotoType.NONE.name,
+    val motionVideoUri: String? = null,
+    val motionVideoDurationMs: Long = 0L,
+    val motionVideoOffset: Long? = null,
+    val motionVideoLength: Long? = null,
+    val pairedMediaStoreKey: String? = null,
     val year: Int,
     val month: Int, // 1..12
     val day: Int,   // 1..31
@@ -69,11 +107,52 @@ data class PhotoItemEntity(
 
     val isVideo: Boolean
         get() = mediaType == MediaType.VIDEO.name
+
+    val imageFormatKind: ImageFormat
+        get() = ImageFormat.entries.firstOrNull { it.name == imageFormat } ?: ImageFormat.UNKNOWN
+
+    val mediaSubtypeKind: MediaSubtype
+        get() = MediaSubtype.entries.firstOrNull { it.name == mediaSubtype } ?: MediaSubtype.STANDARD
+
+    val motionPhotoKind: MotionPhotoType
+        get() = MotionPhotoType.entries.firstOrNull { it.name == motionPhotoType } ?: MotionPhotoType.NONE
+
+    val isLivePhoto: Boolean
+        get() = !isVideo && motionPhotoKind != MotionPhotoType.NONE && !motionVideoUri.isNullOrBlank()
+
+    val physicalMediaUris: List<String>
+        get() = buildList {
+            contentUri?.takeIf { it.isNotBlank() }?.let { add(it) }
+            if (motionPhotoKind == MotionPhotoType.PAIRED) {
+                motionVideoUri?.takeIf { it.isNotBlank() && it != contentUri }?.let { add(it) }
+            }
+        }
 }
 
 data class DeviceMediaKeyRow(
     val id: Long,
     val mediaStoreKey: String?
+)
+
+data class DeviceMediaSyncRow(
+    val id: Long,
+    val mediaStoreKey: String?,
+    val durationMs: Long,
+    val mimeType: String?,
+    val imageFormat: String,
+    val mediaSubtype: String,
+    val isAnimated: Boolean,
+    val motionPhotoType: String,
+    val motionVideoUri: String?,
+    val motionVideoDurationMs: Long,
+    val motionVideoOffset: Long?,
+    val motionVideoLength: Long?,
+    val pairedMediaStoreKey: String?,
+    val fileSizeBytes: Long,
+    val widthPx: Int,
+    val heightPx: Int,
+    val caption: String,
+    val bucketName: String?
 )
 
 data class LocationBatchUpdate(

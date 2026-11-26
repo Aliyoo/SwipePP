@@ -111,9 +111,43 @@ class LocalMediaScanner(private val context: Context) {
 
         val rawImages = queryImages()
         val rawVideos = queryVideos()
+        val pairing = pairLivePhotoItems(rawImages, rawVideos)
+        val motionAwareImages = detectEmbeddedMotionPhotos(pairing.images)
 
-        val groupedImages = assignBurstGroups(rawImages)
-        (groupedImages + rawVideos).sortedByDescending { it.takenAtMillis }
+        val groupedImages = assignBurstGroups(motionAwareImages)
+        val visibleVideos = rawVideos.map { it.photo }.filter { video ->
+            video.mediaStoreKey !in pairing.consumedVideoKeys
+        }
+        (groupedImages + visibleVideos).sortedByDescending { it.takenAtMillis }
+    }
+
+    private fun detectEmbeddedMotionPhotos(images: List<PhotoItemEntity>): List<PhotoItemEntity> {
+        val detector = EmbeddedMotionPhotoDetector(context)
+        return images.map { image ->
+            if (image.motionPhotoKind != MotionPhotoType.NONE) {
+                image
+            } else {
+                val info = detector.detect(
+                    contentUri = image.contentUri.orEmpty(),
+                    mimeType = image.mimeType,
+                    displayName = image.caption + ".jpg",
+                    fileSizeBytes = image.fileSizeBytes
+                )
+                if (info == null) {
+                    image
+                } else {
+                    image.copy(
+                        isAnimated = true,
+                        motionPhotoType = MotionPhotoType.EMBEDDED.name,
+                        motionVideoUri = image.contentUri,
+                        motionVideoDurationMs = 0L,
+                        motionVideoOffset = info.videoOffset,
+                        motionVideoLength = info.videoLength,
+                        pairedMediaStoreKey = null
+                    )
+                }
+            }
+        }
     }
 
     /**
@@ -139,11 +173,12 @@ class LocalMediaScanner(private val context: Context) {
         )
     }
 
-    private fun queryImages(): List<PhotoItemEntity> {
-        val results = mutableListOf<PhotoItemEntity>()
+    private fun queryImages(): List<ScannedMediaItem> {
+        val results = mutableListOf<ScannedMediaItem>()
         val projection = buildList {
             add(MediaStore.Images.Media._ID)
             add(MediaStore.Images.Media.DISPLAY_NAME)
+            add(MediaStore.Images.Media.MIME_TYPE)
             add(MediaStore.Images.Media.DATE_TAKEN)
             add(MediaStore.Images.Media.DATE_ADDED)
             add(MediaStore.Images.Media.SIZE)
@@ -169,6 +204,7 @@ class LocalMediaScanner(private val context: Context) {
             )?.use { cursor ->
                 val idCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
                 val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+                val mimeCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.MIME_TYPE)
                 val takenCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_TAKEN)
                 val addedCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
                 val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
@@ -184,7 +220,10 @@ class LocalMediaScanner(private val context: Context) {
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(idCol)
                     val contentUri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
-                    val name = cursor.getString(nameCol).orEmpty().substringBeforeLast('.')
+                    val displayName = cursor.getString(nameCol).orEmpty()
+                    val mimeType = cursor.getString(mimeCol)
+                    val imageFormat = resolveImageFormat(mimeType, displayName)
+                    val name = displayName.substringBeforeLast('.')
                     val rawTaken = cursor.getLong(takenCol)
                     val dateAddedSec = cursor.getLong(addedCol)
                     val takenAt = when {
@@ -220,32 +259,48 @@ class LocalMediaScanner(private val context: Context) {
                     val quality = ((mp * 3.2).toInt().coerceIn(45, 68) +
                         ((size / 1_000_000.0) * 5.5).toInt().coerceIn(8, 28)).coerceIn(58, 98)
 
-                    results += PhotoItemEntity(
-                        mediaStoreKey = "img_$id",
-                        mediaType = MediaType.IMAGE.name,
-                        durationMs = 0L,
-                        year = cal.get(Calendar.YEAR),
-                        month = cal.get(Calendar.MONTH) + 1,
-                        day = cal.get(Calendar.DAY_OF_MONTH),
-                        takenAtMillis = takenAt,
-                        fileSizeBytes = size,
+                    val mediaSubtype = classifyMediaSubtype(
+                        bucketName = bucket,
+                        displayName = displayName,
                         widthPx = width,
                         heightPx = height,
-                        drawableName = null,
-                        contentUri = contentUri.toString(),
-                        status = PhotoStatus.UNREVIEWED.name,
-                        isFavorite = false,
-                        burstGroupId = null,
-                        qualityScore = quality,
-                        isBestInStack = false,
-                        visualVariant = "CRISP",
-                        caption = name.ifBlank { "本地照片" },
-                        bucketName = bucket,
-                        locationName = locationLabel,
-                        latitude = lat,
-                        longitude = lon,
-                        isSample = false,
-                        gpsScanned = hasLegacyGps
+                        isVideo = false
+                    )
+                    val animated = isAnimatedImageContent(contentUri, imageFormat)
+
+                    results += ScannedMediaItem(
+                        photo = PhotoItemEntity(
+                            mediaStoreKey = "img_$id",
+                            mediaType = MediaType.IMAGE.name,
+                            durationMs = 0L,
+                            mimeType = mimeType,
+                            imageFormat = imageFormat.name,
+                            mediaSubtype = mediaSubtype.name,
+                            isAnimated = animated,
+                            year = cal.get(Calendar.YEAR),
+                            month = cal.get(Calendar.MONTH) + 1,
+                            day = cal.get(Calendar.DAY_OF_MONTH),
+                            takenAtMillis = takenAt,
+                            fileSizeBytes = size,
+                            widthPx = width,
+                            heightPx = height,
+                            drawableName = null,
+                            contentUri = contentUri.toString(),
+                            status = PhotoStatus.UNREVIEWED.name,
+                            isFavorite = false,
+                            burstGroupId = null,
+                            qualityScore = quality,
+                            isBestInStack = false,
+                            visualVariant = "CRISP",
+                            caption = name.ifBlank { "本地照片" },
+                            bucketName = bucket,
+                            locationName = locationLabel,
+                            latitude = lat,
+                            longitude = lon,
+                            isSample = false,
+                            gpsScanned = hasLegacyGps
+                        ),
+                        displayName = displayName
                     )
                 }
             }
@@ -253,11 +308,12 @@ class LocalMediaScanner(private val context: Context) {
         return results
     }
 
-    private fun queryVideos(): List<PhotoItemEntity> {
-        val results = mutableListOf<PhotoItemEntity>()
+    private fun queryVideos(): List<ScannedMediaItem> {
+        val results = mutableListOf<ScannedMediaItem>()
         val projection = buildList {
             add(MediaStore.Video.Media._ID)
             add(MediaStore.Video.Media.DISPLAY_NAME)
+            add(MediaStore.Video.Media.MIME_TYPE)
             add(MediaStore.Video.Media.DATE_TAKEN)
             add(MediaStore.Video.Media.DATE_ADDED)
             add(MediaStore.Video.Media.SIZE)
@@ -284,6 +340,7 @@ class LocalMediaScanner(private val context: Context) {
             )?.use { cursor ->
                 val idCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
                 val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+                val mimeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.MIME_TYPE)
                 val takenCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_TAKEN)
                 val addedCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
                 val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
@@ -300,7 +357,9 @@ class LocalMediaScanner(private val context: Context) {
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(idCol)
                     val contentUri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
-                    val name = cursor.getString(nameCol).orEmpty().substringBeforeLast('.')
+                    val displayName = cursor.getString(nameCol).orEmpty()
+                    val mimeType = cursor.getString(mimeCol)
+                    val name = displayName.substringBeforeLast('.')
                     val rawTaken = cursor.getLong(takenCol)
                     val dateAddedSec = cursor.getLong(addedCol)
                     val takenAt = when {
@@ -332,37 +391,65 @@ class LocalMediaScanner(private val context: Context) {
                         }
                     }
 
-                    results += PhotoItemEntity(
-                        mediaStoreKey = "vid_$id",
-                        mediaType = MediaType.VIDEO.name,
-                        durationMs = duration,
-                        year = cal.get(Calendar.YEAR),
-                        month = cal.get(Calendar.MONTH) + 1,
-                        day = cal.get(Calendar.DAY_OF_MONTH),
-                        takenAtMillis = takenAt,
-                        fileSizeBytes = size,
+                    val mediaSubtype = classifyMediaSubtype(
+                        bucketName = bucket,
+                        displayName = displayName,
                         widthPx = width,
                         heightPx = height,
-                        drawableName = null,
-                        contentUri = contentUri.toString(),
-                        status = PhotoStatus.UNREVIEWED.name,
-                        isFavorite = false,
-                        burstGroupId = null,
-                        qualityScore = 90,
-                        isBestInStack = false,
-                        visualVariant = "CRISP",
-                        caption = name.ifBlank { "本地视频" },
-                        bucketName = bucket,
-                        locationName = locationLabel,
-                        latitude = lat,
-                        longitude = lon,
-                        isSample = false,
-                        gpsScanned = hasLegacyGps
+                        isVideo = true
+                    )
+
+                    results += ScannedMediaItem(
+                        photo = PhotoItemEntity(
+                            mediaStoreKey = "vid_$id",
+                            mediaType = MediaType.VIDEO.name,
+                            durationMs = duration,
+                            mimeType = mimeType,
+                            imageFormat = ImageFormat.UNKNOWN.name,
+                            mediaSubtype = mediaSubtype.name,
+                            isAnimated = false,
+                            year = cal.get(Calendar.YEAR),
+                            month = cal.get(Calendar.MONTH) + 1,
+                            day = cal.get(Calendar.DAY_OF_MONTH),
+                            takenAtMillis = takenAt,
+                            fileSizeBytes = size,
+                            widthPx = width,
+                            heightPx = height,
+                            drawableName = null,
+                            contentUri = contentUri.toString(),
+                            status = PhotoStatus.UNREVIEWED.name,
+                            isFavorite = false,
+                            burstGroupId = null,
+                            qualityScore = 90,
+                            isBestInStack = false,
+                            visualVariant = "CRISP",
+                            caption = name.ifBlank { "本地视频" },
+                            bucketName = bucket,
+                            locationName = locationLabel,
+                            latitude = lat,
+                            longitude = lon,
+                            isSample = false,
+                            gpsScanned = hasLegacyGps
+                        ),
+                        displayName = displayName
                     )
                 }
             }
         }
         return results
+    }
+
+    private fun isAnimatedImageContent(contentUri: Uri, format: ImageFormat): Boolean {
+        if (format == ImageFormat.GIF) return true
+        if (format != ImageFormat.WEBP) return false
+        val header = runCatching {
+            context.contentResolver.openInputStream(contentUri)?.use { input ->
+                val buffer = ByteArray(128)
+                val count = input.read(buffer)
+                if (count > 0) buffer.copyOf(count) else byteArrayOf()
+            }
+        }.getOrNull() ?: return false
+        return isPotentiallyAnimatedImage(format, header)
     }
 
     private fun readExifGps(uri: Uri): Pair<Double, Double>? {
@@ -529,23 +616,28 @@ class LocalMediaScanner(private val context: Context) {
 
             for (index in photos.indices) {
                 val photo = photos[index]
-                if (photo.isSample || photo.contentUri.isNullOrBlank() || !photo.contentUri.startsWith("content://")) {
+                val physicalUris = photo.physicalMediaUris
+                if (photo.isSample || physicalUris.isEmpty() || physicalUris.any { !it.startsWith("content://") }) {
                     deleted += photo
                     continue
                 }
-                val uri = runCatching { Uri.parse(photo.contentUri) }.getOrNull()
-                if (uri == null) {
+                val uris = physicalUris.mapNotNull { runCatching { Uri.parse(it) }.getOrNull() }
+                if (uris.size != physicalUris.size) {
                     failed += photo
                     lastReason = "无效的文件路径"
                     continue
                 }
+                var deletedRows = 0
+                var itemFailureReason: String? = null
                 try {
-                    val rows = resolver.delete(uri, null, null)
-                    if (rows > 0) {
+                    for (uri in uris.distinct()) {
+                        deletedRows += resolver.delete(uri, null, null)
+                    }
+                    if (deletedRows >= uris.distinct().size) {
                         deleted += photo
                     } else {
                         failed += photo
-                        lastReason = "系统未删除该文件（可能已被移动或受保护）"
+                        lastReason = "系统未完整删除该媒体组（可能已被移动或受保护）"
                     }
                 } catch (sec: SecurityException) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && sec is RecoverableSecurityException) {
@@ -558,12 +650,14 @@ class LocalMediaScanner(private val context: Context) {
                             remainingUnprocessedPhotos = remaining
                         )
                     } else {
-                        failed += photo
-                        lastReason = "缺少删除权限，部分文件受系统保护"
+                        itemFailureReason = "缺少删除权限，部分文件受系统保护"
                     }
                 } catch (t: Throwable) {
+                    itemFailureReason = t.localizedMessage?.take(48) ?: "文件删除失败"
+                }
+                if (itemFailureReason != null) {
                     failed += photo
-                    lastReason = t.localizedMessage?.take(48) ?: "文件删除失败"
+                    lastReason = itemFailureReason
                 }
             }
 

@@ -65,7 +65,8 @@ data class BatchCompressionResult(
     val compressedUpdates: List<CompressedPhotoUpdate>,
     val skippedAlreadyOptimalCount: Int,
     val skippedVideoCount: Int,
-    val failedCount: Int
+    val failedCount: Int,
+    val skippedProtectedCount: Int = 0
 ) {
     val totalSavedBytes: Long
         get() = compressedUpdates.sumOf { it.savedBytes }
@@ -165,6 +166,17 @@ fun inferSameDayLocations(
     return matches
 }
 
+fun isSafelyCompressibleImage(photo: PhotoItemEntity): Boolean {
+    if (photo.isVideo || photo.isLivePhoto || photo.isAnimated) return false
+    if (photo.isSample) return true
+    return photo.imageFormatKind == ImageFormat.JPEG ||
+        (photo.imageFormatKind == ImageFormat.UNKNOWN && photo.mimeType?.equals("image/jpeg", ignoreCase = true) == true)
+}
+
+fun isDirectExifWritableImage(photo: PhotoItemEntity): Boolean {
+    return isSafelyCompressibleImage(photo) && !photo.isSample
+}
+
 /**
  * Handles scoped-storage safe batch image near-lossless compression (preserving EXIF),
  * batch EXIF GPS writing, and forward geocoding for manual location tagging.
@@ -174,7 +186,7 @@ class BatchMediaEditor(private val context: Context) {
     fun buildSystemWritePendingIntent(photos: List<PhotoItemEntity>): PendingIntent? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
         val uris = photos
-            .filter { !it.isSample && !it.isVideo && !it.contentUri.isNullOrBlank() && it.contentUri.startsWith("content://") }
+            .filter { isDirectExifWritableImage(it) && !it.contentUri.isNullOrBlank() && it.contentUri.startsWith("content://") }
             .map { Uri.parse(it.contentUri) }
             .distinct()
         if (uris.isEmpty()) return null
@@ -188,8 +200,9 @@ class BatchMediaEditor(private val context: Context) {
         preset: CompressionPreset,
         onProgress: (processed: Int, total: Int, savedBytesSoFar: Long) -> Unit
     ): BatchCompressionResult = withContext(Dispatchers.IO) {
-        val imageTargets = photos.filter { !it.isVideo }
-        val skippedVideos = photos.size - imageTargets.size
+        val imageTargets = photos.filter { !it.isVideo && isSafelyCompressibleImage(it) }
+        val skippedVideos = photos.count { it.isVideo }
+        val skippedProtected = photos.count { !it.isVideo && !isSafelyCompressibleImage(it) }
         val updates = ArrayList<CompressedPhotoUpdate>(imageTargets.size)
         var skippedOptimal = 0
         var failed = 0
@@ -221,7 +234,8 @@ class BatchMediaEditor(private val context: Context) {
             compressedUpdates = updates,
             skippedAlreadyOptimalCount = skippedOptimal,
             skippedVideoCount = skippedVideos,
-            failedCount = failed
+            failedCount = failed,
+            skippedProtectedCount = skippedProtected
         )
     }
 
@@ -234,8 +248,7 @@ class BatchMediaEditor(private val context: Context) {
         onProgress: (processed: Int, total: Int) -> Unit = { _, _ -> }
     ): Int = withContext(Dispatchers.IO) {
         val realImages = updates.filter { (photo, loc) ->
-            !photo.isSample &&
-                !photo.isVideo &&
+            isDirectExifWritableImage(photo) &&
                 !photo.contentUri.isNullOrBlank() &&
                 photo.contentUri.startsWith("content://") &&
                 loc.latitude != null &&
@@ -530,6 +543,15 @@ class BatchMediaEditor(private val context: Context) {
                 val newCopy = photo.copy(
                     id = 0,
                     mediaStoreKey = newMediaKey,
+                    mimeType = "image/jpeg",
+                    imageFormat = ImageFormat.JPEG.name,
+                    isAnimated = false,
+                    motionPhotoType = MotionPhotoType.NONE.name,
+                    motionVideoUri = null,
+                    motionVideoDurationMs = 0L,
+                    motionVideoOffset = null,
+                    motionVideoLength = null,
+                    pairedMediaStoreKey = null,
                     contentUri = newUri.toString(),
                     fileSizeBytes = compressedBytes,
                     widthPx = finalW,

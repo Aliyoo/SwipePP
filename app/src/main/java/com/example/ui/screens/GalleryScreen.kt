@@ -74,6 +74,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.CompressionPreset
+import com.example.data.ImageFormat
+import com.example.data.MediaSubtype
 import com.example.data.PhotoItemEntity
 import com.example.data.ResolvedGeoLocation
 import com.example.data.SameDayLocationMatch
@@ -232,6 +234,13 @@ private fun GalleryDecoJumpTag(
 // 方章按钮收敛到共享组件 com.example.ui.components.DecoSealButton（deco-app.html SealBtn）
 
 
+private inline fun GalleryEntry.anyPhoto(predicate: (PhotoItemEntity) -> Boolean): Boolean {
+    return when (this) {
+        is GalleryEntry.Single -> predicate(photo)
+        is GalleryEntry.Burst -> photos.any(predicate)
+    }
+}
+
 internal fun filterGalleryEntriesBySmartAndAlbum(
     allEntries: List<GalleryEntry>,
     smartFilter: GallerySmartFilter,
@@ -256,6 +265,16 @@ internal fun filterGalleryEntriesBySmartAndAlbum(
                 is GalleryEntry.Burst ->
                     entry.photos.any { it.locationName.isNullOrBlank() || it.latitude == null || it.longitude == null }
             }
+        }
+        GallerySmartFilter.LIVE_PHOTOS -> allEntries.filter { entry -> entry.anyPhoto { it.isLivePhoto } }
+        GallerySmartFilter.ANIMATED_IMAGES -> allEntries.filter { entry -> entry.anyPhoto { it.isAnimated } }
+        GallerySmartFilter.SCREENSHOTS -> allEntries.filter { entry ->
+            entry.anyPhoto {
+                it.mediaSubtypeKind in setOf(MediaSubtype.SCREENSHOT, MediaSubtype.LONG_SCREENSHOT, MediaSubtype.SCREEN_RECORD)
+            }
+        }
+        GallerySmartFilter.SPECIAL_FORMATS -> allEntries.filter { entry ->
+            entry.anyPhoto { it.imageFormatKind in setOf(ImageFormat.HEIC, ImageFormat.AVIF, ImageFormat.RAW) }
         }
     }
     return if (selectedAlbum == null) {
@@ -415,6 +434,25 @@ fun GalleryScreen(
                 is GalleryEntry.Burst ->
                     entry.photos.any { it.locationName.isNullOrBlank() || it.latitude == null || it.longitude == null }
             }
+        }
+    }
+
+    val livePhotoEntries = remember(allEntries) {
+        allEntries.filter { entry -> entry.anyPhoto { it.isLivePhoto } }
+    }
+    val animatedImageEntries = remember(allEntries) {
+        allEntries.filter { entry -> entry.anyPhoto { it.isAnimated } }
+    }
+    val screenshotEntries = remember(allEntries) {
+        allEntries.filter { entry ->
+            entry.anyPhoto {
+                it.mediaSubtypeKind in setOf(MediaSubtype.SCREENSHOT, MediaSubtype.LONG_SCREENSHOT, MediaSubtype.SCREEN_RECORD)
+            }
+        }
+    }
+    val specialFormatEntries = remember(allEntries) {
+        allEntries.filter { entry ->
+            entry.anyPhoto { it.imageFormatKind in setOf(ImageFormat.HEIC, ImageFormat.AVIF, ImageFormat.RAW) }
         }
     }
 
@@ -770,13 +808,21 @@ fun GalleryScreen(
                                 val quickSmartChoices = remember(
                                     burstEntries.size,
                                     largePhotoEntries.size,
-                                    missingLocationEntries.size
+                                    missingLocationEntries.size,
+                                    livePhotoEntries.size,
+                                    animatedImageEntries.size,
+                                    screenshotEntries.size,
+                                    specialFormatEntries.size
                                 ) {
                                     buildList {
                                         add(GallerySmartFilter.ALL to "全部")
                                         if (burstEntries.isNotEmpty()) add(GallerySmartFilter.BURSTS to "连拍组 (${burstEntries.size})")
                                         if (largePhotoEntries.isNotEmpty()) add(GallerySmartFilter.LARGE_PHOTOS to "大图 (${largePhotoEntries.size})")
                                         if (missingLocationEntries.isNotEmpty()) add(GallerySmartFilter.MISSING_LOCATION to "缺定位 (${missingLocationEntries.size})")
+                                        if (livePhotoEntries.isNotEmpty()) add(GallerySmartFilter.LIVE_PHOTOS to "Live (${livePhotoEntries.size})")
+                                        if (animatedImageEntries.isNotEmpty()) add(GallerySmartFilter.ANIMATED_IMAGES to "动图 (${animatedImageEntries.size})")
+                                        if (screenshotEntries.isNotEmpty()) add(GallerySmartFilter.SCREENSHOTS to "截图/录屏 (${screenshotEntries.size})")
+                                        if (specialFormatEntries.isNotEmpty()) add(GallerySmartFilter.SPECIAL_FORMATS to "HEIC/RAW (${specialFormatEntries.size})")
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
@@ -879,6 +925,10 @@ fun GalleryScreen(
                                         smartFilter == GallerySmartFilter.BURSTS -> DecoIconKind.BURST
                                         smartFilter == GallerySmartFilter.LARGE_PHOTOS -> DecoIconKind.COMPRESS
                                         smartFilter == GallerySmartFilter.MISSING_LOCATION -> DecoIconKind.LOCATION_OFF
+                                        smartFilter == GallerySmartFilter.LIVE_PHOTOS -> DecoIconKind.PLAY
+                                        smartFilter == GallerySmartFilter.ANIMATED_IMAGES -> DecoIconKind.BOLT
+                                        smartFilter == GallerySmartFilter.SCREENSHOTS -> DecoIconKind.PHONE
+                                        smartFilter == GallerySmartFilter.SPECIAL_FORMATS -> DecoIconKind.PHOTO
                                         else -> DecoIconKind.PHOTO_LIBRARY
                                     },
                                     color = DecoGold,
@@ -894,6 +944,10 @@ fun GalleryScreen(
                                 smartFilter == GallerySmartFilter.BURSTS -> "当前没有待展开的连拍组"
                                 smartFilter == GallerySmartFilter.LARGE_PHOTOS -> "暂未发现大于 3 MB 的高体积照片"
                                 smartFilter == GallerySmartFilter.MISSING_LOCATION -> "全部媒体均已拥有定位"
+                                smartFilter == GallerySmartFilter.LIVE_PHOTOS -> "暂未识别到 Live 图"
+                                smartFilter == GallerySmartFilter.ANIMATED_IMAGES -> "暂未识别到动图"
+                                smartFilter == GallerySmartFilter.SCREENSHOTS -> "暂未识别到截图或录屏"
+                                smartFilter == GallerySmartFilter.SPECIAL_FORMATS -> "暂未识别到 HEIC/AVIF/RAW 原片"
                                 else -> "画廊暂无照片与视频"
                             },
                             style = MaterialTheme.typography.headlineMedium,
@@ -1166,6 +1220,10 @@ fun GalleryScreen(
             burstCount = burstEntries.size,
             largePhotoCount = largePhotoEntries.size,
             missingLocationCount = missingLocationEntries.size,
+            livePhotoCount = livePhotoEntries.size,
+            animatedImageCount = animatedImageEntries.size,
+            screenshotCount = screenshotEntries.size,
+            specialFormatCount = specialFormatEntries.size,
             allBurstsExpanded = allBurstsExpanded,
             onSelectSmartFilter = { smartFilter = it },
             onSelectAlbum = { selectedAlbumFilter = it },

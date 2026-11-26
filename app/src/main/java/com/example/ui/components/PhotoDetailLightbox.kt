@@ -60,6 +60,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,6 +89,8 @@ import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.example.data.ImageDownsampleTier
+import com.example.data.MediaType
+import com.example.data.MotionPhotoPlaybackResolver
 import com.example.data.PhotoItemEntity
 import com.example.data.PhotoStatus
 import com.example.sensor.rememberHapticEngine
@@ -104,7 +107,9 @@ import com.example.ui.theme.EmeraldKeep
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.ObsidianOverlayGlass
 import com.example.ui.theme.SolarAmber
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /**
@@ -477,9 +482,35 @@ private fun PhotoDetailLightboxContent(
                         }
                     }
             ) {
-                if (pagePhoto.isVideo) {
+                val livePlaybackUri by produceState<String?>(
+                    initialValue = null,
+                    pagePhoto.contentUri,
+                    pagePhoto.motionVideoUri,
+                    pagePhoto.motionPhotoType
+                ) {
+                    if (!pagePhoto.isLivePhoto) {
+                        value = null
+                    } else {
+                        value = withContext(Dispatchers.IO) {
+                            MotionPhotoPlaybackResolver.resolvePlaybackUri(context, pagePhoto)
+                        }
+                    }
+                }
+                val liveVideoPhoto = remember(pagePhoto, livePlaybackUri) {
+                    livePlaybackUri?.let { uri ->
+                        pagePhoto.copy(
+                            mediaType = MediaType.VIDEO.name,
+                            durationMs = pagePhoto.motionVideoDurationMs,
+                            contentUri = uri,
+                            mimeType = "video/mp4"
+                        )
+                    }
+                }
+                val playableVideoPhoto = if (pagePhoto.isVideo) pagePhoto else liveVideoPhoto
+
+                if (playableVideoPhoto != null) {
                     InlineVideoPlayer(
-                        photo = pagePhoto,
+                        photo = playableVideoPhoto,
                         playWhenReady = isCurrentPage,
                         initialMuted = false,
                         fillCrop = false,
