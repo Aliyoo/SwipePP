@@ -93,6 +93,18 @@ class SmartContentTaggingTest {
     }
 
     @Test
+    fun compoundPetQueriesHitPetTags() {
+        val entries = listOf(
+            GalleryEntry.Single(photo(1, labels = "PET", caption = "")),
+            GalleryEntry.Single(photo(2, labels = "CITY", caption = ""))
+        )
+        val cats = filterGalleryEntriesBySearch(entries, TimelineSearchQuery(keyword = "猫咪"))
+        assertEquals(1, cats.size)
+        val dogs = filterGalleryEntriesBySearch(entries, TimelineSearchQuery(keyword = "狗狗"))
+        assertEquals(1, dogs.size)
+    }
+
+    @Test
     fun extractionSurfacesSmartCategoriesByFrequency() {
         val entries = listOf(
             GalleryEntry.Single(photo(1, labels = "FOOD", caption = "")),

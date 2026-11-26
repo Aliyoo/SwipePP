@@ -33,7 +33,7 @@ enum class SmartCategory(
     PET(
         "PET", "宠物",
         listOf("dog", "cat", "pet", "puppy", "kitten"),
-        listOf("宠物", "猫", "狗", "喵", "汪")
+        listOf("宠物", "猫", "狗", "喵", "汪", "猫咪", "狗狗", "小猫", "小狗", "猫猫")
     ),
     ANIMAL(
         "ANIMAL", "动物",
