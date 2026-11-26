@@ -346,7 +346,7 @@ internal fun ModernArcSwipeCard(
                     .clip(RoundedCornerShape(2.dp))
                     .border(1.dp, decoGold.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
             ) {
-                if (item.primaryPhoto.isVideo && isFocused) {
+                if (item.primaryPhoto.isVideo && isFocused && isVideoPlaybackActive) {
                     InlineVideoPlayer(
                         photo = item.primaryPhoto,
                         playWhenReady = isVideoPlaybackActive,

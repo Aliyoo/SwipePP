@@ -141,6 +141,9 @@ fun InlineVideoPlayer(
 
     // Sync external playWhenReady (e.g. when Arc Cleaner card scrolls in/out of focus)
     LaunchedEffect(exoPlayer, playWhenReady) {
+        if (playWhenReady && exoPlayer.playbackState == Player.STATE_IDLE) {
+            exoPlayer.prepare()
+        }
         exoPlayer.playWhenReady = playWhenReady
         if (!playWhenReady) {
             exoPlayer.pause()
@@ -500,7 +503,11 @@ fun InlineVideoPlayer(
                         DecoVideoInkOrb(
                             iconKind = DecoIconKind.FULLSCREEN,
                             contentDescription = "全屏播放",
-                            onClick = onOpenFullscreen,
+                            onClick = {
+                                exoPlayer.pause()
+                                exoPlayer.stop()
+                                onOpenFullscreen()
+                            },
                             size = 44.dp,
                             iconSize = 18.dp,
                             modifier = Modifier.testTag("card_video_fullscreen_button")
