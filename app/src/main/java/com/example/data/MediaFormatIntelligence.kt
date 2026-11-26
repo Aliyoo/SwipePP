@@ -221,10 +221,28 @@ internal fun scanSamsungFooterInfo(tailBytes: ByteArray, fileSizeBytes: Long): E
             val blockLength = readLittleEndianInt(tailBytes, entryOffset + 8).toLong()
             val blockStart = footerAbsoluteStart - offsetBack
             val headerLength = 8L + "MotionPhoto_Data".encodeToByteArray().size
-            val videoOffset = blockStart + headerLength
-            val videoLength = blockLength - headerLength
-            if (blockStart >= 0L && videoLength >= 32L && videoOffset + videoLength <= fileSizeBytes) {
-                return EmbeddedMotionInfo(videoOffset = videoOffset, videoLength = videoLength)
+            val payloadStart = blockStart + headerLength
+            val payloadLength = blockLength - headerLength
+            val tailAbsoluteStart = fileSizeBytes - tailBytes.size
+            val payloadStartInTail = payloadStart - tailAbsoluteStart
+
+            if (payloadLength == 12L && payloadStartInTail >= 0L && payloadStartInTail + 12L <= tailBytes.size) {
+                val pointerOffset = payloadStartInTail.toInt()
+                val isMpv2Pointer = tailBytes[pointerOffset] == 'm'.code.toByte() &&
+                    tailBytes[pointerOffset + 1] == 'p'.code.toByte() &&
+                    tailBytes[pointerOffset + 2] == 'v'.code.toByte() &&
+                    tailBytes[pointerOffset + 3] == '2'.code.toByte()
+                if (isMpv2Pointer) {
+                    val videoOffset = readBigEndianInt(tailBytes, pointerOffset + 4).toLong() and 0xffffffffL
+                    val videoLength = readBigEndianInt(tailBytes, pointerOffset + 8).toLong() and 0xffffffffL
+                    if (videoOffset > 0L && videoLength >= 32L && videoOffset + videoLength <= fileSizeBytes) {
+                        return EmbeddedMotionInfo(videoOffset = videoOffset, videoLength = videoLength)
+                    }
+                }
+            }
+
+            if (blockStart >= 0L && payloadLength >= 32L && payloadStart + payloadLength <= fileSizeBytes) {
+                return EmbeddedMotionInfo(videoOffset = payloadStart, videoLength = payloadLength)
             }
         }
         entryOffset += 12
@@ -292,11 +310,9 @@ class EmbeddedMotionPhotoDetector(private val context: Context) {
 
         val strictMotionFilename = isMotionPhotoFilenameCandidate(displayName)
         val uri = runCatching { Uri.parse(contentUri) }.getOrNull() ?: return null
-        if (format == ImageFormat.JPEG) {
-            readTailBytes(uri, fileSizeBytes, FOOTER_SCAN_BYTES)?.let { footerBytes ->
-                scanSamsungFooterInfo(footerBytes, fileSizeBytes)?.let { info ->
-                    if (hasMp4HeaderAt(uri, info.videoOffset)) return info
-                }
+        readTailBytes(uri, fileSizeBytes, FOOTER_SCAN_BYTES)?.let { footerBytes ->
+            scanSamsungFooterInfo(footerBytes, fileSizeBytes)?.let { info ->
+                if (hasMp4HeaderAt(uri, info.videoOffset)) return info
             }
         }
 

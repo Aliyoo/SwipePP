@@ -253,6 +253,68 @@ class MediaFormatIntelligenceTest {
     }
 
     @Test
+    fun samsungFooterParser_resolvesHeicMpv2Pointer() {
+        fun putLe(bytes: ByteArray, offset: Int, value: Int) {
+            bytes[offset] = value.toByte()
+            bytes[offset + 1] = (value ushr 8).toByte()
+            bytes[offset + 2] = (value ushr 16).toByte()
+            bytes[offset + 3] = (value ushr 24).toByte()
+        }
+        fun putBe(bytes: ByteArray, offset: Int, value: Int) {
+            bytes[offset] = (value ushr 24).toByte()
+            bytes[offset + 1] = (value ushr 16).toByte()
+            bytes[offset + 2] = (value ushr 8).toByte()
+            bytes[offset + 3] = value.toByte()
+        }
+
+        val fileSize = 10_000_000L
+        val tail = ByteArray(8_192)
+        val tailAbsoluteStart = fileSize - tail.size
+        val footerLength = 36
+        val footerStart = fileSize - footerLength - 8
+        val footerIndex = (footerStart - tailAbsoluteStart).toInt()
+        val dataBlockLength = 36L
+        val versionBlockLength = 28L
+        val blockStart = footerStart - versionBlockLength - dataBlockLength
+        val blockIndex = (blockStart - tailAbsoluteStart).toInt()
+        val videoOffset = 5_000_008
+        val videoLength = 100_000
+
+        tail[blockIndex] = 0x00
+        tail[blockIndex + 1] = 0x00
+        tail[blockIndex + 2] = 0x30
+        tail[blockIndex + 3] = 0x0a
+        putLe(tail, blockIndex + 4, 16)
+        "MotionPhoto_Data".encodeToByteArray().copyInto(tail, destinationOffset = blockIndex + 8)
+        val pointerIndex = blockIndex + 24
+        "mpv2".encodeToByteArray().copyInto(tail, destinationOffset = pointerIndex)
+        putBe(tail, pointerIndex + 4, videoOffset)
+        putBe(tail, pointerIndex + 8, videoLength)
+
+        "SEFH".encodeToByteArray().copyInto(tail, destinationOffset = footerIndex)
+        putLe(tail, footerIndex + 4, 107)
+        putLe(tail, footerIndex + 8, 2)
+        tail[footerIndex + 12] = 0x00
+        tail[footerIndex + 13] = 0x00
+        tail[footerIndex + 14] = 0x30
+        tail[footerIndex + 15] = 0x0a
+        putLe(tail, footerIndex + 16, 64)
+        putLe(tail, footerIndex + 20, dataBlockLength.toInt())
+        tail[footerIndex + 24] = 0x00
+        tail[footerIndex + 25] = 0x00
+        tail[footerIndex + 26] = 0x31
+        tail[footerIndex + 27] = 0x0a
+        putLe(tail, footerIndex + 28, versionBlockLength.toInt())
+        putLe(tail, footerIndex + 32, versionBlockLength.toInt())
+        putLe(tail, tail.size - 8, footerLength)
+        "SEFT".encodeToByteArray().copyInto(tail, destinationOffset = tail.size - 4)
+
+        val info = scanSamsungFooterInfo(tail, fileSize)
+        assertEquals(videoOffset.toLong(), info?.videoOffset)
+        assertEquals(videoLength.toLong(), info?.videoLength)
+    }
+
+    @Test
     fun xmpMicroVideo_isAcceptedAsMotionEvidence() {
         val xmp = "<rdf:Description GCamera:MicroVideo=\"1\" GCamera:MicroVideoVersion=\"1\"/>"
         assertTrue(xmpIndicatesMotionPhoto(xmp))
