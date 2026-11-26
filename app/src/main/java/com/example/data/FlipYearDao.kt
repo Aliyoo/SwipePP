@@ -99,6 +99,9 @@ interface FlipYearDao {
     @Query("SELECT * FROM photo_embeddings WHERE photoId IN (:ids)")
     suspend fun getEmbeddingsForIds(ids: List<Long>): List<PhotoEmbeddingEntity>
 
+    @Query("SELECT * FROM photo_embeddings")
+    suspend fun getAllEmbeddings(): List<PhotoEmbeddingEntity>
+
     @Transaction
     suspend fun applySmartTagBatch(
         updates: List<SmartTagBatchUpdate>,

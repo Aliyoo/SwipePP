@@ -75,6 +75,22 @@ class SmartTagAnalyzer(context: Context) {
         }
 
     /**
+     * Encodes a free-text query into the shared embedding space for semantic search,
+     * serialized behind any in-flight vision inference.
+     */
+    suspend fun encodeText(query: String): FloatArray? =
+        withContext(Dispatchers.Default) {
+            clipMutex.withLock {
+                try {
+                    clipEmbedder.encodeText(query)
+                } catch (t: Throwable) {
+                    Log.w(TAG, "CLIP text encoding failed", t)
+                    null
+                }
+            }
+        }
+
+    /**
      * Decodes a downsampled bitmap for any photo row: device media (content Uri),
      * bundled sample drawables, or the first frame for videos.
      */

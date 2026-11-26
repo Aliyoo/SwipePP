@@ -47,6 +47,9 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+private const val SEMANTIC_Z_THRESHOLD = 1.5f
+private const val SEMANTIC_MATCH_CAP = 60
+
 class FlipYearViewModel(application: Application) : AndroidViewModel(application) {
 
     private val database = FlipYearDatabase.getInstance(application)
@@ -89,6 +92,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         )
     }
     private var smartTagIndexedOnce = false
+
     private var snackbarDismissJob: Job? = null
     private var pendingBatchWriteTask: PendingBatchWriteTask? = null
     private var pendingLegacyRetryPhotos: List<PhotoItemEntity> = emptyList()
@@ -456,6 +460,54 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     android.util.Log.w("FlipYearViewModel", "smart tag backfill failed", t)
                 }
             }
+        }
+    }
+
+    /**
+     * Encodes [keyword] with the cn-clip text tower and scores it against every stored image
+     * embedding. cn-clip similarity distributions are narrow and query-dependent, so matches
+     * are accepted by z-score within the library rather than an absolute threshold.
+     */
+    suspend fun computeSemanticMatches(keyword: String): Set<Long> {
+        val trimmed = keyword.trim()
+        if (trimmed.isBlank()) return emptySet()
+        return try {
+            val queryVec = smartTagAnalyzer.encodeText(trimmed) ?: return emptySet()
+            val rows = database.flipYearDao().getAllEmbeddings()
+            if (rows.isEmpty()) return emptySet()
+            val scored = ArrayList<Pair<Long, Float>>(rows.size)
+            for (row in rows) {
+                val v = com.example.data.smarttag.decodeEmbeddingFp16(row.embeddingFp16)
+                if (v.size != queryVec.size) continue
+                var dot = 0f
+                var norm = 0f
+                for (i in v.indices) {
+                    dot += queryVec[i] * v[i]
+                    norm += v[i] * v[i]
+                }
+                if (norm > 0f) {
+                    scored.add(row.photoId to dot / kotlin.math.sqrt(norm))
+                }
+            }
+            if (scored.size < 3) return emptySet()
+            var mean = 0f
+            for ((_, s) in scored) mean += s
+            mean /= scored.size
+            var variance = 0f
+            for ((_, s) in scored) variance += (s - mean) * (s - mean)
+            variance /= scored.size
+            val std = kotlin.math.sqrt(variance)
+            if (std <= 1e-6f) return emptySet()
+            val floor = mean + SEMANTIC_Z_THRESHOLD * std
+            scored.filter { it.second >= floor }
+                .sortedByDescending { it.second }
+                .take(SEMANTIC_MATCH_CAP)
+                .mapTo(HashSet()) { it.first }
+        } catch (t: Throwable) {
+            if (t !is kotlinx.coroutines.CancellationException) {
+                android.util.Log.w("FlipYearViewModel", "semantic search failed", t)
+            }
+            emptySet()
         }
     }
 
