@@ -166,8 +166,7 @@ fun InlineVideoPlayer(
                 }
                 if (state == Player.STATE_ENDED && pauseAfterCompletion && exoPlayer.playWhenReady) {
                     exoPlayer.pause()
-                    exoPlayer.seekTo(0L)
-                    positionMs = 0L
+                    positionMs = exoPlayer.duration.coerceAtLeast(exoPlayer.currentPosition).coerceAtLeast(0L)
                     isPlaying = false
                 }
             }
