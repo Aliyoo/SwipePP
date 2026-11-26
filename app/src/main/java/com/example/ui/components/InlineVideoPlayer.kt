@@ -227,7 +227,8 @@ fun InlineVideoPlayer(
                     (durationMs > 1L && positionMs >= durationMs)
                 )
             if (replayFromEnd) {
-                exoPlayer.seekTo(0L)
+                exoPlayer.stop()
+                exoPlayer.prepare()
             }
             exoPlayer.playWhenReady = true
             isPlaying = true
