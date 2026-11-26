@@ -12,6 +12,7 @@ import android.util.Log
 import androidx.core.graphics.drawable.toBitmap
 import com.example.data.PhotoItemEntity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -193,8 +194,21 @@ class SmartTagAnalyzer(context: Context) {
         return stream.use { androidx.exifinterface.media.ExifInterface(it) }
     }
 
+    /**
+     * Releases the ONNX session serialized behind any in-flight inference. Cancellation of the
+     * tagging coroutine cannot interrupt native inference, so closing eagerly from `onCleared`
+     * would free the session while it is still in use and crash the process; instead the close
+     * is queued on the same mutex the inference path holds.
+     */
     fun close() {
-        clipEmbedder.close()
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
+            clipMutex.withLock {
+                try {
+                    clipEmbedder.close()
+                } catch (_: Throwable) {
+                }
+            }
+        }
     }
 
     companion object {
