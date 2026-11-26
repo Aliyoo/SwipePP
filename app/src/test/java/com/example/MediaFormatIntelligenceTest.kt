@@ -315,6 +315,53 @@ class MediaFormatIntelligenceTest {
     }
 
     @Test
+    fun samsungFooterParser_readsMpv2PointerOutsideTailWindow() {
+        fun putLe(bytes: ByteArray, offset: Int, value: Int) {
+            bytes[offset] = value.toByte()
+            bytes[offset + 1] = (value ushr 8).toByte()
+            bytes[offset + 2] = (value ushr 16).toByte()
+            bytes[offset + 3] = (value ushr 24).toByte()
+        }
+        fun putBe(bytes: ByteArray, offset: Int, value: Int) {
+            bytes[offset] = (value ushr 24).toByte()
+            bytes[offset + 1] = (value ushr 16).toByte()
+            bytes[offset + 2] = (value ushr 8).toByte()
+            bytes[offset + 3] = value.toByte()
+        }
+
+        val fileSize = 100_000L
+        val tail = ByteArray(8_192)
+        val footerLength = 24
+        val footerIndex = tail.size - footerLength - 8
+        "SEFH".encodeToByteArray().copyInto(tail, destinationOffset = footerIndex)
+        putLe(tail, footerIndex + 4, 107)
+        putLe(tail, footerIndex + 8, 1)
+        tail[footerIndex + 12] = 0x00
+        tail[footerIndex + 13] = 0x00
+        tail[footerIndex + 14] = 0x30
+        tail[footerIndex + 15] = 0x0a
+        putLe(tail, footerIndex + 16, 20_100)
+        putLe(tail, footerIndex + 20, 36)
+        putLe(tail, tail.size - 8, footerLength)
+        "SEFT".encodeToByteArray().copyInto(tail, destinationOffset = tail.size - 4)
+
+        val videoOffset = 50_000
+        val videoLength = 20_000
+        val info = scanSamsungFooterInfo(tail, fileSize) { offset, length ->
+            assertEquals(79_892L, offset)
+            assertEquals(12, length)
+            ByteArray(12).also { pointer ->
+                "mpv2".encodeToByteArray().copyInto(pointer)
+                putBe(pointer, 4, videoOffset)
+                putBe(pointer, 8, videoLength)
+            }
+        }
+
+        assertEquals(videoOffset.toLong(), info?.videoOffset)
+        assertEquals(videoLength.toLong(), info?.videoLength)
+    }
+
+    @Test
     fun xmpMicroVideo_isAcceptedAsMotionEvidence() {
         val xmp = "<rdf:Description GCamera:MicroVideo=\"1\" GCamera:MicroVideoVersion=\"1\"/>"
         assertTrue(xmpIndicatesMotionPhoto(xmp))

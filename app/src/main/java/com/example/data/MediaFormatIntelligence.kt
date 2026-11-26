@@ -196,7 +196,11 @@ private fun lastIndexOfAscii(bytes: ByteArray, needle: String): Int {
  * detection path for One UI files: their camera filenames do not carry Google's
  * *MP.jpg hint, and the `MotionPhoto_Data` marker may be several megabytes before EOF.
  */
-internal fun scanSamsungFooterInfo(tailBytes: ByteArray, fileSizeBytes: Long): EmbeddedMotionInfo? {
+internal fun scanSamsungFooterInfo(
+    tailBytes: ByteArray,
+    fileSizeBytes: Long,
+    rangeReader: (Long, Int) -> ByteArray? = { _, _ -> null }
+): EmbeddedMotionInfo? {
     if (tailBytes.size < 32 || fileSizeBytes < tailBytes.size) return null
     if (String(tailBytes.copyOfRange(tailBytes.size - 4, tailBytes.size), Charsets.US_ASCII) != "SEFT") return null
 
@@ -226,15 +230,21 @@ internal fun scanSamsungFooterInfo(tailBytes: ByteArray, fileSizeBytes: Long): E
             val tailAbsoluteStart = fileSizeBytes - tailBytes.size
             val payloadStartInTail = payloadStart - tailAbsoluteStart
 
-            if (payloadLength == 12L && payloadStartInTail >= 0L && payloadStartInTail + 12L <= tailBytes.size) {
-                val pointerOffset = payloadStartInTail.toInt()
-                val isMpv2Pointer = tailBytes[pointerOffset] == 'm'.code.toByte() &&
-                    tailBytes[pointerOffset + 1] == 'p'.code.toByte() &&
-                    tailBytes[pointerOffset + 2] == 'v'.code.toByte() &&
-                    tailBytes[pointerOffset + 3] == '2'.code.toByte()
-                if (isMpv2Pointer) {
-                    val videoOffset = readBigEndianInt(tailBytes, pointerOffset + 4).toLong() and 0xffffffffL
-                    val videoLength = readBigEndianInt(tailBytes, pointerOffset + 8).toLong() and 0xffffffffL
+            if (payloadLength == 12L) {
+                val pointerBytes = if (payloadStartInTail >= 0L && payloadStartInTail + 12L <= tailBytes.size) {
+                    val pointerOffset = payloadStartInTail.toInt()
+                    tailBytes.copyOfRange(pointerOffset, pointerOffset + 12)
+                } else {
+                    rangeReader(payloadStart, 12)
+                }
+                if (pointerBytes?.size == 12 &&
+                    pointerBytes[0] == 'm'.code.toByte() &&
+                    pointerBytes[1] == 'p'.code.toByte() &&
+                    pointerBytes[2] == 'v'.code.toByte() &&
+                    pointerBytes[3] == '2'.code.toByte()
+                ) {
+                    val videoOffset = readBigEndianInt(pointerBytes, 4).toLong() and 0xffffffffL
+                    val videoLength = readBigEndianInt(pointerBytes, 8).toLong() and 0xffffffffL
                     if (videoOffset > 0L && videoLength >= 32L && videoOffset + videoLength <= fileSizeBytes) {
                         return EmbeddedMotionInfo(videoOffset = videoOffset, videoLength = videoLength)
                     }
@@ -311,7 +321,9 @@ class EmbeddedMotionPhotoDetector(private val context: Context) {
         val strictMotionFilename = isMotionPhotoFilenameCandidate(displayName)
         val uri = runCatching { Uri.parse(contentUri) }.getOrNull() ?: return null
         readTailBytes(uri, fileSizeBytes, FOOTER_SCAN_BYTES)?.let { footerBytes ->
-            scanSamsungFooterInfo(footerBytes, fileSizeBytes)?.let { info ->
+            scanSamsungFooterInfo(footerBytes, fileSizeBytes) { offset, length ->
+                readRangeBytes(uri, offset, length)
+            }?.let { info ->
                 if (hasMp4HeaderAt(uri, info.videoOffset)) return info
             }
         }
