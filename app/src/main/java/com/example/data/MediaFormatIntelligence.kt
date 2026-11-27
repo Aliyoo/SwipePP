@@ -308,6 +308,7 @@ data class EmbeddedMotionInfo(
 
 class EmbeddedMotionPhotoDetector(private val context: Context) {
 
+
     fun detect(
         contentUri: String,
         mimeType: String?,
@@ -337,7 +338,16 @@ class EmbeddedMotionPhotoDetector(private val context: Context) {
         // follow the official *MP.jpg hint, so positive XMP must be enough to scan the trailer.
         if (!xmpIndicatesMotion && !strictMotionFilename) return null
 
-        val tailBytes = readTailBytes(uri, fileSizeBytes, TAIL_SCAN_BYTES) ?: return null
+        // The 48MB tail read is by far the largest transient allocation in detection;
+        // scans run in parallel during first indexing, so cap concurrent big tails or
+        // a few motion-heavy photos could exhaust the heap together (an allocation
+        // failure would be misread as "not a motion photo" and overwrite good metadata).
+        bigTailScanPermits.acquire()
+        val tailBytes = try {
+            readTailBytes(uri, fileSizeBytes, TAIL_SCAN_BYTES)
+        } finally {
+            bigTailScanPermits.release()
+        } ?: return null
         if (format == ImageFormat.JPEG) {
             scanSamsungMotionPhotoInfo(tailBytes, fileSizeBytes)?.let { return it }
         }
@@ -352,25 +362,29 @@ class EmbeddedMotionPhotoDetector(private val context: Context) {
         return EmbeddedMotionInfo(videoOffset = offset, videoLength = length)
     }
 
+    // IO failures throw rather than returning null: probe callers must distinguish
+    // "unreadable file" (retry later / refuse to write) from a genuine negative probe.
     private fun readPrefixBytes(uri: Uri, maxBytes: Int): ByteArray? {
-        return runCatching {
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                val out = ByteArray(maxBytes)
-                var offset = 0
-                while (offset < maxBytes) {
-                    val count = input.read(out, offset, maxBytes - offset)
-                    if (count < 0) break
-                    if (count == 0) continue
-                    offset += count
-                }
-                if (offset == 0) byteArrayOf() else out.copyOf(offset)
+        val input = context.contentResolver.openInputStream(uri)
+            ?: throw java.io.IOException("cannot open $uri")
+        return input.use { stream ->
+            val out = ByteArray(maxBytes)
+            var offset = 0
+            while (offset < maxBytes) {
+                val count = stream.read(out, offset, maxBytes - offset)
+                if (count < 0) break
+                if (count == 0) continue
+                offset += count
             }
-        }.getOrNull()
+            if (offset == 0) byteArrayOf() else out.copyOf(offset)
+        }
     }
 
     private fun scanEmbeddedVideoOffsetForward(uri: Uri, fileSizeBytes: Long): Long? {
+        val stream = context.contentResolver.openInputStream(uri)
+            ?: throw java.io.IOException("cannot open $uri")
         return runCatching {
-            context.contentResolver.openInputStream(uri)?.use { input ->
+            stream.use { input ->
                 val chunk = ByteArray(256 * 1024)
                 var bytesRead = 0L
                 var carry = byteArrayOf()
@@ -418,49 +432,51 @@ class EmbeddedMotionPhotoDetector(private val context: Context) {
     }
 
     private fun readRangeBytes(uri: Uri, offset: Long, length: Int): ByteArray? {
-        return runCatching {
-            val descriptor = context.contentResolver.openFileDescriptor(uri, "r") ?: return@runCatching null
-            ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input ->
-                val channel = input.channel
-                channel.position(offset)
-                val buffer = java.nio.ByteBuffer.allocate(length)
-                while (buffer.hasRemaining()) {
-                    val count = channel.read(buffer)
-                    if (count < 0) break
-                    if (count == 0) continue
-                }
-                buffer.flip()
-                val bytes = ByteArray(buffer.remaining())
-                buffer.get(bytes)
-                bytes
+        if (length <= 0) return null
+        val descriptor = context.contentResolver.openFileDescriptor(uri, "r")
+            ?: throw java.io.IOException("cannot open $uri")
+        ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input ->
+            val channel = input.channel
+            channel.position(offset)
+            // Single allocation: wrapping the target array avoids a full second copy
+            // (matters at 48MB tail sizes, especially with concurrent detections).
+            val bytes = ByteArray(length)
+            val buffer = java.nio.ByteBuffer.wrap(bytes)
+            while (buffer.hasRemaining()) {
+                val count = channel.read(buffer)
+                if (count < 0) break
+                if (count == 0) continue
             }
-        }.getOrNull()
+            return if (buffer.position() == length) bytes else bytes.copyOf(buffer.position())
+        }
     }
 
     private fun readTailBytes(uri: Uri, fileSizeBytes: Long, maxBytes: Long): ByteArray? {
-        return runCatching {
-            val length = minOf(fileSizeBytes, maxBytes).toInt()
-            if (length <= 0) return@runCatching null
-            val start = fileSizeBytes - length
-            val descriptor = context.contentResolver.openFileDescriptor(uri, "r") ?: return@runCatching null
-            ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input ->
-                val channel = input.channel
-                channel.position(start)
-                val buffer = java.nio.ByteBuffer.allocate(length)
-                while (buffer.hasRemaining()) {
-                    val count = channel.read(buffer)
-                    if (count < 0) break
-                    if (count == 0) continue
-                }
-                buffer.flip()
-                val bytes = ByteArray(buffer.remaining())
-                buffer.get(bytes)
-                bytes
+        val length = minOf(fileSizeBytes, maxBytes).toInt()
+        if (length <= 0) return null
+        val start = fileSizeBytes - length
+        val descriptor = context.contentResolver.openFileDescriptor(uri, "r")
+            ?: throw java.io.IOException("cannot open $uri")
+        ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input ->
+            val channel = input.channel
+            channel.position(start)
+            // Single allocation: wrapping the target array avoids a full second copy
+            // (matters at 48MB tail sizes).
+            val bytes = ByteArray(length)
+            val buffer = java.nio.ByteBuffer.wrap(bytes)
+            while (buffer.hasRemaining()) {
+                val count = channel.read(buffer)
+                if (count < 0) break
+                if (count == 0) continue
             }
-        }.getOrNull()
+            return if (buffer.position() == length) bytes else bytes.copyOf(buffer.position())
+        }
     }
 
     companion object {
+        // Shared across all instances: probe workers create one detector per photo, so an
+        // instance-level semaphore would not cap concurrent big-tail reads at all.
+        private val bigTailScanPermits = java.util.concurrent.Semaphore(1)
         private const val MAX_MOTION_CONTAINER_BYTES = 96L * 1024L * 1024L
         private const val XMP_SCAN_BYTES = 256 * 1024
         private const val FOOTER_SCAN_BYTES = 8L * 1024L

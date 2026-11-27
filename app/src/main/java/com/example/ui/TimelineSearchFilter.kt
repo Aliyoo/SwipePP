@@ -281,7 +281,8 @@ fun extractDescriptiveKeywordTags(
  */
 fun filterGalleryEntriesBySearch(
     entries: List<GalleryEntry>,
-    query: TimelineSearchQuery
+    query: TimelineSearchQuery,
+    semanticMatchIds: Set<Long> = emptySet()
 ): List<GalleryEntry> {
     if (!query.isActive) return entries
     if (entries.isEmpty()) return emptyList()
@@ -347,10 +348,13 @@ fun filterGalleryEntriesBySearch(
                 val hitDate = matchesDateToken(photo.year, photo.month, photo.day, token)
                 val hitTagAlias = tokenMatchedTags[i].any { it.matches(photo) }
                 val hitSmartContent = smartContentMatchesToken(photo, token)
+                // Semantic search: the photo's CLIP embedding matched the query text in the
+                // shared vector space, so the keyword is satisfied even without lexical overlap.
+                val hitSemantic = photo.id in semanticMatchIds
                 val hitUnlocatedKeyword = (token == "无定位" || token == "缺定位") &&
                     (photo.locationName.isNullOrBlank() || photo.latitude == null || photo.longitude == null)
 
-                if (!hitLocation && !hitCaption && !hitBucket && !hitDate && !hitTagAlias && !hitUnlocatedKeyword && !hitSmartContent) {
+                if (!hitLocation && !hitCaption && !hitBucket && !hitDate && !hitTagAlias && !hitUnlocatedKeyword && !hitSmartContent && !hitSemantic) {
                     return false
                 }
             }

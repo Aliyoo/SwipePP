@@ -48,6 +48,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -304,6 +305,7 @@ fun GalleryScreen(
     onBatchManualLocation: (List<PhotoItemEntity>, String, Double, Double, Boolean) -> Unit = { _, _, _, _, _ -> },
     onBatchSameDayLocation: (List<SameDayLocationMatch>, Boolean) -> Unit = { _, _ -> },
     onGeocodeLocation: suspend (String) -> ResolvedGeoLocation? = { null },
+    onComputeSemanticMatches: suspend (String) -> Set<Long> = { emptySet() },
     onSelectionModeChanged: (Boolean) -> Unit = {},
     onToggleFavorite: (PhotoItemEntity, Boolean) -> Unit = { p, f -> onKeepPhoto(p, f) },
     onStartCustomCleanup: (title: String, photoIds: Set<Long>, includeReviewed: Boolean) -> Unit = { _, _, _ -> },
@@ -345,6 +347,18 @@ fun GalleryScreen(
         } else {
             delay(110L)
             searchQuery = searchQuery.copy(keyword = rawSearchKeyword)
+        }
+    }
+
+    val semanticMatchIds by produceState(emptySet(), searchQuery.keyword) {
+        val kw = searchQuery.keyword.trim()
+        if (kw.isBlank()) {
+            value = emptySet()
+        } else {
+            // Debounce past keystroke settling; the encode + library scan is debounce-guarded here
+            // because embedding scan cost grows with library size.
+            delay(280L)
+            value = onComputeSemanticMatches(kw)
         }
     }
 
@@ -478,8 +492,8 @@ fun GalleryScreen(
         )
     }
 
-    val displayedEntries = remember(chipFilteredEntries, searchQuery) {
-        filterGalleryEntriesBySearch(chipFilteredEntries, searchQuery)
+    val displayedEntries = remember(chipFilteredEntries, searchQuery, semanticMatchIds) {
+        filterGalleryEntriesBySearch(chipFilteredEntries, searchQuery, semanticMatchIds)
     }
 
     val displayedPhotos = remember(displayedEntries, isSelectionMode) {

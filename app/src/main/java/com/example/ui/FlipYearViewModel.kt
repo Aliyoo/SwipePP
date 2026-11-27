@@ -47,6 +47,15 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+// cn-clip similarity is heavily compressed: correct hits measured 0.46-0.52 while the noise
+// tail reaches ~0.51 on diverse libraries, so absolute thresholds barely separate signal from
+// noise. Precision comes from the margin below the best score: noise distributions drop fast
+// after their outlier top-1, while genuine matches cluster near the top. The absolute floor
+// rejects noise-only queries whose top hit never rises above the noise bulk (~0.44).
+private const val SEMANTIC_TOP1_MARGIN = 0.04f
+private const val SEMANTIC_ABSOLUTE_FLOOR = 0.45f
+private const val SEMANTIC_MATCH_CAP = 24
+
 class FlipYearViewModel(application: Application) : AndroidViewModel(application) {
 
     private val database = FlipYearDatabase.getInstance(application)
@@ -89,6 +98,17 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         )
     }
     private var smartTagIndexedOnce = false
+
+    // Semantic-search caches. Embedding rows are written only by the smart-tag backfill,
+    // so the cache is invalidated there and at every trash/restore entry point.
+    private var smartTagWarmupDone = false
+    @Volatile private var semanticEmbeddingCache: List<com.example.data.PhotoEmbeddingEntity>? = null
+    private var lastSemanticQuery: Pair<String, FloatArray>? = null
+
+    private fun invalidateSemanticEmbeddingCache() {
+        semanticEmbeddingCache = null
+    }
+
     private var snackbarDismissJob: Job? = null
     private var pendingBatchWriteTask: PendingBatchWriteTask? = null
     private var pendingLegacyRetryPhotos: List<PhotoItemEntity> = emptyList()
@@ -323,7 +343,22 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         )
     )
 
+    // Registered asynchronously off the UI thread (observer setup can touch the writable
+    // database) and unregistered in onCleared so a dead ViewModel is not retained.
+    private val semanticInvalidationObserver =
+        object : androidx.room.InvalidationTracker.Observer(arrayOf("photos", "photo_embeddings")) {
+            override fun onInvalidated(tables: Set<String>) {
+                invalidateSemanticEmbeddingCache()
+            }
+        }
+
     init {
+        // Any write to photos/photo_embeddings (scan, trash, undo, demo removal, purge,
+        // backfill upserts — including paths added in the future) invalidates the
+        // semantic embedding cache, instead of hooking every mutation site by hand.
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            database.invalidationTracker.addObserver(semanticInvalidationObserver)
+        }
         viewModelScope.launch {
             val level = repository.checkMediaAccess()
             mediaAccessLevel.value = level
@@ -341,9 +376,20 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         // archive) even when media permission is missing; the pipeline is idempotent and cheap
         // when there is nothing pending.
         startSmartTagBackfill()
+        // Same for the media probe: without it, a permission-less upgrade leaves rows
+        // unprobed forever and probe-gated features (compression, EXIF writes) never unlock.
+        startMediaProbeBackfill()
     }
 
     override fun onCleared() {
+        // Removing the last observer makes Room drop its invalidation triggers in a
+        // synchronous write transaction — off the main thread, and outside viewModelScope
+        // which is already cancelled by the time onCleared runs.
+        val tracker = database.invalidationTracker
+        val observer = semanticInvalidationObserver
+        kotlin.concurrent.thread(isDaemon = true) {
+            tracker.removeObserver(observer)
+        }
         if (smartTagAnalyzerLazy.isInitialized()) {
             smartTagAnalyzer.close()
         }
@@ -385,6 +431,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     )
                 }
                 startSmartTagBackfill()
+                startMediaProbeBackfill()
             } finally {
                 isScanningDevice.value = false
             }
@@ -433,6 +480,25 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
      * zero-shot categories). Idempotent: only rows behind the current taxonomy version
      * are processed, so repeated calls after incremental syncs are cheap.
      */
+    private var mediaProbeJob: Job? = null
+
+    /**
+     * Background media probe (embedded motion photos / animated WebP). Silent by design:
+     * rows are playable progressively as batches land, newest first.
+     */
+    fun startMediaProbeBackfill() {
+        if (mediaProbeJob?.isActive == true) return
+        mediaProbeJob = viewModelScope.launch {
+            try {
+                repository.backfillMediaProbe()
+            } catch (t: Throwable) {
+                if (t !is kotlinx.coroutines.CancellationException) {
+                    android.util.Log.w("FlipYearViewModel", "media probe backfill failed", t)
+                }
+            }
+        }
+    }
+
     fun startSmartTagBackfill() {
         if (smartTagJob?.isActive == true) {
             // The pipeline caps a run at the pending count sampled when it started; media scanned
@@ -451,11 +517,89 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     }
                     if (processed > 0) smartTagIndexedOnce = true
                 } while (smartTagRerunRequested)
+                // Pre-load the text tower in the background so the first semantic search
+                // keystroke does not eat the multi-second model load on the query path.
+                // Must run outside this job: while it loads, startSmartTagBackfill would
+                // see the job as active and queue a rerun nobody consumes.
+                if (!smartTagWarmupDone) {
+                    smartTagWarmupDone = true
+                    viewModelScope.launch {
+                        try {
+                            smartTagAnalyzer.encodeText("照片")
+                        } catch (t: Throwable) {
+                            if (t !is kotlinx.coroutines.CancellationException) {
+                                android.util.Log.w("FlipYearViewModel", "semantic warmup failed", t)
+                            }
+                        }
+                    }
+                }
             } catch (t: Throwable) {
                 if (t !is kotlinx.coroutines.CancellationException) {
                     android.util.Log.w("FlipYearViewModel", "smart tag backfill failed", t)
                 }
             }
+        }
+    }
+
+    /**
+     * Encodes [keyword] with the cn-clip text tower and scores it against every stored image
+     * embedding. cn-clip similarity distributions are narrow and query-dependent, so matches
+     * are accepted by z-score within the library rather than an absolute threshold.
+     */
+    suspend fun computeSemanticMatches(keyword: String): Set<Long> {
+        val trimmed = keyword.trim()
+        if (trimmed.isBlank()) return emptySet()
+        return try {
+            val cached = lastSemanticQuery
+            val queryVec = if (cached != null && cached.first == trimmed) {
+                cached.second
+            } else {
+                (smartTagAnalyzer.encodeText(trimmed) ?: return emptySet()).also {
+                    lastSemanticQuery = trimmed to it
+                }
+            }
+            val rows = semanticEmbeddingCache
+                ?: database.flipYearDao().getAllEmbeddings().also { semanticEmbeddingCache = it }
+            if (rows.isEmpty()) return emptySet()
+            val scored = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                val out = ArrayList<Pair<Long, Float>>(rows.size)
+                // Stored embeddings are unit-normalized at indexing time and fp16 rounding
+                // keeps them within ~0.1% of unit norm, so cosine is a plain dot product.
+                val v = FloatArray(com.example.data.smarttag.ClipEmbedder.EMBEDDING_DIM)
+                val expectedBytes = queryVec.size * 2
+                for (row in rows) {
+                    // Rows from a different embedding model (e.g. 512-dim MobileCLIP leftovers
+                    // awaiting reindex) must be skipped by payload length — the fixed buffer
+                    // would otherwise keep stale values from the previous row.
+                    if (row.embeddingFp16.size != expectedBytes) continue
+                    com.example.data.smarttag.decodeEmbeddingFp16Into(row.embeddingFp16, v)
+                    var dot = 0f
+                    var norm = 0f
+                    for (i in v.indices) {
+                        dot += queryVec[i] * v[i]
+                        norm += v[i] * v[i]
+                    }
+                    if (norm in 0.99f..1.01f) {
+                        out.add(row.photoId to dot)
+                    } else if (norm > 0f) {
+                        out.add(row.photoId to dot / kotlin.math.sqrt(norm))
+                    }
+                }
+                out
+            }
+            if (scored.isEmpty()) return emptySet()
+            val sorted = scored.sortedByDescending { it.second }
+            val top = sorted.first().second
+            if (top < SEMANTIC_ABSOLUTE_FLOOR) return emptySet()
+            val floor = (top - SEMANTIC_TOP1_MARGIN).coerceAtLeast(SEMANTIC_ABSOLUTE_FLOOR)
+            sorted.filter { it.second >= floor }
+                .take(SEMANTIC_MATCH_CAP)
+                .mapTo(HashSet()) { it.first }
+        } catch (t: Throwable) {
+            if (t !is kotlinx.coroutines.CancellationException) {
+                android.util.Log.w("FlipYearViewModel", "semantic search failed", t)
+            }
+            emptySet()
         }
     }
 
@@ -466,6 +610,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             repository.loadDemoArchive()
             showSnackbar("已加载示例照片与 4K 视频影集")
             startSmartTagBackfill()
+            startMediaProbeBackfill()
         }
     }
 

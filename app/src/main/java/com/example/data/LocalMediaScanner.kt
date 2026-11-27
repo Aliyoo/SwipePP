@@ -15,6 +15,8 @@ import android.provider.MediaStore
 import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Locale
@@ -115,51 +117,15 @@ class LocalMediaScanner(private val context: Context) {
         val imageDisplayNames = rawImages.mapNotNull { item ->
             item.photo.mediaStoreKey?.let { it to item.displayName }
         }.toMap()
-        val motionAwareImages = detectEmbeddedMotionPhotos(pairing.images, imageDisplayNames)
-
-        val groupedImages = assignBurstGroups(motionAwareImages)
+        // Embedded-motion detection is file-IO heavy (2-4 opens per photo) and moved to the
+        // background media probe so first-scan rows reach the gallery in seconds.
+        val groupedImages = assignBurstGroups(pairing.images)
         val visibleVideos = rawVideos.map { it.photo }.filter { video ->
             video.mediaStoreKey !in pairing.consumedVideoKeys
         }
         (groupedImages + visibleVideos).sortedByDescending { it.takenAtMillis }
     }
 
-    private fun detectEmbeddedMotionPhotos(
-        images: List<PhotoItemEntity>,
-        displayNames: Map<String, String>
-    ): List<PhotoItemEntity> {
-        val detector = EmbeddedMotionPhotoDetector(context)
-        return images.map { image ->
-            if (image.motionPhotoKind != MotionPhotoType.NONE) {
-                image
-            } else {
-                val info = detector.detect(
-                    contentUri = image.contentUri.orEmpty(),
-                    mimeType = image.mimeType,
-                    displayName = image.mediaStoreKey?.let(displayNames::get) ?: image.caption,
-                    fileSizeBytes = image.fileSizeBytes
-                )
-                if (info == null) {
-                    image
-                } else {
-                    image.copy(
-                        isAnimated = true,
-                        motionPhotoType = MotionPhotoType.EMBEDDED.name,
-                        motionVideoUri = image.contentUri,
-                        motionVideoDurationMs = 0L,
-                        motionVideoOffset = info.videoOffset,
-                        motionVideoLength = info.videoLength,
-                        pairedMediaStoreKey = null
-                    )
-                }
-            }
-        }
-    }
-
-    /**
-     * Resolves EXIF GPS (for photos) or ISO-6709 container metadata (for videos) for any device item,
-     * with cached reverse-geocoding for readable city/district names and safe coordinate fallback.
-     */
     suspend fun resolveLocationForItem(item: PhotoItemEntity): ResolvedGeoLocation? = withContext(Dispatchers.IO) {
         if (item.isSample) return@withContext null
         val uriStr = item.contentUri?.takeIf { it.isNotBlank() } ?: return@withContext null
@@ -176,6 +142,62 @@ class LocalMediaScanner(private val context: Context) {
             latitude = coords.first,
             longitude = coords.second,
             locationName = label
+        )
+    }
+
+    /**
+     * Background media probe result for one photo: embedded-motion playback fields and the
+     * animated-image flag, or null when the file carries no probe-able extras.
+     */
+    data class MediaProbeResult(
+        val isAnimated: Boolean,
+        val motionPhotoType: String,
+        val motionVideoUri: String?,
+        val motionVideoOffset: Long?,
+        val motionVideoLength: Long?
+    )
+
+    /**
+     * Probes one image file for embedded motion video and animated WebP content.
+     * IO heavy (2-4 file opens); must stay off the scan critical path. Paired live photos
+     * and non-image media need no probing — callers skip them.
+     */
+    fun probeImageMedia(photo: PhotoItemEntity, displayName: String?): MediaProbeResult? {
+        if (photo.isVideo) return null
+        // No readable file behind this row (e.g. sample drawables): a genuine nothing-to-probe,
+        // as opposed to an IO failure which the detector now signals by throwing.
+        if (photo.contentUri.isNullOrBlank()) return null
+        var animated = false
+        var motionType = MotionPhotoType.NONE.name
+        var motionUri: String? = null
+        var motionOffset: Long? = null
+        var motionLength: Long? = null
+
+        if (photo.motionPhotoKind == MotionPhotoType.NONE) {
+            val info = EmbeddedMotionPhotoDetector(context).detect(
+                contentUri = photo.contentUri.orEmpty(),
+                mimeType = photo.mimeType,
+                displayName = displayName,
+                fileSizeBytes = photo.fileSizeBytes
+            )
+            if (info != null) {
+                animated = true
+                motionType = MotionPhotoType.EMBEDDED.name
+                motionUri = photo.contentUri
+                motionOffset = info.videoOffset
+                motionLength = info.videoLength
+            }
+        }
+        if (!animated && photo.imageFormatKind == ImageFormat.WEBP) {
+            animated = isAnimatedImageContent(Uri.parse(photo.contentUri.orEmpty()), photo.imageFormatKind)
+        }
+        if (!animated && motionType == MotionPhotoType.NONE.name) return null
+        return MediaProbeResult(
+            isAnimated = animated,
+            motionPhotoType = motionType,
+            motionVideoUri = motionUri,
+            motionVideoOffset = motionOffset,
+            motionVideoLength = motionLength
         )
     }
 
@@ -272,7 +294,9 @@ class LocalMediaScanner(private val context: Context) {
                         heightPx = height,
                         isVideo = false
                     )
-                    val animated = isAnimatedImageContent(contentUri, imageFormat)
+                    // GIF is certain from the MIME type alone; animated WebP needs a file
+                    // sniff, which the background media probe owns (mediaProbeVersion).
+                    val animated = imageFormat == ImageFormat.GIF
 
                     results += ScannedMediaItem(
                         photo = PhotoItemEntity(
@@ -676,6 +700,7 @@ class LocalMediaScanner(private val context: Context) {
         }
 
     companion object {
+        private const val MOTION_DETECT_CONCURRENCY = 8
         private const val BURST_WINDOW_MS = 10_000L
         private val ISO_6709_REGEX = Regex("""([+-]\d+(?:\.\d+)?)([+-]\d+(?:\.\d+)?)""")
         private val GENERIC_CAMERA_BUCKETS = setOf(

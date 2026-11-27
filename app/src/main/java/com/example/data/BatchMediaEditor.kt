@@ -168,6 +168,9 @@ fun inferSameDayLocations(
 
 fun isSafelyCompressibleImage(photo: PhotoItemEntity): Boolean {
     if (photo.isVideo || photo.isLivePhoto || photo.isAnimated) return false
+    // Unprobed files may still be undetected embedded-motion photos; an in-place EXIF rewrite
+    // (or recompression) would destroy the appended video, so writes wait for the probe.
+    if (photo.mediaProbeVersion < com.example.data.MEDIA_PROBE_VERSION) return false
     if (photo.isSample) return true
     return photo.imageFormatKind == ImageFormat.JPEG ||
         (photo.imageFormatKind == ImageFormat.UNKNOWN && photo.mimeType?.equals("image/jpeg", ignoreCase = true) == true)
@@ -183,10 +186,19 @@ fun isDirectExifWritableImage(photo: PhotoItemEntity): Boolean {
  */
 class BatchMediaEditor(private val context: Context) {
 
+    private fun isPotentiallyExifWritableJpeg(photo: PhotoItemEntity): Boolean {
+        if (photo.isVideo || photo.isSample || photo.isLivePhoto || photo.isAnimated) return false
+        return photo.imageFormatKind == ImageFormat.JPEG ||
+            (photo.imageFormatKind == ImageFormat.UNKNOWN && photo.mimeType?.equals("image/jpeg", ignoreCase = true) == true)
+    }
+
     fun buildSystemWritePendingIntent(photos: List<PhotoItemEntity>): PendingIntent? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        // Consent uses a relaxed probe-independent filter: unprobed JPEGs are included so the
+        // system grants write access for them; the write path re-verifies each file with an
+        // inline probe, so over-consenting is harmless and under-consenting hard-fails writes.
         val uris = photos
-            .filter { isDirectExifWritableImage(it) && !it.contentUri.isNullOrBlank() && it.contentUri.startsWith("content://") }
+            .filter { isPotentiallyExifWritableJpeg(it) && !it.contentUri.isNullOrBlank() && it.contentUri.startsWith("content://") }
             .map { Uri.parse(it.contentUri) }
             .distinct()
         if (uris.isEmpty()) return null
@@ -240,6 +252,33 @@ class BatchMediaEditor(private val context: Context) {
     }
 
     /**
+     * Like [isDirectExifWritableImage] but unprobed JPEGs are probed inline, just-in-time:
+     * location tagging must not silently skip the EXIF write only because the background
+     * probe has not reached the file yet. Embedded-motion positives stay protected; probe
+     * IO failures are treated conservatively as unwritable.
+     */
+    private fun isExifWritableNow(photo: PhotoItemEntity): Boolean {
+        if (isDirectExifWritableImage(photo)) return true
+        if (photo.isVideo || photo.isSample || photo.isLivePhoto || photo.isAnimated) return false
+        if (photo.mediaProbeVersion >= com.example.data.MEDIA_PROBE_VERSION) return false
+        val isJpeg = photo.imageFormatKind == ImageFormat.JPEG ||
+            (photo.imageFormatKind == ImageFormat.UNKNOWN && photo.mimeType?.equals("image/jpeg", ignoreCase = true) == true)
+        if (!isJpeg) return false
+        if (photo.contentUri.isNullOrBlank()) return false
+        val info = try {
+            EmbeddedMotionPhotoDetector(context).detect(
+                contentUri = photo.contentUri,
+                mimeType = photo.mimeType,
+                displayName = photo.caption.takeIf { it.isNotBlank() },
+                fileSizeBytes = photo.fileSizeBytes
+            )
+        } catch (t: Throwable) {
+            return false
+        }
+        return info == null
+    }
+
+    /**
      * Writes GPS latitude & longitude into EXIF metadata of real device JPEGs in-place.
      * Returns number of files whose EXIF tags were successfully updated.
      */
@@ -248,7 +287,7 @@ class BatchMediaEditor(private val context: Context) {
         onProgress: (processed: Int, total: Int) -> Unit = { _, _ -> }
     ): Int = withContext(Dispatchers.IO) {
         val realImages = updates.filter { (photo, loc) ->
-            isDirectExifWritableImage(photo) &&
+            isExifWritableNow(photo) &&
                 !photo.contentUri.isNullOrBlank() &&
                 photo.contentUri.startsWith("content://") &&
                 loc.latitude != null &&

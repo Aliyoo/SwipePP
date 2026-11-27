@@ -161,10 +161,12 @@ enum class SmartCategory(
  * additional near-ties within a small margin join as secondary tags.
  */
 object SmartTagHeuristics {
-    const val CLIP_MIN_SIMILARITY = 0.16f
-    const val CLIP_TIE_MARGIN = 0.02f
+    // cn-clip RN50 compresses cosine similarities into a narrow band (validation samples:
+    // noise floor ~0.42-0.46, correct matches ~0.48-0.51), so categories are accepted relative
+    // to the image's mean similarity across the taxonomy, not by absolute threshold.
+    const val CLIP_CATEGORY_MARGIN_OVER_MEAN = 0.02f
     const val MAX_TAGS_PER_PHOTO = 4
-    const val CONTENT_LABEL_VERSION = 3
+    const val CONTENT_LABEL_VERSION = 4
 }
 
 fun PhotoItemEntity.smartCategories(): List<SmartCategory> = SmartCategory.keysInCsv(contentLabels)

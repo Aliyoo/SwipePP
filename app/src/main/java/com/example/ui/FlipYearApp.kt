@@ -641,6 +641,7 @@ fun FlipYearApp(
                                     )
                                 },
                                 onGeocodeLocation = viewModel::geocodeLocationQuery,
+                                onComputeSemanticMatches = viewModel::computeSemanticMatches,
                                 onSelectionModeChanged = { isGallerySelectionMode = it },
                                 onStartCustomCleanup = { sessionTitle, photoIds, includeRev ->
                                     if (photoIds.isNotEmpty()) {
