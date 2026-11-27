@@ -345,13 +345,15 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         // Any write to photos/photo_embeddings (scan, trash, undo, demo removal, purge,
         // backfill upserts — including paths added in the future) invalidates the
         // semantic embedding cache, instead of hooking every mutation site by hand.
-        database.invalidationTracker.addObserver(
-            object : androidx.room.InvalidationTracker.Observer(arrayOf("photos", "photo_embeddings")) {
-                override fun onInvalidated(tables: Set<String>) {
-                    invalidateSemanticEmbeddingCache()
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            database.invalidationTracker.addObserver(
+                object : androidx.room.InvalidationTracker.Observer(arrayOf("photos", "photo_embeddings")) {
+                    override fun onInvalidated(tables: Set<String>) {
+                        invalidateSemanticEmbeddingCache()
+                    }
                 }
-            }
-        )
+            )
+        }
         viewModelScope.launch {
             val level = repository.checkMediaAccess()
             mediaAccessLevel.value = level
