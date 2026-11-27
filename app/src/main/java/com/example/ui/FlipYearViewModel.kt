@@ -377,7 +377,14 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     }
 
     override fun onCleared() {
-        database.invalidationTracker.removeObserver(semanticInvalidationObserver)
+        // Removing the last observer makes Room drop its invalidation triggers in a
+        // synchronous write transaction — off the main thread, and outside viewModelScope
+        // which is already cancelled by the time onCleared runs.
+        val tracker = database.invalidationTracker
+        val observer = semanticInvalidationObserver
+        kotlin.concurrent.thread(isDaemon = true) {
+            tracker.removeObserver(observer)
+        }
         if (smartTagAnalyzerLazy.isInitialized()) {
             smartTagAnalyzer.close()
         }
