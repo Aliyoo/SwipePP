@@ -40,7 +40,7 @@ interface FlipYearDao {
     @Query(
         "SELECT id, mediaStoreKey, durationMs, mimeType, imageFormat, mediaSubtype, isAnimated, " +
             "motionPhotoType, motionVideoUri, motionVideoDurationMs, motionVideoOffset, motionVideoLength, " +
-            "pairedMediaStoreKey, fileSizeBytes, widthPx, heightPx, caption, bucketName " +
+            "pairedMediaStoreKey, fileSizeBytes, widthPx, heightPx, caption, bucketName, isFavorite " +
             "FROM photos WHERE isSample = 0"
     )
     suspend fun getAllDeviceMediaSyncRowsSync(): List<DeviceMediaSyncRow>
@@ -327,8 +327,16 @@ interface FlipYearDao {
         newItems: List<PhotoItemEntity>,
         invalidateMonthKeys: List<String>,
         deleteSamples: Boolean,
-        metadataUpdates: List<PhotoItemEntity> = emptyList()
+        metadataUpdates: List<PhotoItemEntity> = emptyList(),
+        favoriteTrueIds: List<Long> = emptyList(),
+        favoriteFalseIds: List<Long> = emptyList()
     ) {
+        favoriteTrueIds.chunked(SQLITE_BIND_CHUNK).forEach { chunk ->
+            updatePhotosFavorite(chunk, true)
+        }
+        favoriteFalseIds.chunked(SQLITE_BIND_CHUNK).forEach { chunk ->
+            updatePhotosFavorite(chunk, false)
+        }
         if (metadataUpdates.isNotEmpty()) {
             updateDeviceMediaMetadataBatch(metadataUpdates)
         }

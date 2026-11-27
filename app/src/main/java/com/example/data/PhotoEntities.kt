@@ -187,7 +187,8 @@ data class DeviceMediaSyncRow(
     val widthPx: Int,
     val heightPx: Int,
     val caption: String,
-    val bucketName: String?
+    val bucketName: String?,
+    val isFavorite: Boolean
 )
 
 data class LocationBatchUpdate(

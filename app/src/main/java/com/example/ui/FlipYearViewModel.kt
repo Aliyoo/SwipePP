@@ -2,6 +2,7 @@ package com.example.ui
 
 import android.app.Application
 import android.app.PendingIntent
+import android.content.Context
 import android.content.IntentSender
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -19,6 +20,7 @@ import com.example.data.PhotoRestoreSpec
 import com.example.data.PhotoStatus
 import com.example.data.ResolvedGeoLocation
 import com.example.data.SameDayLocationMatch
+import com.example.data.SystemFavoriteWriteStatus
 import com.example.data.CollageBackdropStyle
 import com.example.data.CollageExportResult
 import com.example.data.CollageSlotTransform
@@ -160,6 +162,11 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     }
 
     private var snackbarDismissJob: Job? = null
+    private val systemSyncPrefs = application.getSharedPreferences("flipyear_system_sync", Context.MODE_PRIVATE)
+    private val pendingFavoriteConsentFlow = MutableStateFlow<PendingFavoriteConsent?>(null)
+    val pendingFavoriteConsent: StateFlow<PendingFavoriteConsent?> = pendingFavoriteConsentFlow
+    private var favoriteMigrationPromptedThisSession = false
+
     private var pendingBatchWriteTask: PendingBatchWriteTask? = null
     private var pendingLegacyRetryPhotos: List<PhotoItemEntity> = emptyList()
     private var accumulatedLegacyFreedBytes: Long = 0L
@@ -171,6 +178,11 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             val summaryLabel: String
         ) : PendingBatchWriteTask
     }
+
+    private data class FavoriteConsentUnit(
+        val photos: List<PhotoItemEntity>,
+        val favorite: Boolean
+    )
 
     private data class GpsIndexProgress(
         val isIndexing: Boolean = false,
@@ -479,7 +491,11 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             isScanningDevice.value = true
             try {
                 hasMediaLocationPermission.value = repository.hasMediaLocationAccess()
-                val result = repository.syncLocalDeviceMedia()
+                val migrationPending = !isSystemFavoriteMigrationComplete()
+                val result = repository.syncLocalDeviceMedia(preserveLocalFavorites = migrationPending)
+                if (migrationPending) {
+                    migrateLegacyFavoritesIfNeeded(result.favoriteExportCandidates)
+                }
                 if (!silent) {
                     if (result.totalFound > 0) {
                         showBanner("已扫描本地 ${result.imageCount} 张照片与 ${result.videoCount} 个视频")
@@ -499,6 +515,132 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 isScanningDevice.value = false
             }
         }
+    }
+
+    private fun isSystemFavoriteMigrationComplete(): Boolean {
+        return systemSyncPrefs.getBoolean(KEY_SYSTEM_FAVORITE_MIGRATION_DONE, false)
+    }
+
+    private fun markSystemFavoriteMigrationComplete() {
+        systemSyncPrefs.edit().putBoolean(KEY_SYSTEM_FAVORITE_MIGRATION_DONE, true).apply()
+    }
+
+    private suspend fun migrateLegacyFavoritesIfNeeded(candidates: List<PhotoItemEntity>) {
+        if (candidates.isEmpty()) {
+            markSystemFavoriteMigrationComplete()
+            return
+        }
+        if (favoriteMigrationPromptedThisSession) return
+        favoriteMigrationPromptedThisSession = true
+        writeFavoritesWithOptionalConsent(
+            photos = candidates,
+            newFavorite = true,
+            onApplied = { markSystemFavoriteMigrationComplete() },
+            onRejected = {
+                showBanner("已有收藏暂未同步到系统相册，下次启动会再次尝试")
+            }
+        )
+    }
+
+    private suspend fun writeFavoritesWithOptionalConsent(
+        photos: List<PhotoItemEntity>,
+        newFavorite: Boolean,
+        onApplied: suspend () -> Unit,
+        onRejected: () -> Unit
+    ) {
+        val outcome = repository.writeFavoritesToSystem(photos, newFavorite)
+        when (outcome.status) {
+            SystemFavoriteWriteStatus.APPLIED,
+            SystemFavoriteWriteStatus.LOCAL_ONLY -> onApplied()
+            SystemFavoriteWriteStatus.NEEDS_CONSENT -> {
+                val units = favoriteConsentUnits(photos, newFavorite)
+                if (units.isEmpty()) {
+                    onApplied()
+                } else {
+                    queueFavoriteConsentUnits(units, onApplied, onRejected)
+                }
+            }
+        }
+    }
+
+    private fun favoriteConsentUnits(
+        photos: List<PhotoItemEntity>,
+        favorite: Boolean
+    ): List<FavoriteConsentUnit> {
+        return photos
+            .filter { !it.isSample && !it.contentUri.isNullOrBlank() && it.contentUri.startsWith("content://") }
+            .chunked(FAVORITE_CONSENT_CHUNK_SIZE)
+            .map { FavoriteConsentUnit(it, favorite) }
+    }
+
+    private fun queueFavoriteConsentUnits(
+        units: List<FavoriteConsentUnit>,
+        onApproved: suspend () -> Unit,
+        onCancelled: () -> Unit
+    ) {
+        fun enqueue(index: Int) {
+            if (index >= units.size) {
+                viewModelScope.launch { onApproved() }
+                return
+            }
+            val unit = units[index]
+            val pendingIntent = repository.buildSystemFavoriteIntent(unit.photos, unit.favorite)
+            if (pendingIntent == null) {
+                onCancelled()
+                return
+            }
+            pendingFavoriteConsentFlow.value = PendingFavoriteConsent(
+                pendingIntent = pendingIntent,
+                onApproved = { enqueue(index + 1) },
+                onCancelled = onCancelled
+            )
+        }
+        enqueue(0)
+    }
+
+    fun confirmPendingFavoriteConsent(granted: Boolean) {
+        val pending = pendingFavoriteConsentFlow.value ?: return
+        pendingFavoriteConsentFlow.value = null
+        if (granted) {
+            viewModelScope.launch { pending.onApproved() }
+        } else {
+            pending.onCancelled()
+        }
+    }
+
+    private suspend fun runFavoriteMutation(
+        photos: List<PhotoItemEntity>,
+        newFavorite: Boolean,
+        snapshot: UndoSnapshot,
+        inCleanerSession: Boolean,
+        showFeedback: Boolean,
+        successText: String,
+        afterFavoriteApplied: suspend () -> Unit = {}
+    ) {
+        val targets = photos.filter { it.isFavorite != newFavorite }
+        if (targets.isEmpty()) {
+            pushUndo(snapshot, inCleanerSession = inCleanerSession)
+            afterFavoriteApplied()
+            if (showFeedback) {
+                showSnackbar(text = successText, undoSnapshot = snapshot)
+            }
+            return
+        }
+        writeFavoritesWithOptionalConsent(
+            photos = targets,
+            newFavorite = newFavorite,
+            onApplied = {
+                repository.togglePhotosFavorite(targets.map { it.id }, newFavorite)
+                pushUndo(snapshot, inCleanerSession = inCleanerSession)
+                afterFavoriteApplied()
+                if (showFeedback) {
+                    showSnackbar(text = successText, undoSnapshot = snapshot)
+                }
+            },
+            onRejected = {
+                showBanner("未获得系统授权，收藏状态未变更")
+            }
+        )
     }
 
     /**
@@ -928,7 +1070,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     month = photo.month,
                     previousStatus = photo.status,
                     previousFavorite = photo.isFavorite,
-                    previousBucketName = photo.bucketName
+                    previousBucketName = photo.bucketName,
+                    favoriteTouched = markFavorite && !photo.isFavorite
                 )
             ),
             description = "已撤回${actionText}操作",
@@ -936,18 +1079,30 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             cardKey = "single_${photo.id}"
         )
         viewModelScope.launch {
-            pushUndo(snapshot, inCleanerSession = fromCleanerSession)
+            suspend fun completeKeep() {
+                val newlyStamped = repository.markPhotoStatus(photo.id, PhotoStatus.KEPT, photo.year, photo.month)
+                if (newlyStamped) triggerMonthStamped(photo.year, photo.month)
+            }
             if (markFavorite && !photo.isFavorite) {
-                repository.toggleFavorite(photo.id, true)
-            }
-            val newlyStamped = repository.markPhotoStatus(photo.id, PhotoStatus.KEPT, photo.year, photo.month)
-            if (!fromCleanerSession) {
-                showSnackbar(
-                    text = if (markFavorite) "已收藏并保留 1 项" else "已标记保留 1 项",
-                    undoSnapshot = snapshot
+                runFavoriteMutation(
+                    photos = listOf(photo),
+                    newFavorite = true,
+                    snapshot = snapshot,
+                    inCleanerSession = fromCleanerSession,
+                    showFeedback = !fromCleanerSession,
+                    successText = "已收藏并保留 1 项",
+                    afterFavoriteApplied = { completeKeep() }
                 )
+            } else {
+                pushUndo(snapshot, inCleanerSession = fromCleanerSession)
+                completeKeep()
+                if (!fromCleanerSession) {
+                    showSnackbar(
+                        text = "已标记保留 1 项",
+                        undoSnapshot = snapshot
+                    )
+                }
             }
-            if (newlyStamped) triggerMonthStamped(photo.year, photo.month)
         }
     }
 
@@ -961,22 +1116,27 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     month = photo.month,
                     previousStatus = photo.status,
                     previousFavorite = photo.isFavorite,
-                    previousBucketName = photo.bucketName
+                    previousBucketName = photo.bucketName,
+                    favoriteTouched = newFavorite != photo.isFavorite
                 )
             ),
             description = "已撤回${actionText}",
             actionLabel = "撤销：${actionText} 1 项"
         )
         viewModelScope.launch {
-            pushUndo(snapshot, inCleanerSession = false)
-            repository.toggleFavorite(photo.id, newFavorite)
-            if (newFavorite && photo.photoStatus == PhotoStatus.UNREVIEWED) {
-                val newlyStamped = repository.markPhotoStatus(photo.id, PhotoStatus.KEPT, photo.year, photo.month)
-                if (newlyStamped) triggerMonthStamped(photo.year, photo.month)
-            }
-            showSnackbar(
-                text = if (newFavorite) "已加入收藏" else "已取消收藏",
-                undoSnapshot = snapshot
+            runFavoriteMutation(
+                photos = listOf(photo),
+                newFavorite = newFavorite,
+                snapshot = snapshot,
+                inCleanerSession = false,
+                showFeedback = true,
+                successText = if (newFavorite) "已加入收藏" else "已取消收藏",
+                afterFavoriteApplied = {
+                    if (newFavorite && photo.photoStatus == PhotoStatus.UNREVIEWED) {
+                        val newlyStamped = repository.markPhotoStatus(photo.id, PhotoStatus.KEPT, photo.year, photo.month)
+                        if (newlyStamped) triggerMonthStamped(photo.year, photo.month)
+                    }
+                }
             )
         }
     }
@@ -995,7 +1155,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     month = it.month,
                     previousStatus = it.status,
                     previousFavorite = it.isFavorite,
-                    previousBucketName = it.bucketName
+                    previousBucketName = it.bucketName,
+                    favoriteTouched = markFavorite && it.id == stack.bestPhoto.id && !it.isFavorite
                 )
             },
             description = "已撤回${actionText} (${stack.photos.size} 张)",
@@ -1003,23 +1164,35 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             cardKey = stack.stableKey
         )
         viewModelScope.launch {
-            pushUndo(snapshot, inCleanerSession = fromCleanerSession)
-            if (markFavorite) {
-                repository.toggleFavorite(stack.bestPhoto.id, true)
-            }
-            val months = stack.photos.map { it.year to it.month }.toSet()
-            val newlyStamped = repository.markPhotosStatus(
-                ids = stack.photos.map { it.id },
-                status = PhotoStatus.KEPT,
-                affectedMonths = months
-            )
-            if (!fromCleanerSession) {
-                showSnackbar(
-                    text = "已保留整组 ${stack.photos.size} 张连拍照片",
-                    undoSnapshot = snapshot
+            suspend fun completeKeepStack() {
+                val months = stack.photos.map { it.year to it.month }.toSet()
+                val newlyStamped = repository.markPhotosStatus(
+                    ids = stack.photos.map { it.id },
+                    status = PhotoStatus.KEPT,
+                    affectedMonths = months
                 )
+                if (newlyStamped) triggerMonthStamped(stack.bestPhoto.year, stack.bestPhoto.month)
             }
-            if (newlyStamped) triggerMonthStamped(stack.bestPhoto.year, stack.bestPhoto.month)
+            if (markFavorite && !stack.bestPhoto.isFavorite) {
+                runFavoriteMutation(
+                    photos = listOf(stack.bestPhoto),
+                    newFavorite = true,
+                    snapshot = snapshot,
+                    inCleanerSession = fromCleanerSession,
+                    showFeedback = !fromCleanerSession,
+                    successText = "已保留整组 ${stack.photos.size} 张连拍照片",
+                    afterFavoriteApplied = { completeKeepStack() }
+                )
+            } else {
+                pushUndo(snapshot, inCleanerSession = fromCleanerSession)
+                completeKeepStack()
+                if (!fromCleanerSession) {
+                    showSnackbar(
+                        text = "已保留整组 ${stack.photos.size} 张连拍照片",
+                        undoSnapshot = snapshot
+                    )
+                }
+            }
         }
     }
 
@@ -1157,31 +1330,44 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     month = it.month,
                     previousStatus = it.status,
                     previousFavorite = it.isFavorite,
-                    previousBucketName = it.bucketName
+                    previousBucketName = it.bucketName,
+                    favoriteTouched = markFavorite && !it.isFavorite
                 )
             },
             description = if (markFavorite) "已撤回批量收藏 (${photos.size} 项)" else "已撤回批量保留 (${photos.size} 项)",
             actionLabel = if (markFavorite) "撤销：收藏 ${photos.size} 项" else "撤销：保留 ${photos.size} 项"
         )
         viewModelScope.launch {
-            pushUndo(snapshot)
             val ids = photos.map { it.id }
-            if (markFavorite) {
-                repository.togglePhotosFavorite(ids, true)
+            suspend fun completeBulkKeep() {
+                val months = photos.map { it.year to it.month }.toSet()
+                val newlyStamped = repository.markPhotosStatus(
+                    ids = ids,
+                    status = PhotoStatus.KEPT,
+                    affectedMonths = months
+                )
+                if (newlyStamped) {
+                    val first = photos.first()
+                    triggerMonthStamped(first.year, first.month)
+                }
             }
-            val months = photos.map { it.year to it.month }.toSet()
-            val newlyStamped = repository.markPhotosStatus(
-                ids = ids,
-                status = PhotoStatus.KEPT,
-                affectedMonths = months
-            )
-            showSnackbar(
-                text = if (markFavorite) "已收藏并保留 ${photos.size} 项媒体" else "已批量保留 ${photos.size} 项媒体",
-                undoSnapshot = snapshot
-            )
-            if (newlyStamped) {
-                val first = photos.first()
-                triggerMonthStamped(first.year, first.month)
+            if (markFavorite) {
+                runFavoriteMutation(
+                    photos = photos,
+                    newFavorite = true,
+                    snapshot = snapshot,
+                    inCleanerSession = false,
+                    showFeedback = true,
+                    successText = "已收藏并保留 ${photos.size} 项媒体",
+                    afterFavoriteApplied = { completeBulkKeep() }
+                )
+            } else {
+                pushUndo(snapshot)
+                completeBulkKeep()
+                showSnackbar(
+                    text = "已批量保留 ${photos.size} 项媒体",
+                    undoSnapshot = snapshot
+                )
             }
         }
     }
@@ -1497,6 +1683,49 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     }
 
     private suspend fun applyUndoSnapshot(snapshot: UndoSnapshot, triggeredByShake: Boolean) {
+        val favoriteBackups = snapshot.photoStates.filter { it.favoriteTouched }
+        if (favoriteBackups.isEmpty()) {
+            applyUndoSnapshotRestore(snapshot, triggeredByShake)
+            return
+        }
+
+        val photos = repository.getPhotosByIds(favoriteBackups.map { it.photoId })
+        val backupById = favoriteBackups.associateBy { it.photoId }
+        val favoriteBatches = photos
+            .mapNotNull { photo ->
+                val backup = backupById[photo.id] ?: return@mapNotNull null
+                photo to backup.previousFavorite
+            }
+            .groupBy({ it.second }, { it.first })
+            .map { (favorite, targets) -> FavoriteConsentUnit(targets, favorite) }
+        applyUndoFavoriteBatchesThen(favoriteBatches, 0) {
+            applyUndoSnapshotRestore(snapshot, triggeredByShake)
+        }
+    }
+
+    private suspend fun applyUndoFavoriteBatchesThen(
+        batches: List<FavoriteConsentUnit>,
+        index: Int,
+        onComplete: suspend () -> Unit
+    ) {
+        if (index >= batches.size) {
+            onComplete()
+            return
+        }
+        val batch = batches[index]
+        writeFavoritesWithOptionalConsent(
+            photos = batch.photos,
+            newFavorite = batch.favorite,
+            onApplied = {
+                applyUndoFavoriteBatchesThen(batches, index + 1, onComplete)
+            },
+            onRejected = {
+                showBanner("未获得系统授权，撤销未执行")
+            }
+        )
+    }
+
+    private suspend fun applyUndoSnapshotRestore(snapshot: UndoSnapshot, triggeredByShake: Boolean) {
         val specs = snapshot.photoStates.map { backup ->
             val targetStatus = runCatching { PhotoStatus.valueOf(backup.previousStatus) }
                 .getOrDefault(PhotoStatus.UNREVIEWED)
@@ -1731,6 +1960,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
 }
 
 private const val PRECOMPUTED_LARGE_PHOTO_THRESHOLD_BYTES = 3_000_000L
+private const val FAVORITE_CONSENT_CHUNK_SIZE = 1_000
+private const val KEY_SYSTEM_FAVORITE_MIGRATION_DONE = "system_favorite_migration_done_v1"
 
 /**
  * Single-pass background indexing of Gallery metadata & monthly timeline clusters.

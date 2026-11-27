@@ -282,6 +282,18 @@ fun FlipYearApp(
         }
     )
 
+    val systemFavoriteLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult(),
+        onResult = { result ->
+            viewModel.confirmPendingFavoriteConsent(result.resultCode == Activity.RESULT_OK)
+        }
+    )
+    val pendingFavoriteConsent by viewModel.pendingFavoriteConsent.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingFavoriteConsent) {
+        val request = pendingFavoriteConsent ?: return@LaunchedEffect
+        systemFavoriteLauncher.launch(IntentSenderRequest.Builder(request.pendingIntent.intentSender).build())
+    }
+
     val launchWriteIfNeeded: (PendingIntent?) -> Unit = { pendingIntent ->
         if (pendingIntent != null) {
             systemWriteLauncher.launch(IntentSenderRequest.Builder(pendingIntent.intentSender).build())

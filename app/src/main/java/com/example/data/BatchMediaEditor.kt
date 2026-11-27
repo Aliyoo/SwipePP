@@ -11,6 +11,7 @@ import android.location.Geocoder
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.os.ext.SdkExtensions
 import android.provider.MediaStore
 import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.Dispatchers
@@ -205,6 +206,40 @@ class BatchMediaEditor(private val context: Context) {
         return runCatching {
             MediaStore.createWriteRequest(context.contentResolver, uris)
         }.getOrNull()
+    }
+
+    private fun favoriteCapableUris(photos: List<PhotoItemEntity>): List<Uri> {
+        return photos
+            .filter { !it.isSample && !it.contentUri.isNullOrBlank() && it.contentUri.startsWith("content://") }
+            .map { Uri.parse(it.contentUri) }
+            .distinct()
+    }
+
+    fun buildSystemFavoritePendingIntent(photos: List<PhotoItemEntity>, value: Boolean): PendingIntent? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        val uris = favoriteCapableUris(photos)
+        if (uris.isEmpty()) return null
+        return runCatching {
+            MediaStore.createFavoriteRequest(context.contentResolver, uris, value)
+        }.getOrNull()
+    }
+
+    fun canWriteFavoriteStatusDirectly(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) return true
+        return runCatching {
+            SdkExtensions.getExtensionVersion(Build.VERSION_CODES.R) >= 16
+        }.getOrDefault(false)
+    }
+
+    fun writeFavoriteStatusDirectly(photos: List<PhotoItemEntity>, value: Boolean): Boolean {
+        if (!canWriteFavoriteStatusDirectly()) return false
+        val uris = favoriteCapableUris(photos)
+        if (uris.isEmpty()) return true
+        return runCatching {
+            MediaStore.markIsFavoriteStatus(context.contentResolver, uris, value)
+            true
+        }.getOrDefault(false)
     }
 
     suspend fun compressPhotosNearLossless(

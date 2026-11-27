@@ -1,5 +1,6 @@
 package com.example.ui
 
+import android.app.PendingIntent
 import androidx.compose.runtime.Immutable
 import com.example.data.CleanupStatsEntity
 import com.example.data.CollageBackdropStyle
@@ -145,7 +146,14 @@ data class PhotoStateBackup(
     val previousLocationName: String? = null,
     val previousLatitude: Double? = null,
     val previousLongitude: Double? = null,
-    val previousGpsScanned: Boolean = false
+    val previousGpsScanned: Boolean = false,
+    val favoriteTouched: Boolean = false
+)
+
+data class PendingFavoriteConsent(
+    val pendingIntent: PendingIntent,
+    val onApproved: suspend () -> Unit,
+    val onCancelled: () -> Unit
 )
 
 @Immutable
