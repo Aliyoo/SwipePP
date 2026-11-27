@@ -288,9 +288,10 @@ private fun PhotoDetailLightboxContent(
     }
     val sessionPhotos = remember { mutableStateListOf<PhotoItemEntity>().apply { addAll(initialList) } }
     LaunchedEffect(photos) {
+        val sessionIndexById = sessionPhotos.mapIndexed { index, item -> item.id to index }.toMap()
         photos.forEach { updated ->
-            val index = sessionPhotos.indexOfFirst { it.id == updated.id }
-            if (index >= 0 && sessionPhotos[index] != updated) {
+            val index = sessionIndexById[updated.id]
+            if (index != null && sessionPhotos[index] != updated) {
                 sessionPhotos[index] = updated
             }
         }
