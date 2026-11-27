@@ -3,6 +3,7 @@ package com.example.ui
 import android.app.Application
 import android.app.PendingIntent
 import android.content.Context
+import android.os.Build
 import android.content.IntentSender
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -491,8 +492,11 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             isScanningDevice.value = true
             try {
                 hasMediaLocationPermission.value = repository.hasMediaLocationAccess()
-                val migrationPending = !isSystemFavoriteMigrationComplete()
-                val result = repository.syncLocalDeviceMedia(preserveLocalFavorites = migrationPending)
+                val systemFavoritesSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                val migrationPending = systemFavoritesSupported && !isSystemFavoriteMigrationComplete()
+                val result = repository.syncLocalDeviceMedia(
+                    preserveLocalFavorites = migrationPending || !systemFavoritesSupported
+                )
                 if (migrationPending) {
                     migrateLegacyFavoritesIfNeeded(result.favoriteExportCandidates)
                 }
@@ -1132,7 +1136,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 showFeedback = true,
                 successText = if (newFavorite) "已加入收藏" else "已取消收藏",
                 afterFavoriteApplied = {
-                    if (newFavorite && photo.photoStatus == PhotoStatus.UNREVIEWED) {
+                    val currentPhoto = repository.getPhotosByIds(listOf(photo.id)).firstOrNull() ?: photo
+                    if (newFavorite && currentPhoto.photoStatus == PhotoStatus.UNREVIEWED) {
                         val newlyStamped = repository.markPhotoStatus(photo.id, PhotoStatus.KEPT, photo.year, photo.month)
                         if (newlyStamped) triggerMonthStamped(photo.year, photo.month)
                     }
