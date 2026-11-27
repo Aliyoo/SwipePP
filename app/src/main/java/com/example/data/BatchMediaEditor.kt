@@ -243,6 +243,33 @@ class BatchMediaEditor(private val context: Context) {
     }
 
     /**
+     * Like [isDirectExifWritableImage] but unprobed JPEGs are probed inline, just-in-time:
+     * location tagging must not silently skip the EXIF write only because the background
+     * probe has not reached the file yet. Embedded-motion positives stay protected; probe
+     * IO failures are treated conservatively as unwritable.
+     */
+    private fun isExifWritableNow(photo: PhotoItemEntity): Boolean {
+        if (isDirectExifWritableImage(photo)) return true
+        if (photo.isVideo || photo.isSample || photo.isLivePhoto || photo.isAnimated) return false
+        if (photo.mediaProbeVersion >= com.example.data.MEDIA_PROBE_VERSION) return false
+        val isJpeg = photo.imageFormatKind == ImageFormat.JPEG ||
+            (photo.imageFormatKind == ImageFormat.UNKNOWN && photo.mimeType?.equals("image/jpeg", ignoreCase = true) == true)
+        if (!isJpeg) return false
+        if (photo.contentUri.isNullOrBlank()) return false
+        val info = try {
+            EmbeddedMotionPhotoDetector(context).detect(
+                contentUri = photo.contentUri,
+                mimeType = photo.mimeType,
+                displayName = photo.caption.takeIf { it.isNotBlank() },
+                fileSizeBytes = photo.fileSizeBytes
+            )
+        } catch (t: Throwable) {
+            return false
+        }
+        return info == null
+    }
+
+    /**
      * Writes GPS latitude & longitude into EXIF metadata of real device JPEGs in-place.
      * Returns number of files whose EXIF tags were successfully updated.
      */
@@ -251,7 +278,7 @@ class BatchMediaEditor(private val context: Context) {
         onProgress: (processed: Int, total: Int) -> Unit = { _, _ -> }
     ): Int = withContext(Dispatchers.IO) {
         val realImages = updates.filter { (photo, loc) ->
-            isDirectExifWritableImage(photo) &&
+            isExifWritableNow(photo) &&
                 !photo.contentUri.isNullOrBlank() &&
                 photo.contentUri.startsWith("content://") &&
                 loc.latitude != null &&
