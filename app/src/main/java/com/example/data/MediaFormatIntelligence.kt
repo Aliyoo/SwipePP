@@ -308,6 +308,8 @@ data class EmbeddedMotionInfo(
 
 class EmbeddedMotionPhotoDetector(private val context: Context) {
 
+    private val bigTailScanPermits = java.util.concurrent.Semaphore(1)
+
     fun detect(
         contentUri: String,
         mimeType: String?,
@@ -337,7 +339,16 @@ class EmbeddedMotionPhotoDetector(private val context: Context) {
         // follow the official *MP.jpg hint, so positive XMP must be enough to scan the trailer.
         if (!xmpIndicatesMotion && !strictMotionFilename) return null
 
-        val tailBytes = readTailBytes(uri, fileSizeBytes, TAIL_SCAN_BYTES) ?: return null
+        // The 48MB tail read is by far the largest transient allocation in detection;
+        // scans run in parallel during first indexing, so cap concurrent big tails or
+        // a few motion-heavy photos could exhaust the heap together (an allocation
+        // failure would be misread as "not a motion photo" and overwrite good metadata).
+        bigTailScanPermits.acquire()
+        val tailBytes = try {
+            readTailBytes(uri, fileSizeBytes, TAIL_SCAN_BYTES)
+        } finally {
+            bigTailScanPermits.release()
+        } ?: return null
         if (format == ImageFormat.JPEG) {
             scanSamsungMotionPhotoInfo(tailBytes, fileSizeBytes)?.let { return it }
         }
@@ -423,16 +434,16 @@ class EmbeddedMotionPhotoDetector(private val context: Context) {
             ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input ->
                 val channel = input.channel
                 channel.position(offset)
-                val buffer = java.nio.ByteBuffer.allocate(length)
+                // Single allocation: wrapping the target array avoids a full second copy
+                // (matters at 48MB tail sizes, especially with concurrent detections).
+                val bytes = ByteArray(length)
+                val buffer = java.nio.ByteBuffer.wrap(bytes)
                 while (buffer.hasRemaining()) {
                     val count = channel.read(buffer)
                     if (count < 0) break
                     if (count == 0) continue
                 }
-                buffer.flip()
-                val bytes = ByteArray(buffer.remaining())
-                buffer.get(bytes)
-                bytes
+                if (buffer.position() == length) bytes else bytes.copyOf(buffer.position())
             }
         }.getOrNull()
     }
