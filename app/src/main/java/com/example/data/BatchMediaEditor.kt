@@ -574,6 +574,9 @@ class BatchMediaEditor(private val context: Context) {
                     put(MediaStore.Images.Media.DATE_TAKEN, photo.takenAtMillis)
                     put(MediaStore.Images.Media.WIDTH, finalW)
                     put(MediaStore.Images.Media.HEIGHT, finalH)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && photo.isFavorite) {
+                        put(MediaStore.MediaColumns.IS_FAVORITE, 1)
+                    }
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         val targetFolder = photo.bucketName?.takeIf { it.isNotBlank() } ?: "SwipePP"
                         put(
