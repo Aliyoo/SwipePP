@@ -978,7 +978,7 @@ fun FlipYearApp(
                         .navigationBarsPadding()
                         .padding(start = 16.dp, end = 16.dp, bottom = snackbarBottomPadding)
                         .widthIn(max = 460.dp)
-                        .zIndex(2f)
+                        .zIndex(101f)
                         .testTag("bottom_feedback_snackbar")
                 ) {
                     uiState.snackbarMessage?.let { snack ->
