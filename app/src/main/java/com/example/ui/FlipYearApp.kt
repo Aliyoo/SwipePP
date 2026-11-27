@@ -962,6 +962,40 @@ fun FlipYearApp(
                 }
                 }
 
+                // Truly floating pill bar overlaid directly above full-bleed content (zero opaque dock background)
+                AnimatedVisibility(
+                    visible = showTopLevelNav && !useNavigationRail && !isGallerySelectionMode,
+                    enter = fadeIn(animationSpec = tween(220)) + slideInVertically(
+                        initialOffsetY = { it / 2 },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    ),
+                    exit = fadeOut(animationSpec = tween(160)) + slideOutVertically(
+                        targetOffsetY = { it / 2 },
+                        animationSpec = tween(160)
+                    ),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        // 画报底座：导航条区域以 DecoGroundDeep 纯色填充（不再透出滚动内容），
+                        // 与 dock 纵向渐变终点无缝衔接为一整块 footer
+                        .background(DecoGroundDeep)
+                        .navigationBarsPadding()
+                ) {
+                    FloatingGalleryDock(
+                        tabs = tabs,
+                        currentRoute = currentRoute,
+                        trashedCount = uiState.trashedPhotos.size,
+                        onSelectTab = navigateToTab,
+                        onTopEdgeMeasured = { dockTopYPx.value = it }
+                    )
+                }
+
+                // True full-screen edge-to-edge overlay layer (e.g. PhotoDetailLightbox) inside
+                // MainActivity's window so system bars, cutouts, and bottom docks never clip.
+                FullScreenOverlayLayer(host = fullScreenOverlayHost)
+
                 // Stage 1.4: Bottom Material 3 Snackbar positioned above the Floating Gallery Dock,
                 // carrying each message's own bound UndoSnapshot and explicit undo copy (>=4s).
                 val snackbarBottomPadding = when {
@@ -1021,39 +1055,6 @@ fun FlipYearApp(
                     }
                 }
 
-                // Truly floating pill bar overlaid directly above full-bleed content (zero opaque dock background)
-                AnimatedVisibility(
-                    visible = showTopLevelNav && !useNavigationRail && !isGallerySelectionMode,
-                    enter = fadeIn(animationSpec = tween(220)) + slideInVertically(
-                        initialOffsetY = { it / 2 },
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioLowBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        )
-                    ),
-                    exit = fadeOut(animationSpec = tween(160)) + slideOutVertically(
-                        targetOffsetY = { it / 2 },
-                        animationSpec = tween(160)
-                    ),
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        // 画报底座：导航条区域以 DecoGroundDeep 纯色填充（不再透出滚动内容），
-                        // 与 dock 纵向渐变终点无缝衔接为一整块 footer
-                        .background(DecoGroundDeep)
-                        .navigationBarsPadding()
-                ) {
-                    FloatingGalleryDock(
-                        tabs = tabs,
-                        currentRoute = currentRoute,
-                        trashedCount = uiState.trashedPhotos.size,
-                        onSelectTab = navigateToTab,
-                        onTopEdgeMeasured = { dockTopYPx.value = it }
-                    )
-                }
-
-                // True full-screen edge-to-edge overlay layer (e.g. PhotoDetailLightbox) inside
-                // MainActivity's window so system bars, cutouts, and bottom docks never clip.
-                FullScreenOverlayLayer(host = fullScreenOverlayHost)
 
                 // Stage 4: One-time skippable gesture guide shown once on first launch
                 if (!hasSeenOnboarding && !uiState.isLoading) {
