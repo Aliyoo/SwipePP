@@ -341,18 +341,21 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         )
     )
 
+    // Registered asynchronously off the UI thread (observer setup can touch the writable
+    // database) and unregistered in onCleared so a dead ViewModel is not retained.
+    private val semanticInvalidationObserver =
+        object : androidx.room.InvalidationTracker.Observer(arrayOf("photos", "photo_embeddings")) {
+            override fun onInvalidated(tables: Set<String>) {
+                invalidateSemanticEmbeddingCache()
+            }
+        }
+
     init {
         // Any write to photos/photo_embeddings (scan, trash, undo, demo removal, purge,
         // backfill upserts — including paths added in the future) invalidates the
         // semantic embedding cache, instead of hooking every mutation site by hand.
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            database.invalidationTracker.addObserver(
-                object : androidx.room.InvalidationTracker.Observer(arrayOf("photos", "photo_embeddings")) {
-                    override fun onInvalidated(tables: Set<String>) {
-                        invalidateSemanticEmbeddingCache()
-                    }
-                }
-            )
+            database.invalidationTracker.addObserver(semanticInvalidationObserver)
         }
         viewModelScope.launch {
             val level = repository.checkMediaAccess()
@@ -374,6 +377,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     }
 
     override fun onCleared() {
+        database.invalidationTracker.removeObserver(semanticInvalidationObserver)
         if (smartTagAnalyzerLazy.isInitialized()) {
             smartTagAnalyzer.close()
         }
