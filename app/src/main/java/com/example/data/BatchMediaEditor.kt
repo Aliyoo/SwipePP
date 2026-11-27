@@ -186,10 +186,19 @@ fun isDirectExifWritableImage(photo: PhotoItemEntity): Boolean {
  */
 class BatchMediaEditor(private val context: Context) {
 
+    private fun isPotentiallyExifWritableJpeg(photo: PhotoItemEntity): Boolean {
+        if (photo.isVideo || photo.isSample || photo.isLivePhoto || photo.isAnimated) return false
+        return photo.imageFormatKind == ImageFormat.JPEG ||
+            (photo.imageFormatKind == ImageFormat.UNKNOWN && photo.mimeType?.equals("image/jpeg", ignoreCase = true) == true)
+    }
+
     fun buildSystemWritePendingIntent(photos: List<PhotoItemEntity>): PendingIntent? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        // Consent uses a relaxed probe-independent filter: unprobed JPEGs are included so the
+        // system grants write access for them; the write path re-verifies each file with an
+        // inline probe, so over-consenting is harmless and under-consenting hard-fails writes.
         val uris = photos
-            .filter { isDirectExifWritableImage(it) && !it.contentUri.isNullOrBlank() && it.contentUri.startsWith("content://") }
+            .filter { isPotentiallyExifWritableJpeg(it) && !it.contentUri.isNullOrBlank() && it.contentUri.startsWith("content://") }
             .map { Uri.parse(it.contentUri) }
             .distinct()
         if (uris.isEmpty()) return null
