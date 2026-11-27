@@ -350,6 +350,30 @@ fun decodeEmbeddingFp16(bytes: ByteArray): FloatArray {
     return out
 }
 
+/** Zero-allocation variant of [decodeEmbeddingFp16]: decodes into [out] (must be at least bytes.size/2 long). */
+fun decodeEmbeddingFp16Into(bytes: ByteArray, out: FloatArray) {
+    val buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+    var i = 0
+    while (buf.remaining() >= 2 && i < out.size) {
+        val bits = buf.short.toInt() and 0xFFFF
+        val sign = (bits ushr 15) and 0x1
+        val exp = (bits ushr 10) and 0x1F
+        val frac = bits and 0x3FF
+        val value = when {
+            exp == 0 -> frac.toFloat() / 1024f * 6.103515625e-05f
+            exp == 31 -> if (frac == 0) Float.POSITIVE_INFINITY else Float.NaN
+            else -> {
+                var m = 1f + frac.toFloat() / 1024f
+                var e = exp - 15
+                while (e > 0) { m *= 2f; e-- }
+                while (e < 0) { m /= 2f; e++ }
+                m
+            }
+        }
+        out[i++] = if (sign == 1) -value else value
+    }
+}
+
 private fun floatToHalf(f: Float): Short {
     val bits = java.lang.Float.floatToIntBits(f)
     val sign = (bits ushr 16) and 0x8000
