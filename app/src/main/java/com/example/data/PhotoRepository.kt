@@ -148,20 +148,27 @@ class PhotoRepository(
 
             val results = ArrayList<com.example.data.MediaProbeBatchItem>(batch.size)
             val probedOnlyIds = ArrayList<Long>(batch.size)
+            var failuresInBatch = 0
             for (subChunk in batch.chunked(MEDIA_PROBE_CONCURRENCY)) {
                 val resolved = coroutineScope {
                     subChunk.map { item ->
                         async {
-                            val probe = runCatching {
-                                scanner.probeImageMedia(item, item.caption.takeIf { it.isNotBlank() })
-                            }.getOrNull()
-                            item.id to probe
+                            val outcome = try {
+                                scanner.probeImageMedia(item, item.caption.takeIf { it.isNotBlank() }) to null
+                            } catch (t: Throwable) {
+                                // IO failures (permission not yet granted, transient read errors)
+                                // must NOT be recorded as probed — the row stays pending and is
+                                // retried on a later pass.
+                                null to t
+                            }
+                            Triple(item.id, outcome.first, outcome.second)
                         }
                     }.map { it.await() }
                 }
-                for ((id, probe) in resolved) {
-                    if (probe != null) {
-                        results.add(
+                for ((id, probe, error) in resolved) {
+                    when {
+                        error != null -> failuresInBatch++
+                        probe != null -> results.add(
                             com.example.data.MediaProbeBatchItem(
                                 id = id,
                                 isAnimated = probe.isAnimated,
@@ -171,14 +178,16 @@ class PhotoRepository(
                                 motionVideoLength = probe.motionVideoLength
                             )
                         )
-                    } else {
-                        probedOnlyIds.add(id)
+                        else -> probedOnlyIds.add(id)
                     }
                 }
             }
             dao.applyMediaProbeBatch(results, probedOnlyIds, version)
-            processed += batch.size
+            processed += results.size + probedOnlyIds.size
             onProgress(processed, total)
+            // Every row in this batch failed to read: retrying the same head of the queue
+            // would spin forever, so end the pass — the next scan/launch retries.
+            if (failuresInBatch == batch.size) break
         }
         processed
     }

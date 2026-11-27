@@ -164,6 +164,9 @@ class LocalMediaScanner(private val context: Context) {
      */
     fun probeImageMedia(photo: PhotoItemEntity, displayName: String?): MediaProbeResult? {
         if (photo.isVideo) return null
+        // No readable file behind this row (e.g. sample drawables): a genuine nothing-to-probe,
+        // as opposed to an IO failure which the detector now signals by throwing.
+        if (photo.contentUri.isNullOrBlank()) return null
         var animated = false
         var motionType = MotionPhotoType.NONE.name
         var motionUri: String? = null
