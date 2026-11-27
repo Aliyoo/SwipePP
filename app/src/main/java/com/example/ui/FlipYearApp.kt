@@ -90,6 +90,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -977,6 +978,7 @@ fun FlipYearApp(
                         .navigationBarsPadding()
                         .padding(start = 16.dp, end = 16.dp, bottom = snackbarBottomPadding)
                         .widthIn(max = 460.dp)
+                        .zIndex(2f)
                         .testTag("bottom_feedback_snackbar")
                 ) {
                     uiState.snackbarMessage?.let { snack ->
