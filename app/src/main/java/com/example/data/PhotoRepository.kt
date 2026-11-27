@@ -509,7 +509,6 @@ class PhotoRepository(
     }
 
     companion object {
-        private const val MEDIA_PROBE_VERSION = 1
         private const val MEDIA_PROBE_BATCH_SIZE = 48
         private const val MEDIA_PROBE_CONCURRENCY = 8
         fun yearMonthKey(year: Int, month: Int): String =

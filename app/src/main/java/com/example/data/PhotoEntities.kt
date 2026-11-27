@@ -157,6 +157,9 @@ data class DeviceMediaKeyRow(
     val mediaStoreKey: String?
 )
 
+// Current media probe taxonomy version; bump when detection logic changes so rows re-probe.
+const val MEDIA_PROBE_VERSION = 1
+
 data class MediaProbeBatchItem(
     val id: Long,
     val isAnimated: Boolean,

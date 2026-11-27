@@ -168,6 +168,9 @@ fun inferSameDayLocations(
 
 fun isSafelyCompressibleImage(photo: PhotoItemEntity): Boolean {
     if (photo.isVideo || photo.isLivePhoto || photo.isAnimated) return false
+    // Unprobed files may still be undetected embedded-motion photos; an in-place EXIF rewrite
+    // (or recompression) would destroy the appended video, so writes wait for the probe.
+    if (photo.mediaProbeVersion < com.example.data.MEDIA_PROBE_VERSION) return false
     if (photo.isSample) return true
     return photo.imageFormatKind == ImageFormat.JPEG ||
         (photo.imageFormatKind == ImageFormat.UNKNOWN && photo.mimeType?.equals("image/jpeg", ignoreCase = true) == true)
