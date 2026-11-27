@@ -47,12 +47,14 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-private const val SEMANTIC_Z_THRESHOLD = 1.2f
-// cn-clip similarities for genuinely relevant hits measured 0.46-0.51 on the validation set
-// while even the best noise stays below ~0.43; without this floor, queries with no relevant
-// content in the library would still surface their top-ranking noise.
-private const val SEMANTIC_ABSOLUTE_FLOOR = 0.44f
-private const val SEMANTIC_MATCH_CAP = 60
+// cn-clip similarity is heavily compressed: correct hits measured 0.46-0.52 while the noise
+// tail reaches ~0.51 on diverse libraries, so absolute thresholds barely separate signal from
+// noise. Precision comes from the margin below the best score: noise distributions drop fast
+// after their outlier top-1, while genuine matches cluster near the top. The absolute floor
+// rejects noise-only queries whose top hit never rises above the noise bulk (~0.44).
+private const val SEMANTIC_TOP1_MARGIN = 0.04f
+private const val SEMANTIC_ABSOLUTE_FLOOR = 0.45f
+private const val SEMANTIC_MATCH_CAP = 24
 
 class FlipYearViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -586,18 +588,11 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 out
             }
             if (scored.isEmpty()) return emptySet()
-            var mean = 0f
-            for ((_, s) in scored) mean += s
-            mean /= scored.size
-            var variance = 0f
-            for ((_, s) in scored) variance += (s - mean) * (s - mean)
-            variance /= scored.size
-            val std = kotlin.math.sqrt(variance)
-            // z-score needs a meaningful sample; tiny or uniform libraries fall back to the absolute floor only
-            val zFloor = if (scored.size >= 3 && std > 1e-6f) mean + SEMANTIC_Z_THRESHOLD * std else 0f
-            val floor = zFloor.coerceAtLeast(SEMANTIC_ABSOLUTE_FLOOR)
-            scored.filter { it.second >= floor }
-                .sortedByDescending { it.second }
+            val sorted = scored.sortedByDescending { it.second }
+            val top = sorted.first().second
+            if (top < SEMANTIC_ABSOLUTE_FLOOR) return emptySet()
+            val floor = (top - SEMANTIC_TOP1_MARGIN).coerceAtLeast(SEMANTIC_ABSOLUTE_FLOOR)
+            sorted.filter { it.second >= floor }
                 .take(SEMANTIC_MATCH_CAP)
                 .mapTo(HashSet()) { it.first }
         } catch (t: Throwable) {
