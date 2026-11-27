@@ -58,7 +58,8 @@ class MediaFormatIntelligenceTest {
             contentUri = "content://media/$key",
             caption = displayBase,
             bucketName = "Camera",
-            isSample = false
+            isSample = false,
+            mediaProbeVersion = com.example.data.MEDIA_PROBE_VERSION
         )
     }
 
@@ -404,5 +405,13 @@ class MediaFormatIntelligenceTest {
         assertFalse(isSafelyCompressibleImage(gif))
         assertFalse(isSafelyCompressibleImage(heic))
         assertFalse(isSafelyCompressibleImage(live))
+    }
+
+    @Test
+    fun compressionProtection_skipsUnprobedPhotos() {
+        // Unprobed files may be undetected embedded-motion photos; in-place rewrites would
+        // destroy the appended video, so they stay protected until the probe completes.
+        val unprobed = photo("unprobed", format = ImageFormat.JPEG).copy(mediaProbeVersion = 0)
+        assertFalse(isSafelyCompressibleImage(unprobed))
     }
 }
