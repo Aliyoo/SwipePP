@@ -15,6 +15,8 @@ import android.provider.MediaStore
 import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Locale
@@ -124,36 +126,46 @@ class LocalMediaScanner(private val context: Context) {
         (groupedImages + visibleVideos).sortedByDescending { it.takenAtMillis }
     }
 
-    private fun detectEmbeddedMotionPhotos(
+    private suspend fun detectEmbeddedMotionPhotos(
         images: List<PhotoItemEntity>,
         displayNames: Map<String, String>
     ): List<PhotoItemEntity> {
+        // Each detection costs 2-4 file opens; serial over thousands of first-scan photos
+        // this dominated cold-start scan time. Bounded parallelism keeps IO throughput
+        // high without starving Coil's image loading.
         val detector = EmbeddedMotionPhotoDetector(context)
-        return images.map { image ->
-            if (image.motionPhotoKind != MotionPhotoType.NONE) {
-                image
-            } else {
-                val info = detector.detect(
-                    contentUri = image.contentUri.orEmpty(),
-                    mimeType = image.mimeType,
-                    displayName = image.mediaStoreKey?.let(displayNames::get) ?: image.caption,
-                    fileSizeBytes = image.fileSizeBytes
-                )
-                if (info == null) {
-                    image
-                } else {
-                    image.copy(
-                        isAnimated = true,
-                        motionPhotoType = MotionPhotoType.EMBEDDED.name,
-                        motionVideoUri = image.contentUri,
-                        motionVideoDurationMs = 0L,
-                        motionVideoOffset = info.videoOffset,
-                        motionVideoLength = info.videoLength,
-                        pairedMediaStoreKey = null
-                    )
-                }
+        return coroutineScope {
+            images.withIndex().chunked(MOTION_DETECT_CONCURRENCY).flatMap { chunk ->
+                chunk.map { (index, image) ->
+                    async {
+                        detectSingleMotionPhoto(detector, image, displayNames)
+                    }
+                }.map { it.await() }
             }
         }
+    }
+
+    private fun detectSingleMotionPhoto(
+        detector: EmbeddedMotionPhotoDetector,
+        image: PhotoItemEntity,
+        displayNames: Map<String, String>
+    ): PhotoItemEntity {
+        if (image.motionPhotoKind != MotionPhotoType.NONE) return image
+        val info = detector.detect(
+            contentUri = image.contentUri.orEmpty(),
+            mimeType = image.mimeType,
+            displayName = image.mediaStoreKey?.let(displayNames::get) ?: image.caption,
+            fileSizeBytes = image.fileSizeBytes
+        ) ?: return image
+        return image.copy(
+            isAnimated = true,
+            motionPhotoType = MotionPhotoType.EMBEDDED.name,
+            motionVideoUri = image.contentUri,
+            motionVideoDurationMs = 0L,
+            motionVideoOffset = info.videoOffset,
+            motionVideoLength = info.videoLength,
+            pairedMediaStoreKey = null
+        )
     }
 
     /**
@@ -676,6 +688,7 @@ class LocalMediaScanner(private val context: Context) {
         }
 
     companion object {
+        private const val MOTION_DETECT_CONCURRENCY = 8
         private const val BURST_WINDOW_MS = 10_000L
         private val ISO_6709_REGEX = Regex("""([+-]\d+(?:\.\d+)?)([+-]\d+(?:\.\d+)?)""")
         private val GENERIC_CAMERA_BUCKETS = setOf(
