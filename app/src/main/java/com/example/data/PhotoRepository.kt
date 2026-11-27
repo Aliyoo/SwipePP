@@ -141,14 +141,18 @@ class PhotoRepository(
         if (total == 0) return@withContext 0
 
         var processed = 0
+        val failedIds = ArrayList<Long>()
         onProgress(0, total)
         while (true) {
-            val batch = dao.getPhotosPendingMediaProbe(version, MEDIA_PROBE_BATCH_SIZE)
+            val batch = if (failedIds.isEmpty()) {
+                dao.getPhotosPendingMediaProbe(version, MEDIA_PROBE_BATCH_SIZE)
+            } else {
+                dao.getPhotosPendingMediaProbeExcluding(version, MEDIA_PROBE_BATCH_SIZE, failedIds)
+            }
             if (batch.isEmpty()) break
 
             val results = ArrayList<com.example.data.MediaProbeBatchItem>(batch.size)
             val probedOnlyIds = ArrayList<Long>(batch.size)
-            var failuresInBatch = 0
             for (subChunk in batch.chunked(MEDIA_PROBE_CONCURRENCY)) {
                 val resolved = coroutineScope {
                     subChunk.map { item ->
@@ -167,7 +171,7 @@ class PhotoRepository(
                 }
                 for ((id, probe, error) in resolved) {
                     when {
-                        error != null -> failuresInBatch++
+                        error != null -> failedIds.add(id)
                         probe != null -> results.add(
                             com.example.data.MediaProbeBatchItem(
                                 id = id,
@@ -185,9 +189,6 @@ class PhotoRepository(
             dao.applyMediaProbeBatch(results, probedOnlyIds, version)
             processed += results.size + probedOnlyIds.size
             onProgress(processed, total)
-            // Every row in this batch failed to read: retrying the same head of the queue
-            // would spin forever, so end the pass — the next scan/launch retries.
-            if (failuresInBatch == batch.size) break
         }
         processed
     }

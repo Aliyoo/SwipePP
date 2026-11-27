@@ -89,6 +89,18 @@ interface FlipYearDao {
     )
     suspend fun getPhotosPendingMediaProbe(version: Int, limit: Int): List<PhotoItemEntity>
 
+    // Excludes rows that already failed in this pass, so permanently unreadable files at
+    // the head of the queue cannot starve every photo behind them.
+    @Query(
+        "SELECT * FROM photos WHERE mediaProbeVersion < :version AND status != 'PURGED' " +
+            "AND id NOT IN (:excludeIds) ORDER BY takenAtMillis DESC LIMIT :limit"
+    )
+    suspend fun getPhotosPendingMediaProbeExcluding(
+        version: Int,
+        limit: Int,
+        excludeIds: List<Long>
+    ): List<PhotoItemEntity>
+
     @Query("SELECT COUNT(*) FROM photos WHERE mediaProbeVersion < :version AND status != 'PURGED'")
     suspend fun countPendingMediaProbe(version: Int): Int
 
