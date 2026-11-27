@@ -342,6 +342,16 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     )
 
     init {
+        // Any write to photos/photo_embeddings (scan, trash, undo, demo removal, purge,
+        // backfill upserts — including paths added in the future) invalidates the
+        // semantic embedding cache, instead of hooking every mutation site by hand.
+        database.invalidationTracker.addObserver(
+            object : androidx.room.InvalidationTracker.Observer(arrayOf("photos", "photo_embeddings")) {
+                override fun onInvalidated(tables: Set<String>) {
+                    invalidateSemanticEmbeddingCache()
+                }
+            }
+        )
         viewModelScope.launch {
             val level = repository.checkMediaAccess()
             mediaAccessLevel.value = level
@@ -464,7 +474,6 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 do {
                     smartTagRerunRequested = false
                     val processed = smartTagPipeline.runPending()
-                    if (processed > 0) invalidateSemanticEmbeddingCache()
                     if (processed > 0 && !smartTagIndexedOnce) {
                         showBanner("智能标签索引完成，可在筛选中按内容标签查找")
                     }
@@ -729,7 +738,6 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         photo: PhotoItemEntity,
         fromCleanerSession: Boolean = false
     ) {
-        invalidateSemanticEmbeddingCache()
         val mediaNoun = if (photo.isVideo) "视频" else "照片"
         val snapshot = UndoSnapshot(
             photoStates = listOf(
@@ -873,7 +881,6 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         chosenBest: PhotoItemEntity = stack.bestPhoto,
         fromCleanerSession: Boolean = false
     ) {
-        invalidateSemanticEmbeddingCache()
         val others = stack.photos.filter { it.id != chosenBest.id }
         val snapshot = UndoSnapshot(
             photoStates = stack.photos.map {
@@ -924,7 +931,6 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun trashEntireStack(stack: CleanupCardItem.BurstStack, fromCleanerSession: Boolean = true) {
-        invalidateSemanticEmbeddingCache()
         val snapshot = UndoSnapshot(
             photoStates = stack.photos.map {
                 PhotoStateBackup(
@@ -959,7 +965,6 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun bulkTrashPhotos(photos: List<PhotoItemEntity>) {
-        invalidateSemanticEmbeddingCache()
         if (photos.isEmpty()) return
         val snapshot = UndoSnapshot(
             photoStates = photos.map {
@@ -1374,7 +1379,6 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun restoreFromVault(photo: PhotoItemEntity) {
-        invalidateSemanticEmbeddingCache()
         val snapshot = UndoSnapshot(
             photoStates = listOf(
                 PhotoStateBackup(
@@ -1400,7 +1404,6 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun restoreAllFromVault(targets: List<PhotoItemEntity> = uiState.value.trashedPhotos) {
-        invalidateSemanticEmbeddingCache()
         if (targets.isEmpty()) return
         val snapshot = UndoSnapshot(
             photoStates = targets.map { photo ->
@@ -1451,7 +1454,6 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         targets: List<PhotoItemEntity>,
         onNeedRecoverableConsent: (IntentSender) -> Unit
     ) {
-        invalidateSemanticEmbeddingCache()
         if (targets.isEmpty()) return
         pendingLegacyRetryPhotos = emptyList()
         accumulatedLegacyFreedBytes = 0L
