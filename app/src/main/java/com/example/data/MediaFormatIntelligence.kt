@@ -308,7 +308,6 @@ data class EmbeddedMotionInfo(
 
 class EmbeddedMotionPhotoDetector(private val context: Context) {
 
-    private val bigTailScanPermits = java.util.concurrent.Semaphore(1)
 
     fun detect(
         contentUri: String,
@@ -472,6 +471,9 @@ class EmbeddedMotionPhotoDetector(private val context: Context) {
     }
 
     companion object {
+        // Shared across all instances: probe workers create one detector per photo, so an
+        // instance-level semaphore would not cap concurrent big-tail reads at all.
+        private val bigTailScanPermits = java.util.concurrent.Semaphore(1)
         private const val MAX_MOTION_CONTAINER_BYTES = 96L * 1024L * 1024L
         private const val XMP_SCAN_BYTES = 256 * 1024
         private const val FOOTER_SCAN_BYTES = 8L * 1024L
