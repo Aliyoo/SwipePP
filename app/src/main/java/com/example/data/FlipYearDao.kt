@@ -51,7 +51,7 @@ interface FlipYearDao {
             "motionVideoUri = :motionVideoUri, motionVideoDurationMs = :motionVideoDurationMs, " +
             "motionVideoOffset = :motionVideoOffset, motionVideoLength = :motionVideoLength, " +
             "pairedMediaStoreKey = :pairedMediaStoreKey, fileSizeBytes = :fileSizeBytes, " +
-            "widthPx = :widthPx, heightPx = :heightPx " +
+            "widthPx = :widthPx, heightPx = :heightPx, mediaProbeVersion = 0 " +
             "WHERE mediaStoreKey = :mediaStoreKey AND isSample = 0"
     )
     suspend fun updateDeviceMediaMetadata(
@@ -80,6 +80,57 @@ interface FlipYearDao {
 
     @Query("SELECT * FROM photos WHERE year = :year AND month = :month AND status != 'PURGED'")
     suspend fun getPhotosForMonth(year: Int, month: Int): List<PhotoItemEntity>
+
+    // ---- Media probe (embedded motion photo / animated WebP detection) ----
+
+    @Query(
+        "SELECT * FROM photos WHERE mediaProbeVersion < :version AND status != 'PURGED' " +
+            "ORDER BY takenAtMillis DESC LIMIT :limit"
+    )
+    suspend fun getPhotosPendingMediaProbe(version: Int, limit: Int): List<PhotoItemEntity>
+
+    @Query("SELECT COUNT(*) FROM photos WHERE mediaProbeVersion < :version AND status != 'PURGED'")
+    suspend fun countPendingMediaProbe(version: Int): Int
+
+    @Query(
+        "UPDATE photos SET isAnimated = :isAnimated, motionPhotoType = :motionPhotoType, " +
+            "motionVideoUri = :motionVideoUri, motionVideoOffset = :motionVideoOffset, " +
+            "motionVideoLength = :motionVideoLength, mediaProbeVersion = :version WHERE id = :id"
+    )
+    suspend fun applyMediaProbeResult(
+        id: Long,
+        isAnimated: Boolean,
+        motionPhotoType: String,
+        motionVideoUri: String?,
+        motionVideoOffset: Long?,
+        motionVideoLength: Long?,
+        version: Int
+    )
+
+    @Query("UPDATE photos SET mediaProbeVersion = :version WHERE id IN (:ids)")
+    suspend fun markMediaProbed(ids: List<Long>, version: Int)
+
+    @Transaction
+    suspend fun applyMediaProbeBatch(
+        results: List<MediaProbeBatchItem>,
+        probedOnlyIds: List<Long>,
+        version: Int
+    ) {
+        for (item in results) {
+            applyMediaProbeResult(
+                id = item.id,
+                isAnimated = item.isAnimated,
+                motionPhotoType = item.motionPhotoType,
+                motionVideoUri = item.motionVideoUri,
+                motionVideoOffset = item.motionVideoOffset,
+                motionVideoLength = item.motionVideoLength,
+                version = version
+            )
+        }
+        probedOnlyIds.chunked(SQLITE_BIND_CHUNK).forEach { chunk ->
+            markMediaProbed(chunk, version)
+        }
+    }
 
     @Query(
         "SELECT * FROM photos WHERE contentLabelVersion < :version AND status != 'PURGED' " +

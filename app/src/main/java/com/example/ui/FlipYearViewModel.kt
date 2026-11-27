@@ -426,6 +426,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     )
                 }
                 startSmartTagBackfill()
+                startMediaProbeBackfill()
             } finally {
                 isScanningDevice.value = false
             }
@@ -474,6 +475,25 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
      * zero-shot categories). Idempotent: only rows behind the current taxonomy version
      * are processed, so repeated calls after incremental syncs are cheap.
      */
+    private var mediaProbeJob: Job? = null
+
+    /**
+     * Background media probe (embedded motion photos / animated WebP). Silent by design:
+     * rows are playable progressively as batches land, newest first.
+     */
+    fun startMediaProbeBackfill() {
+        if (mediaProbeJob?.isActive == true) return
+        mediaProbeJob = viewModelScope.launch {
+            try {
+                repository.backfillMediaProbe()
+            } catch (t: Throwable) {
+                if (t !is kotlinx.coroutines.CancellationException) {
+                    android.util.Log.w("FlipYearViewModel", "media probe backfill failed", t)
+                }
+            }
+        }
+    }
+
     fun startSmartTagBackfill() {
         if (smartTagJob?.isActive == true) {
             // The pipeline caps a run at the pending count sampled when it started; media scanned
@@ -592,6 +612,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             repository.loadDemoArchive()
             showSnackbar("已加载示例照片与 4K 视频影集")
             startSmartTagBackfill()
+            startMediaProbeBackfill()
         }
     }
 

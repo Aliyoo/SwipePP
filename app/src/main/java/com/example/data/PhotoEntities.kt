@@ -95,7 +95,11 @@ data class PhotoItemEntity(
     val isSample: Boolean = true,
     val gpsScanned: Boolean = false,
     val contentLabels: String = "",
-    val contentLabelVersion: Int = 0
+    val contentLabelVersion: Int = 0,
+    // Version of the media probe pass (embedded motion photo / animated WebP detection).
+    // Rows behind the current version are (re-)probed in the background; scan-time inserts
+    // and metadata updates reset it to 0.
+    val mediaProbeVersion: Int = 0
 ) {
     // Zero-allocation fast lookup (avoids PhotoStatus.valueOf + runCatching overhead across 10k+ rows)
     val photoStatus: PhotoStatus
@@ -151,6 +155,15 @@ data class SmartTagBatchUpdate(
 data class DeviceMediaKeyRow(
     val id: Long,
     val mediaStoreKey: String?
+)
+
+data class MediaProbeBatchItem(
+    val id: Long,
+    val isAnimated: Boolean,
+    val motionPhotoType: String,
+    val motionVideoUri: String?,
+    val motionVideoOffset: Long?,
+    val motionVideoLength: Long?
 )
 
 data class DeviceMediaSyncRow(

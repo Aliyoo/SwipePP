@@ -128,6 +128,62 @@ class PhotoRepository(
     }
 
     /**
+     * Background media probe: detects embedded motion photos and animated WebP files,
+     * which were moved off the scan critical path so first-scan rows reach the gallery
+     * in seconds. Batched writes keep Room invalidations smooth; rows whose probe finds
+     * nothing are still marked probed so the pass terminates.
+     */
+    suspend fun backfillMediaProbe(
+        onProgress: (processed: Int, total: Int) -> Unit = { _, _ -> }
+    ): Int = withContext(Dispatchers.IO) {
+        val version = MEDIA_PROBE_VERSION
+        val total = dao.countPendingMediaProbe(version)
+        if (total == 0) return@withContext 0
+
+        var processed = 0
+        onProgress(0, total)
+        while (true) {
+            val batch = dao.getPhotosPendingMediaProbe(version, MEDIA_PROBE_BATCH_SIZE)
+            if (batch.isEmpty()) break
+
+            val results = ArrayList<com.example.data.MediaProbeBatchItem>(batch.size)
+            val probedOnlyIds = ArrayList<Long>(batch.size)
+            for (subChunk in batch.chunked(MEDIA_PROBE_CONCURRENCY)) {
+                val resolved = coroutineScope {
+                    subChunk.map { item ->
+                        async {
+                            val probe = runCatching {
+                                scanner.probeImageMedia(item, item.caption.takeIf { it.isNotBlank() })
+                            }.getOrNull()
+                            item.id to probe
+                        }
+                    }.map { it.await() }
+                }
+                for ((id, probe) in resolved) {
+                    if (probe != null) {
+                        results.add(
+                            com.example.data.MediaProbeBatchItem(
+                                id = id,
+                                isAnimated = probe.isAnimated,
+                                motionPhotoType = probe.motionPhotoType,
+                                motionVideoUri = probe.motionVideoUri,
+                                motionVideoOffset = probe.motionVideoOffset,
+                                motionVideoLength = probe.motionVideoLength
+                            )
+                        )
+                    } else {
+                        probedOnlyIds.add(id)
+                    }
+                }
+            }
+            dao.applyMediaProbeBatch(results, probedOnlyIds, version)
+            processed += batch.size
+            onProgress(processed, total)
+        }
+        processed
+    }
+
+    /**
      * Scans only device photos & videos whose GPS has not yet been scanned (`gpsScanned = 0`),
      * writing results in batched Room transactions so 10,000+ items never flood Flow invalidations
      * and screenshots/non-GPS files are never redundantly re-read on subsequent visits.
@@ -436,17 +492,14 @@ class PhotoRepository(
         }
     }
 
+    // Probe-owned fields (isAnimated / embedded motion video data) are intentionally excluded:
+    // scan rows never carry them anymore, and the background probe rewrites them — comparing
+    // them here would retrigger a metadata update (and probe reset) on every single scan.
     private fun deviceMediaMetadataDiffers(existing: DeviceMediaSyncRow, scanned: PhotoItemEntity): Boolean {
         return existing.durationMs != scanned.durationMs ||
             existing.mimeType != scanned.mimeType ||
             existing.imageFormat != scanned.imageFormat ||
             existing.mediaSubtype != scanned.mediaSubtype ||
-            existing.isAnimated != scanned.isAnimated ||
-            existing.motionPhotoType != scanned.motionPhotoType ||
-            existing.motionVideoUri != scanned.motionVideoUri ||
-            existing.motionVideoDurationMs != scanned.motionVideoDurationMs ||
-            existing.motionVideoOffset != scanned.motionVideoOffset ||
-            existing.motionVideoLength != scanned.motionVideoLength ||
             existing.pairedMediaStoreKey != scanned.pairedMediaStoreKey ||
             existing.fileSizeBytes != scanned.fileSizeBytes ||
             existing.widthPx != scanned.widthPx ||
@@ -456,6 +509,9 @@ class PhotoRepository(
     }
 
     companion object {
+        private const val MEDIA_PROBE_VERSION = 1
+        private const val MEDIA_PROBE_BATCH_SIZE = 48
+        private const val MEDIA_PROBE_CONCURRENCY = 8
         fun yearMonthKey(year: Int, month: Int): String =
             "%04d-%02d".format(year, month)
     }
