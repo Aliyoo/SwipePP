@@ -287,6 +287,14 @@ private fun PhotoDetailLightboxContent(
         if (base.any { it.id == photo.id }) base else listOf(photo)
     }
     val sessionPhotos = remember { mutableStateListOf<PhotoItemEntity>().apply { addAll(initialList) } }
+    LaunchedEffect(photos) {
+        photos.forEach { updated ->
+            val index = sessionPhotos.indexOfFirst { it.id == updated.id }
+            if (index >= 0 && sessionPhotos[index] != updated) {
+                sessionPhotos[index] = updated
+            }
+        }
+    }
     val resolvedStartIndex = remember {
         if (initialIndex in initialList.indices && initialList[initialIndex].id == photo.id) {
             initialIndex
