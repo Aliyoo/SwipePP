@@ -472,9 +472,19 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 } while (smartTagRerunRequested)
                 // Pre-load the text tower in the background so the first semantic search
                 // keystroke does not eat the multi-second model load on the query path.
+                // Must run outside this job: while it loads, startSmartTagBackfill would
+                // see the job as active and queue a rerun nobody consumes.
                 if (!smartTagWarmupDone) {
                     smartTagWarmupDone = true
-                    smartTagAnalyzer.encodeText("照片")
+                    viewModelScope.launch {
+                        try {
+                            smartTagAnalyzer.encodeText("照片")
+                        } catch (t: Throwable) {
+                            if (t !is kotlinx.coroutines.CancellationException) {
+                                android.util.Log.w("FlipYearViewModel", "semantic warmup failed", t)
+                            }
+                        }
+                    }
                 }
             } catch (t: Throwable) {
                 if (t !is kotlinx.coroutines.CancellationException) {
