@@ -509,9 +509,13 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 // Stored embeddings are unit-normalized at indexing time and fp16 rounding
                 // keeps them within ~0.1% of unit norm, so cosine is a plain dot product.
                 val v = FloatArray(com.example.data.smarttag.ClipEmbedder.EMBEDDING_DIM)
+                val expectedBytes = queryVec.size * 2
                 for (row in rows) {
+                    // Rows from a different embedding model (e.g. 512-dim MobileCLIP leftovers
+                    // awaiting reindex) must be skipped by payload length — the fixed buffer
+                    // would otherwise keep stale values from the previous row.
+                    if (row.embeddingFp16.size != expectedBytes) continue
                     com.example.data.smarttag.decodeEmbeddingFp16Into(row.embeddingFp16, v)
-                    if (v.size != queryVec.size) continue
                     var dot = 0f
                     var norm = 0f
                     for (i in v.indices) {
