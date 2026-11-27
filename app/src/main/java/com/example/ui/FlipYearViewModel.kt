@@ -47,14 +47,57 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-// cn-clip similarity is heavily compressed: correct hits measured 0.46-0.52 while the noise
-// tail reaches ~0.51 on diverse libraries, so absolute thresholds barely separate signal from
-// noise. Precision comes from the margin below the best score: noise distributions drop fast
-// after their outlier top-1, while genuine matches cluster near the top. The absolute floor
-// rejects noise-only queries whose top hit never rises above the noise bulk (~0.44).
-private const val SEMANTIC_TOP1_MARGIN = 0.04f
-private const val SEMANTIC_ABSOLUTE_FLOOR = 0.45f
-private const val SEMANTIC_MATCH_CAP = 24
+// Zero-centered semantic lift constants calibrated on Chinese-CLIP RN50 + CLC2 neutral baseline.
+// Each photo's Hubness baseline `dot(imgVec, neutralMean)` is subtracted from `dot(imgVec, queryVec)`,
+// eliminating document/screenshot/blank-frame bias so true matches sit at +0.026..+0.110 while
+// absent-concept queries sit below +0.015.
+internal const val SEMANTIC_LIFT_FLOOR = 0.025f
+internal const val SEMANTIC_TOP1_MARGIN = 0.036f
+internal const val SEMANTIC_MEDIAN_MARGIN = 0.022f
+internal const val SEMANTIC_STRONG_LIFT = 0.042f
+internal const val SEMANTIC_RAW_FLOOR = 0.435f
+internal const val SEMANTIC_MATCH_CAP = 200
+
+internal data class ScoredSemanticCandidate(
+    val photoId: Long,
+    val lift: Float,
+    val rawCosine: Float
+)
+
+/**
+ * Pure threshold & ranking filter over debiased semantic candidates. Returns a map of
+ * `photoId -> lift` ordered by lift descending, or emptyMap when the query is out-of-library noise.
+ */
+internal fun selectSemanticMatchesByLift(
+    candidates: List<ScoredSemanticCandidate>
+): Map<Long, Float> {
+    if (candidates.isEmpty()) return emptyMap()
+    val sorted = candidates.sortedByDescending { it.lift }
+    val top = sorted.first()
+    if (top.lift < SEMANTIC_LIFT_FLOOR || top.rawCosine < SEMANTIC_RAW_FLOOR) return emptyMap()
+
+    if (sorted.size >= 6) {
+        val mid = sorted.size / 2
+        val medianLift = if (sorted.size % 2 == 0) {
+            (sorted[mid - 1].lift + sorted[mid].lift) * 0.5f
+        } else {
+            sorted[mid].lift
+        }
+        if ((top.lift - medianLift) < SEMANTIC_MEDIAN_MARGIN && top.lift < SEMANTIC_STRONG_LIFT) {
+            return emptyMap()
+        }
+    }
+
+    val cut = (top.lift - SEMANTIC_TOP1_MARGIN).coerceAtLeast(SEMANTIC_LIFT_FLOOR)
+    val out = LinkedHashMap<Long, Float>(minOf(sorted.size, SEMANTIC_MATCH_CAP))
+    for (item in sorted) {
+        if (out.size >= SEMANTIC_MATCH_CAP) break
+        if (item.lift < cut) break
+        if (item.rawCosine < SEMANTIC_RAW_FLOOR) continue
+        out[item.photoId] = item.lift
+    }
+    return out
+}
 
 class FlipYearViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -80,6 +123,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     private val hasMediaLocationPermission = MutableStateFlow(repository.hasMediaLocationAccess())
     private val isScanningDevice = MutableStateFlow(false)
     private val gpsIndexProgress = MutableStateFlow(GpsIndexProgress())
+    private val smartTagProgress = MutableStateFlow(SmartTagIndexProgress())
     private val batchTaskProgress = MutableStateFlow(BatchTaskProgress())
     private val snackbarMessage = MutableStateFlow<SnackbarMessage?>(null)
     private val recentlyStampedMonthKey = MutableStateFlow<String?>(null)
@@ -99,10 +143,16 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     }
     private var smartTagIndexedOnce = false
 
-    // Semantic-search caches. Embedding rows are written only by the smart-tag backfill,
-    // so the cache is invalidated there and at every trash/restore entry point.
+    private data class CachedEmbeddingRow(
+        val photoId: Long,
+        val embeddingFp16: ByteArray,
+        val imageBaseline: Float
+    )
+
+    // Semantic-search caches. Invalidated automatically by Room's InvalidationTracker whenever
+    // photos or photo_embeddings change.
     private var smartTagWarmupDone = false
-    @Volatile private var semanticEmbeddingCache: List<com.example.data.PhotoEmbeddingEntity>? = null
+    @Volatile private var semanticEmbeddingCache: List<CachedEmbeddingRow>? = null
     private var lastSemanticQuery: Pair<String, FloatArray>? = null
 
     private fun invalidateSemanticEmbeddingCache() {
@@ -128,6 +178,13 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         val total: Int = 0
     )
 
+    private data class SmartTagIndexProgress(
+        val isIndexing: Boolean = false,
+        val processed: Int = 0,
+        val total: Int = 0,
+        val revision: Int = 0
+    )
+
     private data class BatchTaskProgress(
         val message: String? = null,
         val processed: Int = 0,
@@ -141,6 +198,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         val hasLocationPerm: Boolean,
         val scanning: Boolean,
         val gpsProgress: GpsIndexProgress,
+        val smartTagProgress: SmartTagIndexProgress,
         val batchProgress: BatchTaskProgress,
         val snackbar: SnackbarMessage?,
         val recentStamp: String?,
@@ -170,22 +228,23 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     private val metaFlow = combine(
         combine(undoStack, cleanerSessionUndoStack) { global, session -> global.size to session.size },
         combine(mediaAccessLevel, hasMediaLocationPermission) { a, loc -> a to loc },
-        combine(isScanningDevice, gpsIndexProgress, batchTaskProgress) { scan, gps, batch ->
-            Triple(scan, gps, batch)
+        combine(isScanningDevice, gpsIndexProgress, smartTagProgress, batchTaskProgress) { scan, gps, smartTag, batch ->
+            listOf(scan, gps, smartTag, batch)
         },
         combine(snackbarMessage, recentlyStampedMonthKey, vaultSessionFilterIds, customCleanerSession) { snack, stamp, filterIds, custom ->
             listOf(snack, stamp, filterIds, custom)
         }
-    ) { undoPair, accessPair, workTriple, feedbackList ->
+    ) { undoPair, accessPair, workList, feedbackList ->
         @Suppress("UNCHECKED_CAST")
         UiMeta(
             undoDepth = undoPair.first,
             cleanerSessionUndoDepth = undoPair.second,
             access = accessPair.first,
             hasLocationPerm = accessPair.second,
-            scanning = workTriple.first,
-            gpsProgress = workTriple.second,
-            batchProgress = workTriple.third,
+            scanning = workList[0] as Boolean,
+            gpsProgress = workList[1] as GpsIndexProgress,
+            smartTagProgress = workList[2] as SmartTagIndexProgress,
+            batchProgress = workList[3] as BatchTaskProgress,
             snackbar = feedbackList[0] as SnackbarMessage?,
             recentStamp = feedbackList[1] as String?,
             vaultSessionFilter = feedbackList[2] as Set<Long>?,
@@ -332,7 +391,11 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             customCleanerSession = meta.customSession,
             batchTaskMessage = meta.batchProgress.message,
             batchTaskProcessed = meta.batchProgress.processed,
-            batchTaskTotal = meta.batchProgress.total
+            batchTaskTotal = meta.batchProgress.total,
+            isIndexingSmartTags = meta.smartTagProgress.isIndexing,
+            smartTagIndexedCount = meta.smartTagProgress.processed,
+            smartTagTotalCount = meta.smartTagProgress.total,
+            smartTagRevision = meta.smartTagProgress.revision
         )
     }.stateIn(
         scope = viewModelScope,
@@ -500,6 +563,21 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun startSmartTagBackfill() {
+        // Warm up the text tower independently of vision indexing (they hold separate mutexes),
+        // so semantic search stays snappy even while a large library is still indexing.
+        if (!smartTagWarmupDone) {
+            smartTagWarmupDone = true
+            viewModelScope.launch {
+                try {
+                    smartTagAnalyzer.neutralConceptBaseline()
+                    smartTagAnalyzer.encodeText("照片")
+                } catch (t: Throwable) {
+                    if (t !is kotlinx.coroutines.CancellationException) {
+                        android.util.Log.w("FlipYearViewModel", "semantic warmup failed", t)
+                    }
+                }
+            }
+        }
         if (smartTagJob?.isActive == true) {
             // The pipeline caps a run at the pending count sampled when it started; media scanned
             // mid-run would otherwise wait for the next launch. Remember the follow-up request
@@ -511,95 +589,132 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             try {
                 do {
                     smartTagRerunRequested = false
-                    val processed = smartTagPipeline.runPending()
+                    var lastReportedProcessed = 0
+                    val processed = smartTagPipeline.runPending { progress ->
+                        val prev = smartTagProgress.value
+                        val bumpedRev = if (progress.processed > lastReportedProcessed &&
+                            (progress.processed % 12 == 0 || !progress.isRunning)
+                        ) {
+                            lastReportedProcessed = progress.processed
+                            prev.revision + 1
+                        } else {
+                            prev.revision
+                        }
+                        smartTagProgress.value = SmartTagIndexProgress(
+                            isIndexing = progress.isRunning && progress.total > 0,
+                            processed = progress.processed,
+                            total = progress.total,
+                            revision = bumpedRev
+                        )
+                    }
                     if (processed > 0 && !smartTagIndexedOnce) {
                         showBanner("智能标签索引完成，可在筛选中按内容标签查找")
                     }
                     if (processed > 0) smartTagIndexedOnce = true
                 } while (smartTagRerunRequested)
-                // Pre-load the text tower in the background so the first semantic search
-                // keystroke does not eat the multi-second model load on the query path.
-                // Must run outside this job: while it loads, startSmartTagBackfill would
-                // see the job as active and queue a rerun nobody consumes.
-                if (!smartTagWarmupDone) {
-                    smartTagWarmupDone = true
-                    viewModelScope.launch {
-                        try {
-                            smartTagAnalyzer.encodeText("照片")
-                        } catch (t: Throwable) {
-                            if (t !is kotlinx.coroutines.CancellationException) {
-                                android.util.Log.w("FlipYearViewModel", "semantic warmup failed", t)
-                            }
-                        }
-                    }
-                }
             } catch (t: Throwable) {
                 if (t !is kotlinx.coroutines.CancellationException) {
                     android.util.Log.w("FlipYearViewModel", "smart tag backfill failed", t)
                 }
+            } finally {
+                val prev = smartTagProgress.value
+                smartTagProgress.value = prev.copy(isIndexing = false)
             }
         }
     }
 
     /**
-     * Encodes [keyword] with the cn-clip text tower and scores it against every stored image
-     * embedding. cn-clip similarity distributions are narrow and query-dependent, so matches
-     * are accepted by z-score within the library rather than an absolute threshold.
+     * Encodes [keyword] with the cn-clip text tower and computes Hubness-debiased zero-centered
+     * lift (`dot(imgVec, queryVec) - dot(imgVec, neutralMean)`) against every visible stored
+     * embedding. Returns `photoId -> lift` ordered by relevance descending.
      */
-    suspend fun computeSemanticMatches(keyword: String): Set<Long> {
+    suspend fun computeSemanticMatches(keyword: String): Map<Long, Float> {
         val trimmed = keyword.trim()
-        if (trimmed.isBlank()) return emptySet()
+        if (trimmed.isBlank()) return emptyMap()
         return try {
             val cached = lastSemanticQuery
             val queryVec = if (cached != null && cached.first == trimmed) {
                 cached.second
             } else {
-                (smartTagAnalyzer.encodeText(trimmed) ?: return emptySet()).also {
+                (smartTagAnalyzer.encodeText(trimmed) ?: return emptyMap()).also {
                     lastSemanticQuery = trimmed to it
                 }
             }
-            val rows = semanticEmbeddingCache
-                ?: database.flipYearDao().getAllEmbeddings().also { semanticEmbeddingCache = it }
-            if (rows.isEmpty()) return emptySet()
-            val scored = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                val out = ArrayList<Pair<Long, Float>>(rows.size)
-                // Stored embeddings are unit-normalized at indexing time and fp16 rounding
-                // keeps them within ~0.1% of unit norm, so cosine is a plain dot product.
+            val expectedBytes = queryVec.size * 2
+            val rows = semanticEmbeddingCache ?: loadDebiasedEmbeddingCache(expectedBytes).also {
+                semanticEmbeddingCache = it
+            }
+            if (rows.isEmpty()) return emptyMap()
+
+            val candidates = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                val out = ArrayList<ScoredSemanticCandidate>(rows.size)
                 val v = FloatArray(com.example.data.smarttag.ClipEmbedder.EMBEDDING_DIM)
-                val expectedBytes = queryVec.size * 2
                 for (row in rows) {
-                    // Rows from a different embedding model (e.g. 512-dim MobileCLIP leftovers
-                    // awaiting reindex) must be skipped by payload length — the fixed buffer
-                    // would otherwise keep stale values from the previous row.
                     if (row.embeddingFp16.size != expectedBytes) continue
                     com.example.data.smarttag.decodeEmbeddingFp16Into(row.embeddingFp16, v)
                     var dot = 0f
-                    var norm = 0f
+                    var normSq = 0f
                     for (i in v.indices) {
                         dot += queryVec[i] * v[i]
-                        norm += v[i] * v[i]
+                        normSq += v[i] * v[i]
                     }
-                    if (norm in 0.99f..1.01f) {
-                        out.add(row.photoId to dot)
-                    } else if (norm > 0f) {
-                        out.add(row.photoId to dot / kotlin.math.sqrt(norm))
+                    val rawCosine = if (normSq in 0.99f..1.01f) {
+                        dot
+                    } else if (normSq > 0f) {
+                        dot / kotlin.math.sqrt(normSq)
+                    } else {
+                        continue
                     }
+                    val lift = rawCosine - row.imageBaseline
+                    out.add(ScoredSemanticCandidate(row.photoId, lift = lift, rawCosine = rawCosine))
                 }
                 out
             }
-            if (scored.isEmpty()) return emptySet()
-            val sorted = scored.sortedByDescending { it.second }
-            val top = sorted.first().second
-            if (top < SEMANTIC_ABSOLUTE_FLOOR) return emptySet()
-            val floor = (top - SEMANTIC_TOP1_MARGIN).coerceAtLeast(SEMANTIC_ABSOLUTE_FLOOR)
-            sorted.filter { it.second >= floor }
-                .take(SEMANTIC_MATCH_CAP)
-                .mapTo(HashSet()) { it.first }
+            selectSemanticMatchesByLift(candidates)
         } catch (t: Throwable) {
             if (t !is kotlinx.coroutines.CancellationException) {
                 android.util.Log.w("FlipYearViewModel", "semantic search failed", t)
             }
-            emptySet()
+            emptyMap()
+        }
+    }
+
+    private suspend fun loadDebiasedEmbeddingCache(expectedBytes: Int): List<CachedEmbeddingRow> {
+        val rawRows = database.flipYearDao().getAllEmbeddings()
+        if (rawRows.isEmpty()) return emptyList()
+        val neutralBaseline = smartTagAnalyzer.neutralConceptBaseline()
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            val out = ArrayList<CachedEmbeddingRow>(rawRows.size)
+            val v = FloatArray(com.example.data.smarttag.ClipEmbedder.EMBEDDING_DIM)
+            for (row in rawRows) {
+                if (row.embeddingFp16.size != expectedBytes) continue
+                val base = if (neutralBaseline != null && neutralBaseline.size == v.size) {
+                    com.example.data.smarttag.decodeEmbeddingFp16Into(row.embeddingFp16, v)
+                    var dot = 0f
+                    var normSq = 0f
+                    for (i in v.indices) {
+                        dot += v[i] * neutralBaseline[i]
+                        normSq += v[i] * v[i]
+                    }
+                    if (normSq in 0.99f..1.01f) {
+                        dot
+                    } else if (normSq > 0f) {
+                        dot / kotlin.math.sqrt(normSq)
+                    } else {
+                        0f
+                    }
+                } else {
+                    0.43f
+                }
+                out.add(
+                    CachedEmbeddingRow(
+                        photoId = row.photoId,
+                        embeddingFp16 = row.embeddingFp16,
+                        imageBaseline = base
+                    )
+                )
+            }
+            out
         }
     }
 

@@ -11,59 +11,101 @@ import java.nio.FloatBuffer
 import kotlin.math.sqrt
 
 /**
- * On-device Chinese-CLIP RN50 dual encoder (fp16 ONNX):
- * - vision tower: input `image` [1,3,224,224] fp32, direct 224x224 rescale (the model was
- *   trained with a plain resize, NOT aspect-preserving crop), /255 then CLIP mean/std
- *   normalization; output `unnorm_image_features` [1,1024]
- * - text tower: input `text` [1,52] int64 wordpiece ids (see [CnClipTokenizer]);
- *   output `unnorm_text_features` [1,1024]
- * Both share one embedding space, serving fixed-category zero-shot tagging (offline
- * precomputed `clip_categories.bin`, Chinese prompts) and free-text semantic search.
+ * On-device Chinese-CLIP RN50 dual encoder:
+ * - vision tower (`cnclip_vision_fp16.onnx`): input `image` [1,3,224,224] fp32, direct 224x224
+ *   rescale + CLIP mean/std normalization; output `unnorm_image_features` [1,1024]
+ * - text tower (`cnclip_text_int8.onnx`): input `text` [1,52] int64 wordpiece ids (see
+ *   [CnClipTokenizer]); output `unnorm_text_features` [1,1024]
+ * - category table (`clip_categories.bin`, CLC2 format): unnormalized mean vector of 60 neutral
+ *   Chinese concepts (for zero-centered Hubness debiasing) + concrete multi-prototype vectors per
+ *   [SmartCategory] (max-pooled instead of centroid-averaged).
  *
- * Lazy, thread-confined usage: callers must invoke [analyze]/[encodeText] through the
- * analyzer's mutex; sessions are created on first use and reused.
+ * Vision and text sessions load and lock independently so user semantic search is never blocked
+ * behind background vision indexing or vision model initialization.
  */
 class ClipEmbedder(private val context: Context) {
 
     class ModelUnavailableException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
-    private var visionSession: OrtSession? = null
-    private var textSession: OrtSession? = null
-    private var environment: OrtEnvironment? = null
-    private var categoryVectors: List<Pair<SmartCategory, FloatArray>>? = null
-    private var tokenizer: CnClipTokenizer? = null
+    data class CategoryTable(
+        val neutralMean: FloatArray,
+        val categories: List<Pair<SmartCategory, List<FloatArray>>>
+    )
+
+    private val envLock = Any()
+    private val visionLock = Any()
+    private val textLock = Any()
+    private val tableLock = Any()
+
+    @Volatile private var environment: OrtEnvironment? = null
+    @Volatile private var visionSession: OrtSession? = null
+    @Volatile private var textSession: OrtSession? = null
+    @Volatile private var categoryTable: CategoryTable? = null
+    @Volatile private var tokenizer: CnClipTokenizer? = null
 
     val isReady: Boolean
-        get() = visionSession != null && categoryVectors != null
+        get() = visionSession != null && categoryTable != null
 
-    @Synchronized
-    private fun ensureLoaded() {
-        try {
-            val env = environment ?: OrtEnvironment.getEnvironment().also { environment = it }
-            if (visionSession == null) {
-                visionSession = createSession(env, VISION_MODEL_ASSET)
-            }
-            if (categoryVectors == null) {
-                categoryVectors = loadCategoryTable()
-            }
-        } catch (t: Throwable) {
-            throw ModelUnavailableException("CLIP vision model unavailable: ${t.message}", t)
+    private fun getOrCreateEnv(): OrtEnvironment {
+        environment?.let { return it }
+        synchronized(envLock) {
+            return environment ?: OrtEnvironment.getEnvironment().also { environment = it }
         }
     }
 
-    @Synchronized
-    private fun ensureTextLoaded() {
-        ensureLoaded()
-        try {
-            val env = environment!!
-            if (textSession == null) {
-                textSession = createSession(env, TEXT_MODEL_ASSET)
+    private fun ensureCategoryTableLoaded(): CategoryTable {
+        categoryTable?.let { return it }
+        synchronized(tableLock) {
+            categoryTable?.let { return it }
+            return try {
+                loadCategoryTable().also { categoryTable = it }
+            } catch (t: Throwable) {
+                throw ModelUnavailableException("CLIP category table unavailable: ${t.message}", t)
             }
-            if (tokenizer == null) {
-                tokenizer = CnClipTokenizer(context)
+        }
+    }
+
+    private fun ensureVisionLoaded(): OrtSession {
+        ensureCategoryTableLoaded()
+        visionSession?.let { return it }
+        synchronized(visionLock) {
+            visionSession?.let { return it }
+            return try {
+                createSession(getOrCreateEnv(), VISION_MODEL_ASSET).also { visionSession = it }
+            } catch (t: Throwable) {
+                throw ModelUnavailableException("CLIP vision model unavailable: ${t.message}", t)
             }
-        } catch (t: Throwable) {
-            throw ModelUnavailableException("CLIP text model unavailable: ${t.message}", t)
+        }
+    }
+
+    private fun ensureTextLoaded(): Pair<OrtSession, CnClipTokenizer> {
+        val existingSession = textSession
+        val existingTokenizer = tokenizer
+        if (existingSession != null && existingTokenizer != null) {
+            return existingSession to existingTokenizer
+        }
+        synchronized(textLock) {
+            return try {
+                val s = textSession ?: createSession(getOrCreateEnv(), TEXT_MODEL_ASSET).also { textSession = it }
+                val tk = tokenizer ?: CnClipTokenizer(context).also { tokenizer = it }
+                s to tk
+            } catch (t: Throwable) {
+                throw ModelUnavailableException("CLIP text model unavailable: ${t.message}", t)
+            }
+        }
+    }
+
+    /**
+     * Returns the unnormalized mean vector of 60 neutral Chinese visual concepts from
+     * `clip_categories.bin`. Dotting any unit image embedding with this vector estimates that
+     * image's baseline cosine similarity against an average generic query (image Hubness), so
+     * subtracting it yields a zero-centered semantic lift score.
+     */
+    fun getNeutralConceptBaseline(): FloatArray? {
+        return try {
+            ensureCategoryTableLoaded().neutralMean
+        } catch (_: Throwable) {
+            null
         }
     }
 
@@ -98,51 +140,81 @@ class ClipEmbedder(private val context: Context) {
         return out
     }
 
-    private fun loadCategoryTable(): List<Pair<SmartCategory, FloatArray>> {
+    private fun loadCategoryTable(): CategoryTable {
         val bytes = context.assets.open(CATEGORY_TABLE_ASSET).use { it.readBytes() }
         val buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
         require(buf.remaining() >= 12) { "category table too small" }
         val magic = ByteArray(4).also { buf.get(it) }.decodeToString()
-        require(magic == "CLCT") { "bad category table magic: $magic" }
-        val count = buf.int
+        require(magic == "CLC2") { "bad category table magic: $magic (expected CLC2)" }
         val dim = buf.int
+        val count = buf.int
         require(dim == EMBEDDING_DIM) { "unexpected embedding dim $dim" }
-        val out = ArrayList<Pair<SmartCategory, FloatArray>>(count)
+
+        val neutralMean = readFp16Vector(buf, dim)
+        val out = ArrayList<Pair<SmartCategory, List<FloatArray>>>(count)
         repeat(count) {
             val keyLen = buf.int
             val keyBytes = ByteArray(keyLen).also { buf.get(it) }
             val key = keyBytes.decodeToString()
-            val floats = FloatArray(dim)
-            repeat(dim) { i ->
-                floats[i] = halfToFloat(buf.short)
+            val protoCount = buf.int
+            val protos = ArrayList<FloatArray>(protoCount)
+            repeat(protoCount) {
+                protos.add(readFp16Vector(buf, dim))
             }
             val cat = SmartCategory.fromKey(key)
-            if (cat != null) out.add(cat to floats)
+            if (cat != null && protos.isNotEmpty()) {
+                out.add(cat to protos)
+            }
         }
-        return out
+        return CategoryTable(neutralMean = neutralMean, categories = out)
+    }
+
+    private fun readFp16Vector(buf: ByteBuffer, dim: Int): FloatArray {
+        val floats = FloatArray(dim)
+        repeat(dim) { i ->
+            floats[i] = halfToFloat(buf.short)
+        }
+        return floats
     }
 
     data class ClipAnalysis(
         val embedding: FloatArray,
         val categories: List<SmartCategory>,
-        val topSimilarity: Float
+        val topSimilarity: Float,
+        val isLowInfo: Boolean = false
+    )
+
+    private data class PreprocessedImage(
+        val tensorBuffer: FloatBuffer,
+        val lumaStd: Float
     )
 
     /**
      * Computes the normalized 1024-d embedding for [bitmap] (any size; internally rescaled)
-     * and zero-shot category assignments. Returns null when inference fails for this input.
+     * and zero-centered multi-prototype category assignments. Solid-color / blank frames are
+     * flagged [ClipAnalysis.isLowInfo] with empty categories so accidental pocket shots never
+     * pollute tags or semantic search.
      */
     fun analyze(bitmap: Bitmap): ClipAnalysis? {
-        ensureLoaded()
-        val s = visionSession ?: return null
-        val cats = categoryVectors ?: return null
+        val s = ensureVisionLoaded()
+        val table = ensureCategoryTableLoaded()
         return try {
-            val embedding = runVision(bitmap, s) ?: return null
-            val picked = pickCategories(embedding, cats)
+            val preprocessed = preprocess(bitmap)
+            if (preprocessed.lumaStd < SmartTagHeuristics.MIN_IMAGE_LUMA_STD) {
+                return ClipAnalysis(
+                    embedding = FloatArray(0),
+                    categories = emptyList(),
+                    topSimilarity = 0f,
+                    isLowInfo = true
+                )
+            }
+            val embedding = runVision(preprocessed.tensorBuffer, s) ?: return null
+            val picked = pickCategories(embedding, table)
             ClipAnalysis(
                 embedding = embedding,
                 categories = picked.map { it.first },
-                topSimilarity = picked.firstOrNull()?.second ?: 0f
+                topSimilarity = picked.firstOrNull()?.second ?: 0f,
+                isLowInfo = false
             )
         } catch (t: Throwable) {
             null
@@ -156,9 +228,8 @@ class ClipEmbedder(private val context: Context) {
     fun encodeText(query: String): FloatArray? {
         if (query.isBlank()) return null
         return try {
-            ensureTextLoaded()
-            val s = textSession ?: return null
-            val tk = tokenizer ?: return null
+            val (s, tk) = ensureTextLoaded()
+            val env = getOrCreateEnv()
             val ids = tk.encode(query.trim())
             val shape = longArrayOf(1, CnClipTokenizer.CONTEXT_LENGTH.toLong())
             val idBuffer = ByteBuffer.allocateDirect(ids.size * 8)
@@ -166,7 +237,7 @@ class ClipEmbedder(private val context: Context) {
                 .asLongBuffer()
             idBuffer.put(ids)
             idBuffer.rewind()
-            OnnxTensor.createTensor(environment, idBuffer, shape).use { tensor ->
+            OnnxTensor.createTensor(env, idBuffer, shape).use { tensor ->
                 s.run(mapOf(TEXT_INPUT_NAME to tensor)).use { result ->
                     val raw = (result.get(0).value as? Array<*>)?.get(0) as? FloatArray ?: return null
                     val embedding = raw.copyOf()
@@ -179,10 +250,10 @@ class ClipEmbedder(private val context: Context) {
         }
     }
 
-    private fun runVision(bitmap: Bitmap, s: OrtSession): FloatArray? {
-        val input = preprocess(bitmap)
+    private fun runVision(input: FloatBuffer, s: OrtSession): FloatArray? {
+        val env = getOrCreateEnv()
         val shape = longArrayOf(1, 3, INPUT_SIZE.toLong(), INPUT_SIZE.toLong())
-        OnnxTensor.createTensor(environment, input, shape).use { tensor ->
+        OnnxTensor.createTensor(env, input, shape).use { tensor ->
             s.run(mapOf(VISION_INPUT_NAME to tensor)).use { result ->
                 val raw = (result.get(0).value as? Array<*>)?.get(0) as? FloatArray ?: return null
                 val embedding = raw.copyOf()
@@ -193,38 +264,49 @@ class ClipEmbedder(private val context: Context) {
     }
 
     /**
-     * Cosine similarity of [embedding] against every fixed category. cn-clip RN50 compresses
-     * similarities into a narrow band (noise floor ~0.42, correct matches ~0.48-0.51 on the
-     * validation samples), so absolute thresholds are meaningless: acceptance is relative to
-     * the mean similarity across all categories for this image.
+     * Multi-prototype zero-centered lift category selection.
+     * Each category's raw score is `max_{p in subPrototypes} dot(embedding, p)`, minus the
+     * image's baseline similarity `dot(embedding, neutralMean)`. Removing the shared text cone
+     * eliminates Hubness and sticky-category bias (`LANDMARK`, `SCREEN`, `PERSON`).
      */
     private fun pickCategories(
         embedding: FloatArray,
-        cats: List<Pair<SmartCategory, FloatArray>>
+        table: CategoryTable
     ): List<Pair<SmartCategory, Float>> {
-        val scored = cats.map { (cat, vec) ->
-            var dot = 0f
-            for (i in 0 until EMBEDDING_DIM) dot += embedding[i] * vec[i]
-            cat to dot
+        val neutral = table.neutralMean
+        var imageBaseline = 0f
+        for (i in 0 until EMBEDDING_DIM) {
+            imageBaseline += embedding[i] * neutral[i]
+        }
+
+        val scored = table.categories.map { (cat, protos) ->
+            var bestDot = Float.NEGATIVE_INFINITY
+            for (vec in protos) {
+                var dot = 0f
+                for (i in 0 until EMBEDDING_DIM) dot += embedding[i] * vec[i]
+                if (dot > bestDot) bestDot = dot
+            }
+            cat to (bestDot - imageBaseline)
         }.sortedByDescending { it.second }
         if (scored.isEmpty()) return emptyList()
 
-        var sum = 0f
-        for ((_, sim) in scored) sum += sim
-        val floor = sum / scored.size + SmartTagHeuristics.CLIP_CATEGORY_MARGIN_OVER_MEAN
+        val topLift = scored.first().second
+        if (topLift < SmartTagHeuristics.CLIP_CATEGORY_MIN_LIFT) return emptyList()
+        val relativeFloor = (topLift - SmartTagHeuristics.CLIP_CATEGORY_TOP1_MARGIN)
+            .coerceAtLeast(SmartTagHeuristics.CLIP_CATEGORY_MIN_LIFT)
 
         val chosen = ArrayList<Pair<SmartCategory, Float>>(SmartTagHeuristics.MAX_TAGS_PER_PHOTO)
-        for ((cat, sim) in scored) {
+        for ((cat, lift) in scored) {
             if (chosen.size >= SmartTagHeuristics.MAX_TAGS_PER_PHOTO) break
-            if (sim < floor) break
-            chosen.add(cat to sim)
+            if (lift < SmartTagHeuristics.CLIP_CATEGORY_MIN_LIFT) break
+            if (lift < relativeFloor && lift < SmartTagHeuristics.CLIP_CATEGORY_STRONG_LIFT) break
+            chosen.add(cat to lift)
         }
         return chosen
     }
 
-    private fun preprocess(src: Bitmap): FloatBuffer {
-        // Direct rescale to 224x224 without preserving aspect ratio, matching cn-clip's
-        // Resize((224, 224)) training transform.
+    private fun preprocess(src: Bitmap): PreprocessedImage {
+        // Direct rescale to 224x224 matching cn-clip's Resize((224, 224)) training transform.
         val scaled = Bitmap.createScaledBitmap(src, INPUT_SIZE, INPUT_SIZE, true)
         val pixels = IntArray(INPUT_SIZE * INPUT_SIZE)
         scaled.getPixels(pixels, 0, INPUT_SIZE, 0, 0, INPUT_SIZE, INPUT_SIZE)
@@ -233,27 +315,26 @@ class ClipEmbedder(private val context: Context) {
         val buffer = direct.asFloatBuffer()
         val plane = INPUT_SIZE * INPUT_SIZE
         val inv = 1f / 255f
+        var lumaSum = 0.0
+        var lumaSqSum = 0.0
         for (i in pixels.indices) {
             val p = pixels[i]
-            buffer.put(i, ((p shr 16) and 0xFF) * inv)
-            buffer.put(plane + i, ((p shr 8) and 0xFF) * inv)
-            buffer.put(2 * plane + i, (p and 0xFF) * inv)
+            val r = ((p shr 16) and 0xFF) * inv
+            val g = ((p shr 8) and 0xFF) * inv
+            val b = (p and 0xFF) * inv
+            val luma = 0.299 * r + 0.587 * g + 0.114 * b
+            lumaSum += luma
+            lumaSqSum += luma * luma
+            buffer.put(i, (r - CHANNEL_MEAN[0]) / CHANNEL_STD[0])
+            buffer.put(plane + i, (g - CHANNEL_MEAN[1]) / CHANNEL_STD[1])
+            buffer.put(2 * plane + i, (b - CHANNEL_MEAN[2]) / CHANNEL_STD[2])
         }
         buffer.rewind()
-        // Now normalize per-channel with CLIP mean/std in place.
-        for (c in 0 until 3) {
-            val mean = CHANNEL_MEAN[c]
-            val std = CHANNEL_STD[c]
-            val offset = c * plane
-            for (i in 0 until plane) {
-                val idx = offset + i
-                buffer.put(idx, (buffer.get(idx) - mean) / std)
-            }
-        }
-        buffer.rewind()
+        val mean = lumaSum / plane
+        val variance = (lumaSqSum / plane - mean * mean).coerceAtLeast(0.0)
         // `scaled` is a fresh bitmap unless the source was already exactly 224x224; never
         // recycle shared framework instances (see SmartTaggingPipeline note).
-        return buffer
+        return PreprocessedImage(tensorBuffer = buffer, lumaStd = sqrt(variance).toFloat())
     }
 
     private fun normalizeInPlace(v: FloatArray) {
@@ -265,18 +346,29 @@ class ClipEmbedder(private val context: Context) {
         }
     }
 
-    @Synchronized
+    fun closeVision() {
+        synchronized(visionLock) {
+            try {
+                visionSession?.close()
+            } catch (_: Throwable) {
+            }
+            visionSession = null
+        }
+    }
+
+    fun closeText() {
+        synchronized(textLock) {
+            try {
+                textSession?.close()
+            } catch (_: Throwable) {
+            }
+            textSession = null
+        }
+    }
+
     fun close() {
-        try {
-            visionSession?.close()
-        } catch (_: Throwable) {
-        }
-        try {
-            textSession?.close()
-        } catch (_: Throwable) {
-        }
-        visionSession = null
-        textSession = null
+        closeVision()
+        closeText()
     }
 
     companion object {

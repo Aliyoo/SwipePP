@@ -59,6 +59,7 @@ class SmartTaggingPipeline(
 
             val labelUpdates = ArrayList<SmartTagBatchUpdate>(batch.size)
             val embeddings = ArrayList<PhotoEmbeddingEntity>(batch.size)
+            val staleEmbeddingIds = ArrayList<Long>()
 
             for (photo in batch) {
                 if (processed >= total) break
@@ -77,19 +78,24 @@ class SmartTaggingPipeline(
                             labelsCsv = result.categoryKeys.joinToString(",")
                         )
                     )
-                    result.embeddingFp16?.let {
+                    val embBytes = result.embeddingFp16
+                    if (embBytes != null) {
                         embeddings.add(
                             PhotoEmbeddingEntity(
                                 photoId = photo.id,
-                                embeddingFp16 = it,
+                                embeddingFp16 = embBytes,
                                 updatedAtMillis = System.currentTimeMillis()
                             )
                         )
+                    } else if (result.usedClip) {
+                        // Low-info / solid frame: purge any stale embedding from older versions.
+                        staleEmbeddingIds.add(photo.id)
                     }
                     if (result.categoryKeys.isNotEmpty()) tagged++
                 } else {
                     // Undecodable rows are still advanced past this version to avoid infinite retries.
                     labelUpdates.add(SmartTagBatchUpdate(id = photo.id, labelsCsv = ""))
+                    staleEmbeddingIds.add(photo.id)
                 }
                 processed++
                 if (processed % 4 == 0) {
@@ -100,7 +106,7 @@ class SmartTaggingPipeline(
 
             try {
                 if (labelUpdates.isNotEmpty()) {
-                    dao.applySmartTagBatch(labelUpdates, embeddings, version)
+                    dao.applySmartTagBatch(labelUpdates, embeddings, version, staleEmbeddingIds)
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "batch write failed", t)

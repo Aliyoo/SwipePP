@@ -159,6 +159,9 @@ interface FlipYearDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertEmbeddings(embeddings: List<PhotoEmbeddingEntity>)
 
+    @Query("DELETE FROM photo_embeddings WHERE photoId IN (:ids)")
+    suspend fun deleteEmbeddingsByPhotoIds(ids: List<Long>)
+
     @Query("SELECT * FROM photo_embeddings WHERE photoId IN (:ids)")
     suspend fun getEmbeddingsForIds(ids: List<Long>): List<PhotoEmbeddingEntity>
 
@@ -170,10 +173,16 @@ interface FlipYearDao {
     suspend fun applySmartTagBatch(
         updates: List<SmartTagBatchUpdate>,
         embeddings: List<PhotoEmbeddingEntity>,
-        version: Int
+        version: Int,
+        deleteEmbeddingIds: List<Long> = emptyList()
     ) {
         for (u in updates) {
             updatePhotoContentLabels(u.id, u.labelsCsv, version)
+        }
+        if (deleteEmbeddingIds.isNotEmpty()) {
+            deleteEmbeddingIds.chunked(SQLITE_BIND_CHUNK).forEach { chunk ->
+                deleteEmbeddingsByPhotoIds(chunk)
+            }
         }
         if (embeddings.isNotEmpty()) {
             upsertEmbeddings(embeddings)

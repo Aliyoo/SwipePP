@@ -593,36 +593,8 @@ class LocalMediaScanner(private val context: Context) {
         }.getOrNull()
     }
 
-    private fun assignBurstGroups(images: List<PhotoItemEntity>): List<PhotoItemEntity> {
-        if (images.size < 2) return images
-        val sorted = images.sortedBy { it.takenAtMillis }
-        val result = mutableListOf<PhotoItemEntity>()
-        var i = 0
-        while (i < sorted.size) {
-            var j = i + 1
-            while (j < sorted.size &&
-                sorted[j].bucketName == sorted[i].bucketName &&
-                abs(sorted[j].takenAtMillis - sorted[j - 1].takenAtMillis) <= BURST_WINDOW_MS
-            ) {
-                j++
-            }
-            val cluster = sorted.subList(i, j)
-            if (cluster.size >= 2) {
-                val groupId = "burst_ms_${cluster.first().mediaStoreKey}"
-                val bestIdx = cluster.indices.maxByOrNull { cluster[it].qualityScore } ?: 0
-                cluster.forEachIndexed { idx, item ->
-                    result += item.copy(
-                        burstGroupId = groupId,
-                        isBestInStack = idx == bestIdx
-                    )
-                }
-            } else {
-                result += cluster.first()
-            }
-            i = j
-        }
-        return result
-    }
+    private fun assignBurstGroups(images: List<PhotoItemEntity>): List<PhotoItemEntity> =
+        groupBurstImages(images)
 
     fun buildSystemTrashPendingIntent(uris: List<Uri>): PendingIntent? {
         if (uris.isEmpty() || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
@@ -701,11 +673,73 @@ class LocalMediaScanner(private val context: Context) {
 
     companion object {
         private const val MOTION_DETECT_CONCURRENCY = 8
-        private const val BURST_WINDOW_MS = 10_000L
+        internal const val BURST_WINDOW_MS = 2_000L
+        internal const val BURST_MAX_SPAN_MS = 12_000L
+        private const val BURST_ASPECT_TOLERANCE = 0.15f
         private val ISO_6709_REGEX = Regex("""([+-]\d+(?:\.\d+)?)([+-]\d+(?:\.\d+)?)""")
         private val GENERIC_CAMERA_BUCKETS = setOf(
             "camera", "dcim", "pictures", "screenshots", "download", "downloads",
             "weixin", "wechat", "qq", "photos", "movies", "video", "0"
         )
+
+        private fun isBurstEligible(photo: PhotoItemEntity): Boolean {
+            if (photo.isVideo) return false
+            return photo.mediaSubtypeKind == MediaSubtype.CAMERA ||
+                photo.mediaSubtypeKind == MediaSubtype.STANDARD
+        }
+
+        private fun aspectRatiosCompatible(a: PhotoItemEntity, b: PhotoItemEntity): Boolean {
+            if (a.widthPx <= 0 || a.heightPx <= 0 || b.widthPx <= 0 || b.heightPx <= 0) return true
+            val ra = a.widthPx.toFloat() / a.heightPx.toFloat()
+            val rb = b.widthPx.toFloat() / b.heightPx.toFloat()
+            return abs(ra - rb) <= BURST_ASPECT_TOLERANCE
+        }
+
+        internal fun groupBurstImages(images: List<PhotoItemEntity>): List<PhotoItemEntity> {
+            if (images.size < 2) return images
+            val sorted = images.sortedBy { it.takenAtMillis }
+            val result = mutableListOf<PhotoItemEntity>()
+            var i = 0
+            while (i < sorted.size) {
+                val anchor = sorted[i]
+                if (!isBurstEligible(anchor)) {
+                    result += anchor
+                    i++
+                    continue
+                }
+                var j = i + 1
+                while (j < sorted.size) {
+                    val cand = sorted[j]
+                    val prev = sorted[j - 1]
+                    val withinStep = abs(cand.takenAtMillis - prev.takenAtMillis) <= BURST_WINDOW_MS
+                    val withinSpan = abs(cand.takenAtMillis - anchor.takenAtMillis) <= BURST_MAX_SPAN_MS
+                    if (isBurstEligible(cand) &&
+                        cand.bucketName == anchor.bucketName &&
+                        withinStep &&
+                        withinSpan &&
+                        aspectRatiosCompatible(anchor, cand)
+                    ) {
+                        j++
+                    } else {
+                        break
+                    }
+                }
+                val cluster = sorted.subList(i, j)
+                if (cluster.size >= 2) {
+                    val groupId = "burst_ms_${cluster.first().mediaStoreKey}"
+                    val bestIdx = cluster.indices.maxByOrNull { cluster[it].qualityScore } ?: 0
+                    cluster.forEachIndexed { idx, item ->
+                        result += item.copy(
+                            burstGroupId = groupId,
+                            isBestInStack = idx == bestIdx
+                        )
+                    }
+                } else {
+                    result += anchor
+                }
+                i = j
+            }
+            return result
+        }
     }
 }

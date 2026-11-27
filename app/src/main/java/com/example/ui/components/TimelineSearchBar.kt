@@ -158,6 +158,9 @@ fun TimelineGlobalSearchBar(
     selectedAlbum: String? = null,
     onClearSmartFilter: () -> Unit = {},
     onClearAlbum: () -> Unit = {},
+    isIndexingSmartTags: Boolean = false,
+    smartTagIndexedCount: Int = 0,
+    smartTagTotalCount: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val focusManager = LocalFocusManager.current
@@ -286,6 +289,36 @@ fun TimelineGlobalSearchBar(
                         )
                     }
                 }
+            }
+        }
+
+        // Subtle Smart-Tag Indexing Progress Notice (informs user why older photos are still indexing)
+        AnimatedVisibility(
+            visible = isIndexingSmartTags && smartTagTotalCount > 0,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 22.dp)
+                    .testTag("timeline_smart_tag_indexing_indicator"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                DecoIcon(
+                    kind = DecoIconKind.LABEL,
+                    color = DecoGold.copy(alpha = 0.85f),
+                    iconSize = 13.dp
+                )
+                Text(
+                    text = "智能标签索引中 ($smartTagIndexedCount/$smartTagTotalCount)，完成后语义搜索覆盖全库",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = DecoDisplayFontFamily,
+                    color = DecoInkOnGround.copy(alpha = 0.68f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
 
@@ -527,7 +560,8 @@ fun TimelineSearchFilterSheet(
     allBurstsExpanded: Boolean = false,
     onSelectSmartFilter: (GallerySmartFilter) -> Unit = {},
     onSelectAlbum: (String?) -> Unit = {},
-    onToggleExpandAllBursts: (() -> Unit)? = null
+    onToggleExpandAllBursts: (() -> Unit)? = null,
+    availableTagCounts: Map<DescriptiveTag, Int>? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scrollState = rememberScrollState()
@@ -968,7 +1002,14 @@ fun TimelineSearchFilterSheet(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    DescriptiveTag.entries.forEach { tag ->
+                    val visibleDescriptiveTags = if (availableTagCounts == null) {
+                        DescriptiveTag.entries
+                    } else {
+                        DescriptiveTag.entries.filter { tag ->
+                            tag in draft.selectedTags || (availableTagCounts[tag] ?: 0) > 0
+                        }
+                    }
+                    visibleDescriptiveTags.forEach { tag ->
                         val selected = tag in draft.selectedTags
                         DecoSearchJumpTag(
                             selected = selected,

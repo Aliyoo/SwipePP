@@ -105,8 +105,10 @@ import com.example.ui.components.TimelineDateRangePickerDialog
 import com.example.ui.components.TimelineGlobalSearchBar
 import com.example.ui.components.TimelineSearchFilterSheet
 import com.example.ui.components.defaultGalleryZoomTier
+import com.example.ui.countDescriptiveTagMatches
 import com.example.ui.extractDescriptiveKeywordTags
 import com.example.ui.filterGalleryEntriesBySearch
+import com.example.ui.parseTimelineKeyword
 import com.example.ui.screens.gallery.BulkMoveDestinationSheet
 import com.example.ui.screens.gallery.FloatingBulkActionBar
 import com.example.ui.screens.gallery.GalleryMoreBatchActionsSheet
@@ -305,7 +307,7 @@ fun GalleryScreen(
     onBatchManualLocation: (List<PhotoItemEntity>, String, Double, Double, Boolean) -> Unit = { _, _, _, _, _ -> },
     onBatchSameDayLocation: (List<SameDayLocationMatch>, Boolean) -> Unit = { _, _ -> },
     onGeocodeLocation: suspend (String) -> ResolvedGeoLocation? = { null },
-    onComputeSemanticMatches: suspend (String) -> Set<Long> = { emptySet() },
+    onComputeSemanticMatches: suspend (String) -> Map<Long, Float> = { emptyMap() },
     onSelectionModeChanged: (Boolean) -> Unit = {},
     onToggleFavorite: (PhotoItemEntity, Boolean) -> Unit = { p, f -> onKeepPhoto(p, f) },
     onStartCustomCleanup: (title: String, photoIds: Set<Long>, includeReviewed: Boolean) -> Unit = { _, _, _ -> },
@@ -347,18 +349,6 @@ fun GalleryScreen(
         } else {
             delay(110L)
             searchQuery = searchQuery.copy(keyword = rawSearchKeyword)
-        }
-    }
-
-    val semanticMatchIds by produceState(emptySet(), searchQuery.keyword) {
-        val kw = searchQuery.keyword.trim()
-        if (kw.isBlank()) {
-            value = emptySet()
-        } else {
-            // Debounce past keystroke settling; the encode + library scan is debounce-guarded here
-            // because embedding scan cost grows with library size.
-            delay(280L)
-            value = onComputeSemanticMatches(kw)
         }
     }
 
@@ -423,6 +413,34 @@ fun GalleryScreen(
         counts.entries.sortedByDescending { it.value }.map { it.key }
     }
 
+    val knownLocationNames = remember(uiState.locationClusters) {
+        uiState.locationClusters.map { it.locationName }
+    }
+
+    val parsedSearchKeyword = remember(searchQuery.keyword, knownLocationNames, existingAlbums) {
+        parseTimelineKeyword(
+            rawKeyword = searchQuery.keyword,
+            knownLocations = knownLocationNames,
+            knownAlbums = existingAlbums
+        )
+    }
+
+    val semanticScores by produceState<Map<Long, Float>>(
+        emptyMap(),
+        parsedSearchKeyword.semanticQuery,
+        uiState.smartTagRevision
+    ) {
+        val visualQuery = parsedSearchKeyword.semanticQuery
+        if (visualQuery.isBlank()) {
+            value = emptyMap()
+        } else {
+            // Debounce past keystroke settling; only the clean visual residual (stripped of
+            // dates, tag qualifiers, and known locations) is sent to the Chinese-CLIP text tower.
+            delay(280L)
+            value = onComputeSemanticMatches(visualQuery)
+        }
+    }
+
     LaunchedEffect(existingAlbums, selectedAlbumFilter) {
         if (selectedAlbumFilter != null && selectedAlbumFilter !in existingAlbums) {
             selectedAlbumFilter = null
@@ -474,6 +492,10 @@ fun GalleryScreen(
         extractDescriptiveKeywordTags(allEntries)
     }
 
+    val descriptiveTagCounts = remember(allEntries) {
+        countDescriptiveTagMatches(allEntries)
+    }
+
     val chipFilteredEntries = remember(
         allEntries,
         burstEntries,
@@ -492,9 +514,12 @@ fun GalleryScreen(
         )
     }
 
-    val displayedEntries = remember(chipFilteredEntries, searchQuery, semanticMatchIds) {
-        filterGalleryEntriesBySearch(chipFilteredEntries, searchQuery, semanticMatchIds)
+    val displayedEntries = remember(chipFilteredEntries, searchQuery, semanticScores) {
+        filterGalleryEntriesBySearch(chipFilteredEntries, searchQuery, semanticScores)
     }
+
+    val isRelevanceRanked = searchQuery.keyword.isNotBlank() &&
+        (parsedSearchKeyword.visualTokens.isNotEmpty() || parsedSearchKeyword.locationOrAlbumTokens.isNotEmpty())
 
     val displayedPhotos = remember(displayedEntries, isSelectionMode) {
         if (!isSelectionMode) {
@@ -815,7 +840,10 @@ fun GalleryScreen(
                                     activeSmartFilter = smartFilter,
                                     selectedAlbum = selectedAlbumFilter,
                                     onClearSmartFilter = { smartFilter = GallerySmartFilter.ALL },
-                                    onClearAlbum = { selectedAlbumFilter = null }
+                                    onClearAlbum = { selectedAlbumFilter = null },
+                                    isIndexingSmartTags = uiState.isIndexingSmartTags,
+                                    smartTagIndexedCount = uiState.smartTagIndexedCount,
+                                    smartTagTotalCount = uiState.smartTagTotalCount
                                 )
 
                                 // One-tap Quick Smart Filter Strip right below Search Bar
@@ -1034,8 +1062,8 @@ fun GalleryScreen(
                             onStartMonthCleanup(y, m, isCleaned)
                         },
                         monthStamps = uiState.monthStamps,
-                        showMonthStampOverlay = true,
-                        precomputedClusterLayout = if (precomputed != null && displayedEntries === allEntries) {
+                        showMonthStampOverlay = !isRelevanceRanked,
+                        precomputedClusterLayout = if (!isRelevanceRanked && precomputed != null && displayedEntries === allEntries) {
                             precomputed.defaultClusterLayout
                         } else {
                             null
@@ -1212,7 +1240,12 @@ fun GalleryScreen(
                     largePhotoEntries = largePhotoEntries,
                     missingLocationEntries = missingLocationEntries
                 )
-                filterGalleryEntriesBySearch(smartAndAlbumEntries, draftQuery).size
+                val previewSemantic = if (draftQuery.keyword == searchQuery.keyword) {
+                    semanticScores
+                } else {
+                    emptyMap()
+                }
+                filterGalleryEntriesBySearch(smartAndAlbumEntries, draftQuery, previewSemantic).size
             },
             onApplyQuery = { nextQuery ->
                 searchQuery = nextQuery
@@ -1247,7 +1280,8 @@ fun GalleryScreen(
                 } else {
                     burstEntries.map { it.groupId }.toSet()
                 }
-            }
+            },
+            availableTagCounts = descriptiveTagCounts
         )
     }
 

@@ -238,5 +238,9 @@ data class FlipYearUiState(
     val customCleanerSession: CustomCleanerSession? = null,
     val batchTaskMessage: String? = null,
     val batchTaskProcessed: Int = 0,
-    val batchTaskTotal: Int = 0
+    val batchTaskTotal: Int = 0,
+    val isIndexingSmartTags: Boolean = false,
+    val smartTagIndexedCount: Int = 0,
+    val smartTagTotalCount: Int = 0,
+    val smartTagRevision: Int = 0
 )

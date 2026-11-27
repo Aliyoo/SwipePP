@@ -18,15 +18,16 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
- * MobileCLIP zero-shot tagging against the fixed smart taxonomy. The design keeps a seam for
- * adding ML Kit object labels later, but the shipped implementation is CLIP-only: it needs no
- * Google Play services, no model downloads, and has zero transitive dependency cost.
+ * On-device Chinese-CLIP zero-shot tagging and free-text query encoding. Vision and text
+ * sessions are guarded by independent mutexes so interactive semantic search never queues
+ * behind background vision indexing.
  */
 class SmartTagAnalyzer(context: Context) {
 
     private val appContext = context.applicationContext
     private val clipEmbedder = ClipEmbedder(appContext)
-    private val clipMutex = Mutex()
+    private val visionMutex = Mutex()
+    private val textMutex = Mutex()
 
     data class SmartTagResult(
         val categoryKeys: List<String>,
@@ -48,12 +49,16 @@ class SmartTagAnalyzer(context: Context) {
             val analysis = runClip(bitmap)
             if (analysis != null) {
                 usedClip = true
-                clipCategories.addAll(analysis.categories)
-                embeddingBytes = encodeEmbeddingFp16(analysis.embedding)
+                if (!analysis.isLowInfo) {
+                    clipCategories.addAll(analysis.categories)
+                    if (analysis.embedding.size == ClipEmbedder.EMBEDDING_DIM) {
+                        embeddingBytes = encodeEmbeddingFp16(analysis.embedding)
+                    }
+                }
             }
         }
 
-        val capped = clipCategories.take(SmartTagHeuristics.MAX_TAGS_PER_PHOTO + 2)
+        val capped = clipCategories.take(SmartTagHeuristics.MAX_TAGS_PER_PHOTO)
         return SmartTagResult(
             categoryKeys = capped.map { it.key },
             embeddingFp16 = embeddingBytes,
@@ -64,7 +69,7 @@ class SmartTagAnalyzer(context: Context) {
 
     private suspend fun runClip(bitmap: Bitmap): ClipEmbedder.ClipAnalysis? =
         withContext(Dispatchers.Default) {
-            clipMutex.withLock {
+            visionMutex.withLock {
                 try {
                     clipEmbedder.analyze(bitmap)
                 } catch (t: Throwable) {
@@ -76,11 +81,11 @@ class SmartTagAnalyzer(context: Context) {
 
     /**
      * Encodes a free-text query into the shared embedding space for semantic search,
-     * serialized behind any in-flight vision inference.
+     * independent of any in-flight vision indexing work.
      */
     suspend fun encodeText(query: String): FloatArray? =
         withContext(Dispatchers.Default) {
-            clipMutex.withLock {
+            textMutex.withLock {
                 try {
                     clipEmbedder.encodeText(query)
                 } catch (t: Throwable) {
@@ -88,6 +93,15 @@ class SmartTagAnalyzer(context: Context) {
                     null
                 }
             }
+        }
+
+    /**
+     * Returns the unnormalized mean vector of 60 neutral Chinese concepts used to cancel
+     * per-image Hubness during semantic search. Fast and does not load the vision model.
+     */
+    suspend fun neutralConceptBaseline(): FloatArray? =
+        withContext(Dispatchers.IO) {
+            clipEmbedder.getNeutralConceptBaseline()
         }
 
     /**
@@ -218,9 +232,15 @@ class SmartTagAnalyzer(context: Context) {
      */
     fun close() {
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
-            clipMutex.withLock {
+            visionMutex.withLock {
                 try {
-                    clipEmbedder.close()
+                    clipEmbedder.closeVision()
+                } catch (_: Throwable) {
+                }
+            }
+            textMutex.withLock {
+                try {
+                    clipEmbedder.closeText()
                 } catch (_: Throwable) {
                 }
             }
