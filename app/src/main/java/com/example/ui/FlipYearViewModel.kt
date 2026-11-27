@@ -374,6 +374,9 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         // archive) even when media permission is missing; the pipeline is idempotent and cheap
         // when there is nothing pending.
         startSmartTagBackfill()
+        // Same for the media probe: without it, a permission-less upgrade leaves rows
+        // unprobed forever and probe-gated features (compression, EXIF writes) never unlock.
+        startMediaProbeBackfill()
     }
 
     override fun onCleared() {
