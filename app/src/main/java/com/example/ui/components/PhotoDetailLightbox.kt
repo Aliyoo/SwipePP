@@ -993,9 +993,9 @@ private fun LightboxBottomHud(
                                         )
                                     }
                                     if (onFavorite != null) {
-                                        // 收藏：金环小章；已收藏加外圈余辉（原型印钮纯美术字）
+                                        // 珍藏：金环小章；已珍藏加外圈余辉（原型印钮纯美术字）
                                         DecoSealOrb(
-                                            label = if (photo.isFavorite) "珍藏" else "收藏",
+                                            label = "珍藏",
                                             orbSize = 54.dp,
                                             tone = if (photo.isFavorite) DecoOrbTone.GOLD_RING_HALO else DecoOrbTone.GOLD_RING,
                                             onClick = onFavorite,
