@@ -1040,7 +1040,7 @@ fun GalleryScreen(
                             text = when {
                                 searchQuery.isActive -> "尝试调整搜索关键词、放宽日期范围，或清除部分地点与描述标签筛选。"
                                 selectedAlbumFilter != null -> "可以切换回全部媒体，或长按照片批量移动到此相册。"
-                                smartFilter == GallerySmartFilter.TREASURED -> "在清理或详情页收藏后，珍藏媒体会汇聚在这里。"
+                                smartFilter == GallerySmartFilter.TREASURED -> "在清理或详情页收入珍藏后，珍藏媒体会汇聚在这里。"
                                 smartFilter == GallerySmartFilter.BURSTS -> "所有连续拍摄组已整理完成，或切换至全部媒体查看。"
                                 smartFilter == GallerySmartFilter.LARGE_PHOTOS -> "当前相册照片体积都很精巧，可切回全部媒体继续整理。"
                                 smartFilter == GallerySmartFilter.MISSING_LOCATION -> "每张回忆都已标注好足迹地点，可前往足迹地图浏览。"

@@ -521,6 +521,7 @@ internal fun ModernYearbook3DCard(
                     ) {
                         val archiveSummary = buildString {
                             append("${summary.totalPhotos} 项")
+                            if (summary.favoriteCount > 0) append(" · 珍藏 ${summary.favoriteCount}")
                             if (summary.totalMonthsCount > 0) {
                                 append(" · 归档 ${summary.cleanedMonthsCount}/${summary.totalMonthsCount} 月")
                             }

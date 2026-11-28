@@ -39,6 +39,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -98,6 +100,7 @@ import com.example.data.ResolvedGeoLocation
 import com.example.data.SameDayLocationMatch
 import com.example.data.inferSameDayLocations
 import com.example.sensor.rememberHapticEngine
+import com.example.ui.AnnualTreasureMonthGroup
 import com.example.ui.GalleryEntry
 import com.example.ui.LocationCluster
 import com.example.ui.MonthPageModel
@@ -158,6 +161,7 @@ private fun ganzhiOfYear(year: Int): String {
     return "${DECO_GAN[g]}${DECO_ZHI[z]}"
 }
 
+
 @Composable
 fun FlipbookScreen(
     year: Int,
@@ -193,6 +197,7 @@ fun FlipbookScreen(
     var expandedBurstIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var lightboxPhoto by remember { mutableStateOf<PhotoItemEntity?>(null) }
     var lightboxContextPhotos by remember { mutableStateOf<List<PhotoItemEntity>>(emptyList()) }
+    var showAnnualTreasure by rememberSaveable(year) { mutableStateOf(false) }
 
     var galleryZoomTier by rememberSaveable(year) { mutableStateOf(defaultGalleryZoomTier(galleryColumns)) }
     LaunchedEffect(galleryColumns) {
@@ -303,6 +308,17 @@ fun FlipbookScreen(
         }
     }
 
+    val annualTreasureGroups = remember(monthPages) {
+        com.example.ui.domain.LibraryDerivationEngine.buildAnnualTreasureGroups(monthPages)
+    }
+    val annualTreasureCount = annualTreasureGroups.sumOf { it.photos.size }
+    LaunchedEffect(annualTreasureCount) {
+        if (annualTreasureCount == 0) showAnnualTreasure = false
+    }
+    BackHandler(enabled = showAnnualTreasure) {
+        showAnnualTreasure = false
+    }
+
     DecoPaperGround(modifier = modifier) {
         Column(
             modifier = Modifier
@@ -401,6 +417,25 @@ fun FlipbookScreen(
                                 },
                                 testTag = "flipbook_enter_multiselect_button",
                                 contentDescriptionText = stringResource(R.string.action_enter_multiselect),
+                                size = 40.dp,
+                                fontSize = 14.sp
+                            )
+                        }
+
+                        AnimatedVisibility(
+                            visible = annualTreasureCount > 0,
+                            enter = fadeIn(tween(160)),
+                            exit = fadeOut(tween(120))
+                        ) {
+                            DecoSealButton(
+                                labelTop = "珍",
+                                labelBottom = "藏",
+                                onClick = {
+                                    haptics.pageFlipLift()
+                                    showAnnualTreasure = true
+                                },
+                                testTag = "annual_treasure_button",
+                                contentDescriptionText = "查看年度珍藏",
                                 size = 40.dp,
                                 fontSize = 14.sp
                             )
@@ -783,6 +818,25 @@ fun FlipbookScreen(
                 )
             }
         }
+
+        AnimatedVisibility(
+            visible = showAnnualTreasure,
+            enter = fadeIn(tween(180)),
+            exit = fadeOut(tween(140)),
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(6f)
+        ) {
+            AnnualTreasureOverview(
+                year = year,
+                groups = annualTreasureGroups,
+                onBack = { showAnnualTreasure = false },
+                onPhotoClick = { photo, contextPhotos ->
+                    lightboxContextPhotos = contextPhotos
+                    lightboxPhoto = photo
+                }
+            )
+        }
     }
 
     if (showMoreActionsSheet && selectedPhotos.isNotEmpty()) {
@@ -880,6 +934,146 @@ fun FlipbookScreen(
             onTrash = onTrashPhoto,
             onToggleFavorite = onToggleFavorite
         )
+    }
+}
+
+@Composable
+private fun AnnualTreasureOverview(
+    year: Int,
+    groups: List<AnnualTreasureMonthGroup>,
+    onBack: () -> Unit,
+    onPhotoClick: (PhotoItemEntity, List<PhotoItemEntity>) -> Unit
+) {
+    val totalCount = groups.sumOf { it.photos.size }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DecoGround)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {}
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .testTag("annual_treasure_overview")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 640.dp)
+                .align(Alignment.TopCenter)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                DecoSealButton(
+                    labelTop = "返",
+                    labelBottom = "回",
+                    onClick = onBack,
+                    testTag = "annual_treasure_back_button",
+                    contentDescriptionText = stringResource(R.string.cd_back),
+                    size = 40.dp,
+                    fontSize = 14.sp
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "${ganzhiOfYear(year)}年 · 年度珍藏",
+                        fontFamily = DecoDisplayFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 21.sp,
+                        letterSpacing = 1.2.sp,
+                        color = DecoInkOnGround,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "$totalCount 项 · ${groups.size} 个月 · 最近收入优先",
+                        fontSize = 12.sp,
+                        fontFamily = DecoDisplayFontFamily,
+                        color = DecoInkOnGround.copy(alpha = 0.66f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                groups.forEach { group ->
+                    item(key = "annual_treasure_month_${group.month}") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = monthChineseName(group.month),
+                                fontFamily = DecoDisplayFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                letterSpacing = 0.8.sp,
+                                color = DecoInkOnGround
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "${group.photos.size} 项",
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = 11.sp,
+                                color = DecoGold,
+                                maxLines = 1
+                            )
+                            Spacer(modifier = Modifier.weight(1f))
+                            Box(
+                                modifier = Modifier
+                                    .width(42.dp)
+                                    .height(1.dp)
+                                    .background(DecoGold.copy(alpha = 0.42f))
+                            )
+                        }
+                    }
+
+                    group.photos.chunked(3).forEachIndexed { rowIndex, rowPhotos ->
+                        item(key = "annual_treasure_row_${group.month}_$rowIndex") {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                rowPhotos.forEach { photo ->
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(1f)
+                                            .clip(RoundedCornerShape(2.dp))
+                                            .border(0.8.dp, DecoGold.copy(alpha = 0.30f), RoundedCornerShape(2.dp))
+                                            .clickable { onPhotoClick(photo, group.photos) }
+                                            .testTag("annual_treasure_photo_${photo.id}")
+                                    ) {
+                                        PhotoArtwork(
+                                            photo = photo,
+                                            contentDescription = "${monthChineseName(group.month)}珍藏",
+                                            showVideoBadge = true,
+                                            downsampleTier = ImageDownsampleTier.PREVIEW_CARD,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                }
+                                repeat(3 - rowPhotos.size) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

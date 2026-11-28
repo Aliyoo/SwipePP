@@ -5,6 +5,7 @@ import com.example.data.PhotoItemEntity
 import com.example.data.PhotoRepository
 import com.example.data.PhotoStatus
 import com.example.data.YearbookCoverConfigEntity
+import com.example.ui.AnnualTreasureMonthGroup
 import com.example.ui.CleanupCardItem
 import com.example.ui.GalleryEntry
 import com.example.ui.LocationCluster
@@ -28,6 +29,7 @@ object LibraryDerivationEngine {
         var unreviewedCount = 0
         var keptCount = 0
         var trashedCount = 0
+        var favoriteCount = 0
         var reclaimableBytes = 0L
         val yearPhotos = ArrayList<PhotoItemEntity>(32)
         val monthPresent = BooleanArray(13)
@@ -43,6 +45,18 @@ object LibraryDerivationEngine {
         var totalBytes = 0L
         var favoriteCover: PhotoItemEntity? = null
         var bestQualityCover: PhotoItemEntity = firstPhoto
+    }
+
+    fun buildAnnualTreasureGroups(monthPages: List<MonthPageModel>): List<AnnualTreasureMonthGroup> {
+        return monthPages.mapNotNull { page ->
+            val treasured = page.photos
+                .filter { it.photoStatus != PhotoStatus.TRASHED && it.isFavorite }
+                .sortedWith(
+                    compareByDescending<PhotoItemEntity> { it.favoritedAtMillis ?: Long.MIN_VALUE }
+                        .thenByDescending { it.takenAtMillis }
+                )
+            if (treasured.isEmpty()) null else AnnualTreasureMonthGroup(page.month, treasured)
+        }
     }
 
     fun hasValidLocation(photo: PhotoItemEntity): Boolean {
@@ -72,6 +86,7 @@ object LibraryDerivationEngine {
             acc.total++
             acc.yearPhotos.add(p)
             if (p.isVideo) acc.videoCount++
+            if (p.isFavorite && p.photoStatus != PhotoStatus.TRASHED) acc.favoriteCount++
 
             val m = p.month
             if (m in 1..12) acc.monthPresent[m] = true
@@ -133,7 +148,8 @@ object LibraryDerivationEngine {
                 cleanedMonthsCount = cleanedMonths,
                 totalMonthsCount = totalMonths,
                 reclaimableBytes = acc.reclaimableBytes,
-                editionIndex = idx % 4
+                editionIndex = idx % 4,
+                favoriteCount = acc.favoriteCount
             )
         }
     }

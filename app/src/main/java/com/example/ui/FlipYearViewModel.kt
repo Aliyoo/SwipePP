@@ -1166,7 +1166,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun toggleFavoritePhoto(photo: PhotoItemEntity, newFavorite: Boolean) {
-        val actionText = if (newFavorite) "收藏" else "取消收藏"
+        val actionText = if (newFavorite) "珍藏" else "取消珍藏"
         val snapshot = UndoSnapshot(
             photoStates = listOf(
                 PhotoStateBackup(
@@ -1400,8 +1400,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     favoriteTouched = markFavorite && !it.isFavorite
                 )
             },
-            description = if (markFavorite) "已撤回批量收藏 (${photos.size} 项)" else "已撤回批量保留 (${photos.size} 项)",
-            actionLabel = if (markFavorite) "撤销：收藏 ${photos.size} 项" else "撤销：保留 ${photos.size} 项"
+            description = if (markFavorite) "已撤回批量珍藏 (${photos.size} 项)" else "已撤回批量保留 (${photos.size} 项)",
+            actionLabel = if (markFavorite) "撤销：批量珍藏 ${photos.size} 项" else "撤销：保留 ${photos.size} 项"
         )
         viewModelScope.launch {
             val ids = photos.map { it.id }
