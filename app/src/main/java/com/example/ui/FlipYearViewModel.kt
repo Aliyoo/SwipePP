@@ -132,6 +132,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     private val recentlyStampedMonthKey = MutableStateFlow<String?>(null)
     private val vaultSessionFilterIds = MutableStateFlow<Set<Long>?>(null)
     private val customCleanerSession = MutableStateFlow<CustomCleanerSession?>(null)
+    private val treasureGalleryRequest = MutableStateFlow<TreasureGalleryRequest?>(null)
+    private var treasureGalleryRequestSerial = 0L
     private var gpsBackfillJob: Job? = null
     private var smartTagJob: Job? = null
     @Volatile private var smartTagRerunRequested = false
@@ -216,7 +218,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         val snackbar: SnackbarMessage?,
         val recentStamp: String?,
         val vaultSessionFilter: Set<Long>?,
-        val customSession: CustomCleanerSession?
+        val customSession: CustomCleanerSession?,
+        val treasureRequest: TreasureGalleryRequest?
     )
 
     private data class DerivedLibraryData(
@@ -244,8 +247,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         combine(isScanningDevice, gpsIndexProgress, smartTagProgress, batchTaskProgress) { scan, gps, smartTag, batch ->
             listOf(scan, gps, smartTag, batch)
         },
-        combine(snackbarMessage, recentlyStampedMonthKey, vaultSessionFilterIds, customCleanerSession) { snack, stamp, filterIds, custom ->
-            listOf(snack, stamp, filterIds, custom)
+        combine(snackbarMessage, recentlyStampedMonthKey, vaultSessionFilterIds, customCleanerSession, treasureGalleryRequest) { snack, stamp, filterIds, custom, treasureRequest ->
+            listOf(snack, stamp, filterIds, custom, treasureRequest)
         }
     ) { undoPair, accessPair, workList, feedbackList ->
         @Suppress("UNCHECKED_CAST")
@@ -261,7 +264,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             snackbar = feedbackList[0] as SnackbarMessage?,
             recentStamp = feedbackList[1] as String?,
             vaultSessionFilter = feedbackList[2] as Set<Long>?,
-            customSession = feedbackList[3] as CustomCleanerSession?
+            customSession = feedbackList[3] as CustomCleanerSession?,
+            treasureRequest = feedbackList[4] as TreasureGalleryRequest?
         )
     }
 
@@ -402,6 +406,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             recentlyStampedMonthKey = meta.recentStamp,
             vaultSessionFilterIds = meta.vaultSessionFilter,
             customCleanerSession = meta.customSession,
+            pendingTreasureGalleryRequest = meta.treasureRequest,
             batchTaskMessage = meta.batchProgress.message,
             batchTaskProcessed = meta.batchProgress.processed,
             batchTaskTotal = meta.batchProgress.total,
@@ -990,6 +995,19 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         customCleanerSession.value = null
     }
 
+    fun requestTreasureGalleryView(year: Int?, month: Int?) {
+        treasureGalleryRequestSerial += 1L
+        treasureGalleryRequest.value = TreasureGalleryRequest(
+            year = year,
+            month = month,
+            requestId = treasureGalleryRequestSerial
+        )
+    }
+
+    fun consumeTreasureGalleryRequest() {
+        treasureGalleryRequest.value = null
+    }
+
     fun setTimelineSortOrder(order: TimelineSortOrder) {
         timelineSortOrder.value = order
     }
@@ -1065,7 +1083,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         markFavorite: Boolean = false,
         fromCleanerSession: Boolean = false
     ) {
-        val actionText = if (markFavorite) "收藏并保留" else "保留"
+        val actionText = if (markFavorite) "珍藏并保留" else "保留"
         val snapshot = UndoSnapshot(
             photoStates = listOf(
                 PhotoStateBackup(
@@ -1151,7 +1169,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         markFavorite: Boolean = false,
         fromCleanerSession: Boolean = true
     ) {
-        val actionText = if (markFavorite) "收藏并保留整组" else "保留整组"
+        val actionText = if (markFavorite) "珍藏最佳帧并保留整组" else "保留整组"
         val snapshot = UndoSnapshot(
             photoStates = stack.photos.map {
                 PhotoStateBackup(

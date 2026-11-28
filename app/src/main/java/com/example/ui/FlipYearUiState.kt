@@ -183,6 +183,16 @@ sealed interface GalleryEntry {
         val totalBytes: Long = photos.sumOf { it.fileSizeBytes }
         val nonBestBytes: Long = photos.filter { it.id != bestPhoto.id }.sumOf { it.fileSizeBytes }
         val spanSeconds: Long = ((photos.maxOf { it.takenAtMillis } - photos.minOf { it.takenAtMillis }) / 1000L).coerceAtLeast(1L)
+        val representativePhoto: PhotoItemEntity
+            get() {
+                val treasured = photos.filter { it.isFavorite }
+                if (treasured.isEmpty()) return bestPhoto
+                return treasured.firstOrNull { it.id == bestPhoto.id }
+                    ?: treasured.maxWithOrNull(
+                        compareBy<PhotoItemEntity> { it.qualityScore }.thenBy { it.takenAtMillis }
+                    )
+                    ?: bestPhoto
+            }
     }
 }
 
@@ -233,6 +243,13 @@ data class PrecomputedGalleryIndex(
 }
 
 @Immutable
+data class TreasureGalleryRequest(
+    val year: Int? = null,
+    val month: Int? = null,
+    val requestId: Long = 0L
+)
+
+@Immutable
 data class FlipYearUiState(
     val isLoading: Boolean = true,
     val isScanningDevice: Boolean = false,
@@ -264,6 +281,7 @@ data class FlipYearUiState(
     val recentlyStampedMonthKey: String? = null,
     val vaultSessionFilterIds: Set<Long>? = null,
     val customCleanerSession: CustomCleanerSession? = null,
+    val pendingTreasureGalleryRequest: TreasureGalleryRequest? = null,
     val batchTaskMessage: String? = null,
     val batchTaskProcessed: Int = 0,
     val batchTaskTotal: Int = 0,

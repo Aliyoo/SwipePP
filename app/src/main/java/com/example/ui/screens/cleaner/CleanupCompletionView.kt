@@ -178,10 +178,12 @@ internal fun CleanupCompletedCelebration(
     entrySource: CleanerEntrySource,
     onContinueFullMonth: () -> Unit,
     onOpenVault: () -> Unit,
+    onOpenMonthlyTreasures: (() -> Unit)? = null,
     onDone: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isSingleDayFinishedWithMoreInMonth = completedDay != null && remainingInFullQueue > 0
+    val ordinaryKeptCount = (sessionKeptCount - sessionFavoritedCount).coerceAtLeast(0)
     val palette = LocalFlipYearPalette.current
     val decoGold = palette.decoGold
     val decoMat = palette.decoMat
@@ -221,7 +223,7 @@ internal fun CleanupCompletedCelebration(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // 金框账册：三栏画报遥测（保留 / 收藏 / 移入回收站）
+        // 金框账册：三栏互斥遥测（普通保留 / 珍藏 / 舍弃）
         Surface(
             shape = RoundedCornerShape(3.dp),
             color = decoMat,
@@ -238,8 +240,8 @@ internal fun CleanupCompletedCelebration(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 CompletionMetricSlot(
-                    label = "保留",
-                    value = "$sessionKeptCount",
+                    label = "普通保留",
+                    value = "$ordinaryKeptCount",
                     subLabel = "已入册",
                     accent = decoGold,
                     modifier = Modifier.weight(1f)
@@ -250,9 +252,9 @@ internal fun CleanupCompletedCelebration(
                     color = decoGold.copy(alpha = 0.4f)
                 )
                 CompletionMetricSlot(
-                    label = "收藏",
+                    label = "珍藏",
                     value = "$sessionFavoritedCount",
-                    subLabel = "精选佳作",
+                    subLabel = "精选资产",
                     accent = decoGold,
                     modifier = Modifier.weight(1f)
                 )
@@ -262,7 +264,7 @@ internal fun CleanupCompletedCelebration(
                     color = decoGold.copy(alpha = 0.4f)
                 )
                 CompletionMetricSlot(
-                    label = "移入回收站",
+                    label = "舍弃",
                     value = formatStorageSize(sessionTrashedBytes),
                     subLabel = "$sessionTrashedCount 项待清",
                     accent = vermInk,
@@ -287,6 +289,22 @@ internal fun CleanupCompletedCelebration(
         )
 
         Spacer(modifier = Modifier.height(22.dp))
+
+        if (sessionFavoritedCount > 0 && onOpenMonthlyTreasures != null) {
+            GalleryActionButton(
+                text = "查看本月珍藏",
+                leadingIconKind = DecoIconKind.FAVORITE,
+                iconTint = decoGold,
+                onClick = onOpenMonthlyTreasures,
+                tone = GalleryButtonTone.IMMERSIVE,
+                height = 48.dp,
+                shape = RoundedCornerShape(3.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("completion_open_treasures_button")
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+        }
 
         if (isSingleDayFinishedWithMoreInMonth) {
             DecoVermStripButton(

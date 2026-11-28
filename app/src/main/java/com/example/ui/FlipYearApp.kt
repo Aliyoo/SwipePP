@@ -682,7 +682,8 @@ fun FlipYearApp(
                                         )
                                     )
                                 },
-                                onResetGlobalMediaFilter = { viewModel.setMediaFilter(MediaFilter.ALL) }
+                                onResetGlobalMediaFilter = { viewModel.setMediaFilter(MediaFilter.ALL) },
+                                onConsumeTreasureGalleryRequest = viewModel::consumeTreasureGalleryRequest
                             )
                         }
 
@@ -863,6 +864,7 @@ fun FlipYearApp(
                             ArcCleanerScreen(
                                 title = headerTitle,
                                 monthNumber = monthArg,
+                                yearNumber = yearArg,
                                 initialFocusDay = dayArg,
                                 includeReviewed = includeReviewed,
                                 entrySource = entrySource,
@@ -879,6 +881,10 @@ fun FlipYearApp(
                                         launchSingleTop = true
                                         restoreState = false
                                     }
+                                },
+                                onOpenTreasureGallery = { year, month ->
+                                    viewModel.requestTreasureGalleryView(year, month)
+                                    navigateToTab(FlipYearRoutes.GALLERY)
                                 },
                                 onKeepPhoto = { photo, fav ->
                                     viewModel.keepPhoto(photo, fav, fromCleanerSession = true)

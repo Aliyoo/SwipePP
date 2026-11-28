@@ -46,6 +46,20 @@ class TreasureGalleryTest {
     }
 
     @Test
+    fun burstRepresentativePrefersTreasuredFrameWithoutChangingBestFrame() {
+        val best = photo(1, favorite = false)
+        val treasured = photo(2, favorite = true)
+        val burst = GalleryEntry.Burst(
+            groupId = "burst",
+            photos = listOf(best, treasured),
+            bestPhoto = best
+        )
+
+        assertEquals(2L, burst.representativePhoto.id)
+        assertEquals(1L, burst.bestPhoto.id)
+    }
+
+    @Test
     fun monthlyClusterCountsTreasuredMedia() {
         val favorite = GalleryEntry.Single(photo(1, favorite = true))
         val plain = GalleryEntry.Single(photo(2))

@@ -171,7 +171,7 @@ internal fun ModernArcSwipeCard(
                             onSwipeDownKeep()
                             true
                         },
-                        CustomAccessibilityAction("收藏") {
+                        CustomAccessibilityAction("珍藏") {
                             onFavoriteAction()
                             true
                         },
@@ -503,7 +503,7 @@ internal fun ModernArcSwipeCard(
                                 color = DecoPaperCream,
                                 selected = true,
                                 iconSize = 38.dp,
-                                contentDescription = "收藏保留"
+                                contentDescription = "珍藏保留"
                             )
                         }
                     }

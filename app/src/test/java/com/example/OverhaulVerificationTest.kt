@@ -141,8 +141,8 @@ class OverhaulVerificationTest {
 
         // Completion screen displays 3-column session-scoped telemetry dashboard and Footprint-specific back label
         composeRule.onNodeWithTag("completion_session_stats")
-            .assertTextContains("保留", substring = true)
-            .assertTextContains("移入回收站", substring = true)
+            .assertTextContains("普通保留", substring = true)
+            .assertTextContains("舍弃", substring = true)
             .assertTextContains("1 项待清", substring = true)
         composeRule.onNodeWithText("返回足迹", substring = true).assertIsDisplayed()
         composeRule.onNodeWithTag("completion_open_vault_button").assertIsDisplayed()
@@ -150,6 +150,43 @@ class OverhaulVerificationTest {
         composeRule.waitForIdle()
 
         assertEquals(setOf(2L), openedVaultIds)
+    }
+
+    @Test
+    fun stage3_completionTreasureEntryOpensRequestedMonth() {
+        val treasured = samplePhoto(3L, 3_000L, status = PhotoStatus.UNREVIEWED).copy(isFavorite = true)
+        val queue = listOf(CleanupCardItem.SinglePhoto(treasured))
+        var treasureTarget by mutableStateOf<Pair<Int, Int>?>(null)
+
+        composeRule.setContent {
+            FlipYearTheme {
+                ArcCleanerScreen(
+                    title = "整理 2025年八月",
+                    monthNumber = 8,
+                    yearNumber = 2025,
+                    queue = queue,
+                    undoStackDepth = 0,
+                    onBack = {},
+                    onKeepPhoto = { _, _ -> },
+                    onTrashPhoto = {},
+                    onKeepEntireStack = { _, _ -> },
+                    onKeepBestInStack = { _, _ -> },
+                    onTrashEntireStack = {},
+                    onSelectBestInStack = { _, _ -> },
+                    onUndoSession = { null },
+                    onOpenTreasureGallery = { year, month -> treasureTarget = year to month }
+                )
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("arc_keep_button").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("completion_open_treasures_button").assertIsDisplayed()
+        composeRule.onNodeWithTag("completion_open_treasures_button").performClick()
+        composeRule.waitForIdle()
+        assertEquals(2025 to 8, treasureTarget)
     }
 
     @Test

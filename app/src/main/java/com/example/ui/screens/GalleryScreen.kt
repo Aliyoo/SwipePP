@@ -316,6 +316,7 @@ fun GalleryScreen(
     onStartCustomCleanup: (title: String, photoIds: Set<Long>, includeReviewed: Boolean) -> Unit = { _, _, _ -> },
     onStartMonthCleanup: (year: Int, month: Int, includeReviewed: Boolean) -> Unit = { _, _, _ -> },
     onResetGlobalMediaFilter: () -> Unit = {},
+    onConsumeTreasureGalleryRequest: () -> Unit = {},
     galleryColumns: Int = 3,
     modifier: Modifier = Modifier
 ) {
@@ -353,6 +354,28 @@ fun GalleryScreen(
             delay(110L)
             searchQuery = searchQuery.copy(keyword = rawSearchKeyword)
         }
+    }
+
+    LaunchedEffect(uiState.pendingTreasureGalleryRequest) {
+        val request = uiState.pendingTreasureGalleryRequest ?: return@LaunchedEffect
+        explicitSelectionMode = false
+        selectedPhotoIds = emptySet()
+        smartFilter = GallerySmartFilter.TREASURED
+        selectedAlbumFilter = null
+        rawSearchKeyword = ""
+        searchQuery = if (request.year != null && request.month != null) {
+            TimelineSearchQuery(
+                dateRange = DateRangeFilter(
+                    startDateKey = DateRangeFilter.encodeDateKey(request.year, request.month, 1),
+                    endDateKey = DateRangeFilter.encodeDateKey(request.year, request.month, 31),
+                    presetLabel = "${request.year}年${request.month}月"
+                )
+            )
+        } else {
+            TimelineSearchQuery()
+        }
+        onResetGlobalMediaFilter()
+        onConsumeTreasureGalleryRequest()
     }
 
     val resetSearchAndFilters = remember {

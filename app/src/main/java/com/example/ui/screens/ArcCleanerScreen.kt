@@ -133,7 +133,7 @@ private fun CleanupCardItem.matchesDay(day: Int): Boolean = when (this) {
 private data class SessionDecisionRecord(
     val cardKey: String,
     val keptDelta: Int = 0,
-    val favoritedDelta: Int = 0,
+    val treasuredKeptDelta: Int = 0,
     val trashedIds: Set<Long> = emptySet(),
     val trashedBytes: Long = 0L
 )
@@ -186,6 +186,7 @@ private fun DecoHintSpan(text: String, color: Color) {
 fun ArcCleanerScreen(
     title: String,
     monthNumber: Int?,
+    yearNumber: Int? = null,
     queue: List<CleanupCardItem>,
     undoStackDepth: Int,
     onBack: () -> Unit,
@@ -197,6 +198,7 @@ fun ArcCleanerScreen(
     onSelectBestInStack: (String, Long) -> Unit,
     onUndoSession: (Boolean) -> String?,
     onOpenVaultForSession: (Set<Long>) -> Unit = {},
+    onOpenTreasureGallery: (year: Int, month: Int) -> Unit = { _, _ -> },
     includeReviewed: Boolean = false,
     entrySource: CleanerEntrySource = CleanerEntrySource.BOOKSHELF,
     initialFocusDay: Int? = null,
@@ -211,7 +213,7 @@ fun ArcCleanerScreen(
     var processedCardKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     var sessionHistory by remember { mutableStateOf<List<SessionDecisionRecord>>(emptyList()) }
     val sessionKeptCount = remember(sessionHistory) { sessionHistory.sumOf { it.keptDelta } }
-    val sessionFavoritedCount = remember(sessionHistory) { sessionHistory.sumOf { it.favoritedDelta } }
+    val sessionFavoritedCount = remember(sessionHistory) { sessionHistory.sumOf { it.treasuredKeptDelta } }
     val sessionTrashedIds = remember(sessionHistory) {
         sessionHistory.flatMapTo(LinkedHashSet()) { it.trashedIds }
     }
@@ -281,7 +283,7 @@ fun ArcCleanerScreen(
             SessionDecisionRecord(
                 cardKey = "single_${photo.id}",
                 keptDelta = 1,
-                favoritedDelta = if (favorite) 1 else 0
+                treasuredKeptDelta = if (favorite || photo.isFavorite) 1 else 0
             )
         )
         onKeepPhoto(photo, favorite)
@@ -291,7 +293,8 @@ fun ArcCleanerScreen(
             SessionDecisionRecord(
                 cardKey = stack.stableKey,
                 keptDelta = stack.photos.size,
-                favoritedDelta = if (favorite) 1 else 0
+                treasuredKeptDelta = stack.photos.count { it.isFavorite } +
+                    if (favorite && !stack.bestPhoto.isFavorite) 1 else 0
             )
         )
         onKeepEntireStack(stack, favorite)
@@ -302,6 +305,7 @@ fun ArcCleanerScreen(
             SessionDecisionRecord(
                 cardKey = stack.stableKey,
                 keptDelta = 1,
+                treasuredKeptDelta = if (chosen.isFavorite) 1 else 0,
                 trashedIds = others.mapTo(HashSet()) { it.id },
                 trashedBytes = others.sumOf { it.fileSizeBytes }
             )
@@ -540,6 +544,11 @@ fun ArcCleanerScreen(
                     entrySource = entrySource,
                     onContinueFullMonth = { onlyFocusedDay = false },
                     onOpenVault = { onOpenVaultForSession(sessionTrashedIds) },
+                    onOpenMonthlyTreasures = if (yearNumber != null && monthNumber != null) {
+                        { onOpenTreasureGallery(yearNumber, monthNumber) }
+                    } else {
+                        null
+                    },
                     onDone = onBack,
                     modifier = Modifier.weight(1f)
                 )
@@ -997,9 +1006,9 @@ fun ArcCleanerScreen(
                                         modifier = Modifier.testTag("arc_trash_button")
                                     )
 
-                                    // 收藏：金环小章（原型印钮纯美术字，无图标）
+                                    // 珍藏：金环小章（原型印钮纯美术字，无图标）
                                     DecoSealOrb(
-                                        label = "收藏",
+                                        label = "珍藏",
                                         orbSize = 54.dp,
                                         tone = DecoOrbTone.GOLD_RING,
                                         onClick = {
