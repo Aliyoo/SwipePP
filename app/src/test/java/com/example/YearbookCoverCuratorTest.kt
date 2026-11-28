@@ -105,6 +105,32 @@ class YearbookCoverCuratorTest {
     }
 
     @Test
+    fun coverRankingDoesNotLetTreasuredScreenshotsDisplacePhotography() {
+        val treasuredScreenshot = photo(
+            id = 1,
+            widthPx = 1080,
+            heightPx = 3200,
+            qualityScore = 95,
+            isFavorite = true,
+            status = PhotoStatus.KEPT,
+            bucketName = "Screenshots",
+            caption = "Screenshot_20251128"
+        )
+        val cameraPhoto = photo(
+            id = 2,
+            qualityScore = 90,
+            isFavorite = false,
+            status = PhotoStatus.KEPT,
+            bucketName = "Camera",
+            locationName = "京都"
+        )
+
+        val ranked = YearbookCoverCurator.rankPhotosForCoverPicker(listOf(treasuredScreenshot, cameraPhoto))
+
+        assertEquals(2L, ranked.first().id)
+    }
+
+    @Test
     fun smartCuration_enforcesMonthDiversityAndBurstDeduplication() {
         val photos = listOf(
             // Burst stack in May — should pick at most 1
