@@ -45,6 +45,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -765,7 +767,8 @@ fun DecoSealButton(
     size: Dp = 38.dp,
     fontSize: TextUnit = 15.sp,
     testTag: String? = null,
-    contentDescriptionText: String? = null
+    contentDescriptionText: String? = null,
+    focusRequester: FocusRequester? = null
 ) {
     val gold = DecoGold
     val ground = DecoGround
@@ -788,6 +791,7 @@ fun DecoSealButton(
                 scaleY = pressScale
             }
             .clip(RoundedCornerShape(4.dp))
+            .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
             .clickable(
                 interactionSource = interactionSource,
                 indication = ripple(color = gold),
@@ -832,8 +836,8 @@ fun DecoSealButton(
     }
 }
 
-/** 印钮三态：金环印钮 / 金环印钮带余辉 / 朱红实印（原型 decOrb 语法，弧形清理与灯箱共用）。 */
-enum class DecoOrbTone { GOLD_RING, GOLD_RING_HALO, VERM_SOLID }
+/** 印钮状态：金环 / 金环余辉 / 珍藏金实印 / 朱红实印（原型 decOrb 语法，弧形清理与灯箱共用）。 */
+enum class DecoOrbTone { GOLD_RING, GOLD_RING_HALO, GOLD_SOLID, VERM_SOLID }
 
 /**
  * 决断印钮（原型 SealOrb）：圆形印章钮，**纯美术字居中、无图标**（原型同款：
@@ -861,16 +865,21 @@ fun DecoSealOrb(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "deco_orb_scale"
     )
-    val hasHalo = tone == DecoOrbTone.GOLD_RING_HALO
+    val hasHalo = tone == DecoOrbTone.GOLD_RING_HALO || tone == DecoOrbTone.GOLD_SOLID
     val totalSize = orbSize + if (hasHalo) 10.dp else 0.dp
     val ringColor = if (tone == DecoOrbTone.VERM_SOLID) cream.copy(alpha = 0.35f) else gold
     // 保留（金环余辉）是最高频正向动作：给淡金实底提升视觉重心，避免与朱红实印「舍弃」权重倒置
     val fillColor = when (tone) {
         DecoOrbTone.VERM_SOLID -> verm
+        DecoOrbTone.GOLD_SOLID -> gold
         DecoOrbTone.GOLD_RING_HALO -> gold.copy(alpha = 0.16f).compositeOver(ground)
         DecoOrbTone.GOLD_RING -> ground.copy(alpha = 0.42f)
     }
-    val contentColor = if (tone == DecoOrbTone.VERM_SOLID) cream else gold
+    val contentColor = when (tone) {
+        DecoOrbTone.VERM_SOLID -> cream
+        DecoOrbTone.GOLD_SOLID -> DecoInkOnGround
+        else -> gold
+    }
     // 原型字号：64dp 金环 15sp / 朱红实印 14sp；54dp 小章按比例收一档
     val labelSize = when {
         tone == DecoOrbTone.VERM_SOLID -> 14.sp

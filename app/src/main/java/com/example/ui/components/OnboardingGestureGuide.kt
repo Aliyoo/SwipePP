@@ -101,7 +101,7 @@ fun OnboardingGestureGuideOverlay(
                 iconKind = DecoIconKind.TOUCH,
                 sealColor = goldSeal,
                 title = "长按 · 多选批量整理",
-                detail = "在画廊中长按任意照片进入多选模式，可批量保留、收藏、移入回收站或压缩。"
+                detail = "在画廊中长按任意照片进入多选模式，可批量保留、珍藏、移入回收站或压缩。"
             ),
             GestureGuideRow(
                 iconKind = DecoIconKind.SWIPE_VERTICAL,

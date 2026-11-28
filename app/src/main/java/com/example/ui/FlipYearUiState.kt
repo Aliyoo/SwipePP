@@ -39,11 +39,26 @@ data class YearbookSummary(
     val cleanedMonthsCount: Int,
     val totalMonthsCount: Int,
     val reclaimableBytes: Long,
-    val editionIndex: Int
+    val editionIndex: Int,
+    val favoriteCount: Int = 0
 ) {
     val progressFraction: Float
         get() = if (totalPhotos == 0) 1f else ((totalPhotos - unreviewedCount).toFloat() / totalPhotos.toFloat()).coerceIn(0f, 1f)
 }
+
+@Immutable
+data class AnnualTreasureMonthGroup(
+    val month: Int,
+    val photos: List<PhotoItemEntity>
+)
+
+
+@Immutable
+data class TreasureRecommendation(
+    val photo: PhotoItemEntity,
+    val score: Int,
+    val reason: String
+)
 
 @Immutable
 data class MonthPageModel(
@@ -141,6 +156,7 @@ data class PhotoStateBackup(
     val month: Int,
     val previousStatus: String,
     val previousFavorite: Boolean,
+    val previousFavoritedAtMillis: Long? = null,
     val previousBucketName: String? = null,
     val restoreLocation: Boolean = false,
     val previousLocationName: String? = null,

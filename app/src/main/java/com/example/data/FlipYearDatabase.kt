@@ -10,12 +10,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 @Database(
     entities = [
         PhotoItemEntity::class,
+        DeviceFavoriteTimestampEntity::class,
         PhotoEmbeddingEntity::class,
         MonthStampEntity::class,
         CleanupStatsEntity::class,
         YearbookCoverConfigEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class FlipYearDatabase : RoomDatabase() {
@@ -92,6 +93,21 @@ abstract class FlipYearDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Existing favorites predate this timestamp field; keep null rather than inventing a migration time.
+                db.execSQL("ALTER TABLE photos ADD COLUMN favoritedAtMillis INTEGER")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `device_favorite_timestamps` (" +
+                        "`mediaStoreKey` TEXT NOT NULL, " +
+                        "`favoritedAtMillis` INTEGER NOT NULL, " +
+                        "`takenAtMillis` INTEGER NOT NULL, " +
+                        "`fileSizeBytes` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`mediaStoreKey`))"
+                )
+            }
+        }
+
         private val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE photos ADD COLUMN mimeType TEXT")
@@ -114,7 +130,7 @@ abstract class FlipYearDatabase : RoomDatabase() {
                     FlipYearDatabase::class.java,
                     "flipyear_cleaner.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                     .also { INSTANCE = it }

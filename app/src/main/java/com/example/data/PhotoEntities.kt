@@ -82,6 +82,7 @@ data class PhotoItemEntity(
     val contentUri: String? = null,
     val status: String = PhotoStatus.UNREVIEWED.name,
     val isFavorite: Boolean = false,
+    val favoritedAtMillis: Long? = null,
     val burstGroupId: String? = null,
     val qualityScore: Int = 85,
     val isBestInStack: Boolean = false,
@@ -135,6 +136,14 @@ data class PhotoItemEntity(
         }
 }
 
+@Entity(tableName = "device_favorite_timestamps")
+data class DeviceFavoriteTimestampEntity(
+    @PrimaryKey val mediaStoreKey: String,
+    val favoritedAtMillis: Long,
+    val takenAtMillis: Long,
+    val fileSizeBytes: Long
+)
+
 @Entity(tableName = "photo_embeddings")
 data class PhotoEmbeddingEntity(
     @PrimaryKey val photoId: Long,
@@ -183,12 +192,14 @@ data class DeviceMediaSyncRow(
     val motionVideoOffset: Long?,
     val motionVideoLength: Long?,
     val pairedMediaStoreKey: String?,
+    val takenAtMillis: Long,
     val fileSizeBytes: Long,
     val widthPx: Int,
     val heightPx: Int,
     val caption: String,
     val bucketName: String?,
-    val isFavorite: Boolean
+    val isFavorite: Boolean,
+    val favoritedAtMillis: Long?
 )
 
 data class LocationBatchUpdate(

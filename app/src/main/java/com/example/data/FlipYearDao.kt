@@ -40,7 +40,7 @@ interface FlipYearDao {
     @Query(
         "SELECT id, mediaStoreKey, durationMs, mimeType, imageFormat, mediaSubtype, isAnimated, " +
             "motionPhotoType, motionVideoUri, motionVideoDurationMs, motionVideoOffset, motionVideoLength, " +
-            "pairedMediaStoreKey, fileSizeBytes, widthPx, heightPx, caption, bucketName, isFavorite " +
+            "pairedMediaStoreKey, takenAtMillis, fileSizeBytes, widthPx, heightPx, caption, bucketName, isFavorite, favoritedAtMillis " +
             "FROM photos WHERE isSample = 0"
     )
     suspend fun getAllDeviceMediaSyncRowsSync(): List<DeviceMediaSyncRow>
@@ -207,11 +207,20 @@ interface FlipYearDao {
     @Query("UPDATE photos SET status = :status, trashedAtMillis = :trashedAtMillis WHERE id IN (:ids)")
     suspend fun updatePhotosStatus(ids: List<Long>, status: String, trashedAtMillis: Long?)
 
-    @Query("UPDATE photos SET isFavorite = :isFavorite WHERE id = :id")
-    suspend fun updatePhotoFavorite(id: Long, isFavorite: Boolean)
+    @Query("UPDATE photos SET isFavorite = :isFavorite, favoritedAtMillis = :favoritedAtMillis WHERE id = :id")
+    suspend fun updatePhotoFavorite(id: Long, isFavorite: Boolean, favoritedAtMillis: Long?)
 
-    @Query("UPDATE photos SET isFavorite = :isFavorite WHERE id IN (:ids)")
-    suspend fun updatePhotosFavorite(ids: List<Long>, isFavorite: Boolean)
+    @Query("UPDATE photos SET isFavorite = :isFavorite, favoritedAtMillis = :favoritedAtMillis WHERE id IN (:ids)")
+    suspend fun updatePhotosFavorite(ids: List<Long>, isFavorite: Boolean, favoritedAtMillis: Long?)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertFavoriteTimestampTombstones(rows: List<DeviceFavoriteTimestampEntity>)
+
+    @Query("SELECT * FROM device_favorite_timestamps")
+    suspend fun getFavoriteTimestampTombstones(): List<DeviceFavoriteTimestampEntity>
+
+    @Query("DELETE FROM device_favorite_timestamps WHERE mediaStoreKey IN (:keys)")
+    suspend fun deleteFavoriteTimestampTombstones(keys: List<String>)
 
     @Query("UPDATE photos SET bucketName = :bucketName WHERE id IN (:ids)")
     suspend fun updatePhotosAlbum(ids: List<Long>, bucketName: String?)
@@ -224,7 +233,7 @@ interface FlipYearDao {
 
     @Query(
         "UPDATE photos SET status = :status, trashedAtMillis = :trashedAtMillis, " +
-            "isFavorite = :isFavorite, bucketName = :bucketName, year = :year, month = :month " +
+            "isFavorite = :isFavorite, favoritedAtMillis = :favoritedAtMillis, bucketName = :bucketName, year = :year, month = :month " +
             "WHERE id = :id"
     )
     suspend fun restorePhotoState(
@@ -232,6 +241,7 @@ interface FlipYearDao {
         status: String,
         trashedAtMillis: Long?,
         isFavorite: Boolean,
+        favoritedAtMillis: Long?,
         bucketName: String?,
         year: Int,
         month: Int
@@ -239,7 +249,7 @@ interface FlipYearDao {
 
     @Query(
         "UPDATE photos SET status = :status, trashedAtMillis = :trashedAtMillis, " +
-            "isFavorite = :isFavorite, bucketName = :bucketName, year = :year, month = :month, " +
+            "isFavorite = :isFavorite, favoritedAtMillis = :favoritedAtMillis, bucketName = :bucketName, year = :year, month = :month, " +
             "locationName = :locationName, latitude = :latitude, longitude = :longitude, gpsScanned = :gpsScanned " +
             "WHERE id = :id"
     )
@@ -248,6 +258,7 @@ interface FlipYearDao {
         status: String,
         trashedAtMillis: Long?,
         isFavorite: Boolean,
+        favoritedAtMillis: Long?,
         bucketName: String?,
         year: Int,
         month: Int,
@@ -329,13 +340,22 @@ interface FlipYearDao {
         deleteSamples: Boolean,
         metadataUpdates: List<PhotoItemEntity> = emptyList(),
         favoriteTrueIds: List<Long> = emptyList(),
-        favoriteFalseIds: List<Long> = emptyList()
+        favoriteFalseIds: List<Long> = emptyList(),
+        favoriteTrueAtMillis: Long? = null,
+        favoriteTimestampTombstones: List<DeviceFavoriteTimestampEntity> = emptyList(),
+        scannedMediaKeys: List<String> = emptyList()
     ) {
+        if (favoriteTimestampTombstones.isNotEmpty()) {
+            upsertFavoriteTimestampTombstones(favoriteTimestampTombstones)
+        }
+        scannedMediaKeys.chunked(SQLITE_BIND_CHUNK).forEach { chunk ->
+            deleteFavoriteTimestampTombstones(chunk)
+        }
         favoriteTrueIds.chunked(SQLITE_BIND_CHUNK).forEach { chunk ->
-            updatePhotosFavorite(chunk, true)
+            updatePhotosFavorite(chunk, true, favoriteTrueAtMillis)
         }
         favoriteFalseIds.chunked(SQLITE_BIND_CHUNK).forEach { chunk ->
-            updatePhotosFavorite(chunk, false)
+            updatePhotosFavorite(chunk, false, null)
         }
         if (metadataUpdates.isNotEmpty()) {
             updateDeviceMediaMetadataBatch(metadataUpdates)
@@ -397,6 +417,7 @@ interface FlipYearDao {
                     status = spec.status,
                     trashedAtMillis = spec.trashedAtMillis,
                     isFavorite = spec.isFavorite,
+                    favoritedAtMillis = spec.favoritedAtMillis,
                     bucketName = spec.bucketName,
                     year = spec.year,
                     month = spec.month,
@@ -411,6 +432,7 @@ interface FlipYearDao {
                     status = spec.status,
                     trashedAtMillis = spec.trashedAtMillis,
                     isFavorite = spec.isFavorite,
+                    favoritedAtMillis = spec.favoritedAtMillis,
                     bucketName = spec.bucketName,
                     year = spec.year,
                     month = spec.month
@@ -484,6 +506,7 @@ data class PhotoRestoreSpec(
     val status: String,
     val trashedAtMillis: Long?,
     val isFavorite: Boolean,
+    val favoritedAtMillis: Long?,
     val bucketName: String?,
     val year: Int,
     val month: Int,
