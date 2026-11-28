@@ -52,6 +52,14 @@ data class AnnualTreasureMonthGroup(
     val photos: List<PhotoItemEntity>
 )
 
+
+@Immutable
+data class TreasureRecommendation(
+    val photo: PhotoItemEntity,
+    val score: Int,
+    val reason: String
+)
+
 @Immutable
 data class MonthPageModel(
     val year: Int,

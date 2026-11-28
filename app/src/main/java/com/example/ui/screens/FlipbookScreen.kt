@@ -109,6 +109,7 @@ import com.example.data.SameDayLocationMatch
 import com.example.data.inferSameDayLocations
 import com.example.sensor.rememberHapticEngine
 import com.example.ui.AnnualTreasureMonthGroup
+import com.example.ui.TreasureRecommendation
 import com.example.ui.GalleryEntry
 import com.example.ui.LocationCluster
 import com.example.ui.MonthPageModel
@@ -319,6 +320,13 @@ fun FlipbookScreen(
 
     val annualTreasureGroups = remember(year, allPhotos, timelineSortOrder) {
         com.example.ui.domain.LibraryDerivationEngine.buildAnnualTreasureGroups(
+            year = year,
+            allPhotos = allPhotos,
+            sortOrder = timelineSortOrder
+        )
+    }
+    val annualTreasureRecommendations = remember(year, allPhotos, timelineSortOrder) {
+        com.example.ui.domain.TreasureRecommendationEngine.recommend(
             year = year,
             allPhotos = allPhotos,
             sortOrder = timelineSortOrder
@@ -853,7 +861,12 @@ fun FlipbookScreen(
             AnnualTreasureOverview(
                 year = year,
                 groups = annualTreasureGroups,
+                recommendations = annualTreasureRecommendations,
                 onBack = { showAnnualTreasure = false },
+                onTreasureRecommendation = { photo ->
+                    haptics.swipeKeepConfirm()
+                    onToggleFavorite(photo, true)
+                },
                 onPhotoClick = { photo, contextPhotos ->
                     lightboxContextPhotos = contextPhotos
                     lightboxPhoto = photo
@@ -964,7 +977,9 @@ fun FlipbookScreen(
 private fun AnnualTreasureOverview(
     year: Int,
     groups: List<AnnualTreasureMonthGroup>,
+    recommendations: List<TreasureRecommendation>,
     onBack: () -> Unit,
+    onTreasureRecommendation: (PhotoItemEntity) -> Unit,
     onPhotoClick: (PhotoItemEntity, List<PhotoItemEntity>) -> Unit
 ) {
     val totalCount = groups.sumOf { it.photos.size }
@@ -1042,6 +1057,95 @@ private fun AnnualTreasureOverview(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+            }
+
+            if (recommendations.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 2.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(7.dp)
+                    ) {
+                        Text(
+                            text = "智能推荐",
+                            fontFamily = DecoDisplayFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = DecoInkOnGround
+                        )
+                        Text(
+                            text = "只建议 · 不自动珍藏",
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontSize = 10.5.sp,
+                            color = DecoGold,
+                            maxLines = 1
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(9.dp)
+                    ) {
+                        recommendations.forEach { recommendation ->
+                            val photo = recommendation.photo
+                            Column(
+                                modifier = Modifier.widthIn(max = 86.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(76.dp)
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .border(0.9.dp, DecoGold.copy(alpha = 0.48f), RoundedCornerShape(2.dp))
+                                        .clickable {
+                                            onPhotoClick(photo, recommendations.map { it.photo })
+                                        }
+                                        .testTag("treasure_recommendation_${photo.id}")
+                                ) {
+                                    PhotoArtwork(
+                                        photo = photo,
+                                        contentDescription = recommendation.reason,
+                                        showVideoBadge = true,
+                                        downsampleTier = ImageDownsampleTier.PREVIEW_CARD,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .padding(4.dp)
+                                            .size(24.dp)
+                                            .clip(RoundedCornerShape(2.dp))
+                                            .background(DecoGold)
+                                            .clickable { onTreasureRecommendation(photo) }
+                                            .testTag("treasure_recommendation_accept_${photo.id}"),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "收",
+                                            fontFamily = DecoDisplayFontFamily,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp,
+                                            color = DecoInkOnGround
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = recommendation.reason,
+                                    fontFamily = DecoDisplayFontFamily,
+                                    fontSize = 10.sp,
+                                    color = DecoInkOnGround.copy(alpha = 0.64f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
