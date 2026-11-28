@@ -387,6 +387,17 @@ fun FlipYearApp(
         }
     }
 
+    val navigateToTabDiscardingIntermediates: (String) -> Unit = { route ->
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = false
+            }
+            launchSingleTop = true
+            restoreState = false
+        }
+    }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -871,21 +882,19 @@ fun FlipYearApp(
                                 timelineSortOrder = uiState.timelineSortOrder,
                                 queue = queue,
                                 undoStackDepth = uiState.cleanerSessionUndoDepth,
-                                onBack = { navController.popBackStack() },
+                                onBack = {
+                                    if (isCustomSession) viewModel.clearCustomCleanerSession()
+                                    navController.popBackStack()
+                                },
                                 onOpenVaultForSession = { sessionTrashedIds ->
+                                    if (isCustomSession) viewModel.clearCustomCleanerSession()
                                     viewModel.setVaultSessionFilter(sessionTrashedIds)
-                                    navController.navigate(FlipYearRoutes.VAULT) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            saveState = true
-                                        }
-                                        launchSingleTop = true
-                                        restoreState = false
-                                    }
+                                    navigateToTabDiscardingIntermediates(FlipYearRoutes.VAULT)
                                 },
                                 onOpenTreasureGallery = { year, month ->
+                                    if (isCustomSession) viewModel.clearCustomCleanerSession()
                                     viewModel.requestTreasureGalleryView(year, month)
-                                    navController.popBackStack()
-                                    navigateToTab(FlipYearRoutes.GALLERY)
+                                    navigateToTabDiscardingIntermediates(FlipYearRoutes.GALLERY)
                                 },
                                 cleanerMutationRejection = uiState.pendingCleanerMutationRejection,
                                 onConsumeCleanerMutationRejection = viewModel::consumeCleanerMutationRejection,

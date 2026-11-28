@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
@@ -137,7 +138,11 @@ private data class SessionDecisionRecord(
     val treasuredKeptDelta: Int = 0,
     val trashedIds: Set<Long> = emptySet(),
     val trashedBytes: Long = 0L
-)
+) : java.io.Serializable {
+    companion object {
+        private const val serialVersionUID = 1L
+    }
+}
 
 // ---------------------------------------------------------------------------
 // 摩登画报 · 屏内一次性构件（design-demos/deco-app.html：PaperGround / SealBtn / 印钮）
@@ -213,8 +218,10 @@ fun ArcCleanerScreen(
     val haptics = rememberHapticEngine()
     val scope = rememberCoroutineScope()
 
-    var processedCardKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var sessionHistory by remember { mutableStateOf<List<SessionDecisionRecord>>(emptyList()) }
+    BackHandler { onBack() }
+
+    var processedCardKeys by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
+    var sessionHistory by rememberSaveable { mutableStateOf<List<SessionDecisionRecord>>(emptyList()) }
     val sessionKeptCount = remember(sessionHistory) { sessionHistory.sumOf { it.keptDelta } }
     val sessionFavoritedCount = remember(sessionHistory) { sessionHistory.sumOf { it.treasuredKeptDelta } }
     val sessionTrashedIds = remember(sessionHistory) {
