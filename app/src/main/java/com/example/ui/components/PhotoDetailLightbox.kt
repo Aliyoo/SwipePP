@@ -999,7 +999,12 @@ private fun LightboxBottomHud(
                                             orbSize = 54.dp,
                                             tone = if (photo.isFavorite) DecoOrbTone.GOLD_RING_HALO else DecoOrbTone.GOLD_RING,
                                             onClick = onFavorite,
-                                            testTag = "lightbox_favorite_button"
+                                            testTag = "lightbox_favorite_button",
+                                            accessibilityLabel = if (photo.isFavorite) {
+                                                "已珍藏，激活后移出珍藏"
+                                            } else {
+                                                "未珍藏，激活后收入珍藏"
+                                            }
                                         )
                                     }
                                     if (onKeep != null) {
