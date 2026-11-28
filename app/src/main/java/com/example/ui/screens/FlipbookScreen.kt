@@ -67,6 +67,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -327,6 +331,8 @@ fun FlipbookScreen(
                 .navigationBarsPadding()
                 .widthIn(max = 640.dp)
                 .align(Alignment.TopCenter)
+                .focusProperties { canFocus = !showAnnualTreasure }
+                .focusGroup()
         ) {
             // 画报顶栏：方章返回 + 干支纪年副标 + 『月历/画廊』跳签（多选态整栏切换为选择顶栏）
             val cleanedMonthCount = remember(monthPages) { monthPages.count { it.isCleaned } }
@@ -945,10 +951,15 @@ private fun AnnualTreasureOverview(
     onPhotoClick: (PhotoItemEntity, List<PhotoItemEntity>) -> Unit
 ) {
     val totalCount = groups.sumOf { it.photos.size }
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(DecoGround)
+            .focusRequester(focusRequester)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
