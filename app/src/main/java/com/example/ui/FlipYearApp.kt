@@ -398,6 +398,11 @@ fun FlipYearApp(
         }
     }
 
+    val startCleanerSession: (String) -> Unit = { route ->
+        viewModel.resetCleanerSessionUndo()
+        navController.navigate(route)
+    }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -615,7 +620,7 @@ fun FlipYearApp(
                                     navController.navigate(FlipYearRoutes.flipbook(year))
                                 },
                                 onStartYearCleanup = { year, includeReviewed ->
-                                    navController.navigate(
+                                    startCleanerSession(
                                         FlipYearRoutes.cleanerForYear(
                                             year = year,
                                             includeReviewed = includeReviewed,
@@ -674,7 +679,7 @@ fun FlipYearApp(
                                             photoIds = photoIds,
                                             includeReviewed = includeRev
                                         )
-                                        navController.navigate(
+                                        startCleanerSession(
                                             FlipYearRoutes.cleanerForCustom(
                                                 includeReviewed = includeRev,
                                                 source = CleanerEntrySource.GALLERY
@@ -683,7 +688,7 @@ fun FlipYearApp(
                                     }
                                 },
                                 onStartMonthCleanup = { y, m, includeRev ->
-                                    navController.navigate(
+                                    startCleanerSession(
                                         FlipYearRoutes.cleanerForMonth(
                                             year = y,
                                             month = m,
@@ -702,7 +707,7 @@ fun FlipYearApp(
                             FootprintMapScreen(
                                 uiState = uiState,
                                 onCleanLocation = { locName, includeReviewed ->
-                                    navController.navigate(
+                                    startCleanerSession(
                                         FlipYearRoutes.cleanerForLocation(
                                             location = locName,
                                             includeReviewed = includeReviewed,
@@ -784,7 +789,7 @@ fun FlipYearApp(
                                 allPhotos = uiState.allPhotos,
                                 onBack = { navController.popBackStack() },
                                 onStartMonthCleanup = { y, m, includeReviewed, focusDay ->
-                                    navController.navigate(
+                                    startCleanerSession(
                                         FlipYearRoutes.cleanerForMonth(
                                             year = y,
                                             month = m,
@@ -839,10 +844,6 @@ fun FlipYearApp(
                             val entrySource = CleanerEntrySource.fromRouteKey(entry.arguments?.getString("source"))
                             val isCustomSession = entry.arguments?.getBoolean("custom") ?: false
                             val customSession = if (isCustomSession) uiState.customCleanerSession else null
-
-                            LaunchedEffect(entry.id) {
-                                viewModel.resetCleanerSessionUndo()
-                            }
 
                             val queue = remember(
                                 yearArg,
