@@ -85,6 +85,7 @@ import com.example.ui.theme.JetBrainsMonoFontFamily
 
 enum class GallerySmartFilter(val label: String) {
     ALL("全部"),
+    TREASURED("珍藏"),
     BURSTS("连拍组"),
     LARGE_PHOTOS("大图省空间"),
     MISSING_LOCATION("缺定位"),
@@ -357,6 +358,7 @@ fun TimelineGlobalSearchBar(
                     item(key = "active_smart_filter") {
                         RemovableFilterPill(
                             iconKind = when (activeSmartFilter) {
+                                GallerySmartFilter.TREASURED -> DecoIconKind.FAVORITE
                                 GallerySmartFilter.BURSTS -> DecoIconKind.BURST
                                 GallerySmartFilter.LARGE_PHOTOS -> DecoIconKind.COMPRESS
                                 GallerySmartFilter.MISSING_LOCATION -> DecoIconKind.LOCATION_OFF
@@ -551,6 +553,7 @@ fun TimelineSearchFilterSheet(
     currentAlbum: String? = null,
     existingAlbums: List<String> = emptyList(),
     burstCount: Int = 0,
+    treasuredCount: Int = 0,
     largePhotoCount: Int = 0,
     missingLocationCount: Int = 0,
     livePhotoCount: Int = 0,
@@ -734,6 +737,7 @@ fun TimelineSearchFilterSheet(
                 ) {
                     val smartChoices = buildList {
                         add(GallerySmartFilter.ALL to "全部")
+                        add(GallerySmartFilter.TREASURED to if (treasuredCount > 0) "珍藏 ($treasuredCount)" else "珍藏")
                         if (burstCount > 0) add(GallerySmartFilter.BURSTS to "连拍组 ($burstCount)")
                         if (largePhotoCount > 0) add(GallerySmartFilter.LARGE_PHOTOS to "大图省空间 ($largePhotoCount)")
                         if (missingLocationCount > 0) add(GallerySmartFilter.MISSING_LOCATION to "缺定位 ($missingLocationCount)")

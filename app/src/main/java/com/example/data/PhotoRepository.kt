@@ -2,6 +2,7 @@ package com.example.data
 
 import android.app.PendingIntent
 import android.net.Uri
+import android.os.Build
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -13,7 +14,18 @@ data class MediaSyncResult(
     val totalFound: Int,
     val imageCount: Int,
     val videoCount: Int,
-    val newlyAddedCount: Int
+    val newlyAddedCount: Int,
+    val favoriteExportCandidates: List<PhotoItemEntity> = emptyList()
+)
+
+enum class SystemFavoriteWriteStatus {
+    APPLIED,
+    NEEDS_CONSENT,
+    LOCAL_ONLY
+}
+
+data class SystemFavoriteWriteOutcome(
+    val status: SystemFavoriteWriteStatus
 )
 
 class PhotoRepository(
@@ -70,7 +82,7 @@ class PhotoRepository(
         dao.getDeviceMediaCount() > 0
     }
 
-    suspend fun syncLocalDeviceMedia(): MediaSyncResult = withContext(Dispatchers.IO) {
+    suspend fun syncLocalDeviceMedia(preserveLocalFavorites: Boolean = false): MediaSyncResult = withContext(Dispatchers.IO) {
         val scanned = scanner.scanAllLocalPhotosAndVideos()
         val existingRows = dao.getAllDeviceMediaSyncRowsSync()
         val existingByKey = HashMap<String, DeviceMediaSyncRow>(existingRows.size * 2)
@@ -105,17 +117,26 @@ class PhotoRepository(
             }
         }
 
+        val favoritePlan = buildFavoriteReconcilePlan(
+            scanned = scanned,
+            existingByKey = existingByKey,
+            preserveLocalFavorites = preserveLocalFavorites
+        )
         val shouldDeleteSamples = scanned.isNotEmpty() && dao.getSamplePhotoCount() > 0
 
         // Only write to SQLite if there is an actual diff -> zero wasted Room Flow invalidations on warm start!
-        if (vanishedIds.isNotEmpty() || newItems.isNotEmpty() || shouldDeleteSamples || metadataUpdates.isNotEmpty()) {
+        if (vanishedIds.isNotEmpty() || newItems.isNotEmpty() || shouldDeleteSamples || metadataUpdates.isNotEmpty() ||
+            favoritePlan.favoriteTrueIds.isNotEmpty() || favoritePlan.favoriteFalseIds.isNotEmpty()
+        ) {
             val invalidateKeys = (newItems + metadataUpdates).map { yearMonthKey(it.year, it.month) }.distinct()
             dao.syncDeviceMediaBatch(
                 vanishedIds = vanishedIds,
                 newItems = newItems,
                 invalidateMonthKeys = invalidateKeys,
                 deleteSamples = shouldDeleteSamples,
-                metadataUpdates = metadataUpdates
+                metadataUpdates = metadataUpdates,
+                favoriteTrueIds = favoritePlan.favoriteTrueIds,
+                favoriteFalseIds = favoritePlan.favoriteFalseIds
             )
         }
 
@@ -123,7 +144,8 @@ class PhotoRepository(
             totalFound = scanned.size,
             imageCount = imageCount,
             videoCount = videoCount,
-            newlyAddedCount = newItems.size
+            newlyAddedCount = newItems.size,
+            favoriteExportCandidates = favoritePlan.legacyFavoriteExportCandidates
         )
     }
 
@@ -290,6 +312,35 @@ class PhotoRepository(
             if (syncMonthStamp(y, m)) newlyStamped = true
         }
         return newlyStamped
+    }
+
+    suspend fun writeFavoritesToSystem(
+        photos: List<PhotoItemEntity>,
+        isFavorite: Boolean
+    ): SystemFavoriteWriteOutcome = withContext(Dispatchers.IO) {
+        val devicePhotos = photos.filter {
+            !it.isSample && !it.contentUri.isNullOrBlank() && it.contentUri.startsWith("content://")
+        }
+        if (devicePhotos.isEmpty()) {
+            return@withContext SystemFavoriteWriteOutcome(SystemFavoriteWriteStatus.LOCAL_ONLY)
+        }
+        if (batchEditor.writeFavoriteStatusDirectly(devicePhotos, isFavorite)) {
+            return@withContext SystemFavoriteWriteOutcome(SystemFavoriteWriteStatus.APPLIED)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            SystemFavoriteWriteOutcome(SystemFavoriteWriteStatus.NEEDS_CONSENT)
+        } else {
+            // Android 10 and below have no shared MediaStore favorite bit; keep the legacy in-app behavior.
+            SystemFavoriteWriteOutcome(SystemFavoriteWriteStatus.LOCAL_ONLY)
+        }
+    }
+
+    fun buildSystemFavoriteIntent(photos: List<PhotoItemEntity>, isFavorite: Boolean): PendingIntent? {
+        return batchEditor.buildSystemFavoritePendingIntent(photos, isFavorite)
+    }
+
+    suspend fun getPhotosByIds(ids: List<Long>): List<PhotoItemEntity> = withContext(Dispatchers.IO) {
+        ids.distinct().chunked(500).flatMap { dao.getPhotosByIds(it) }
     }
 
     suspend fun toggleFavorite(photoId: Long, isFavorite: Boolean) {
@@ -524,4 +575,44 @@ class PhotoRepository(
         fun yearMonthKey(year: Int, month: Int): String =
             "%04d-%02d".format(year, month)
     }
+}
+
+internal data class FavoriteReconcilePlan(
+    val favoriteTrueIds: List<Long> = emptyList(),
+    val favoriteFalseIds: List<Long> = emptyList(),
+    val legacyFavoriteExportCandidates: List<PhotoItemEntity> = emptyList()
+)
+
+/**
+ * MediaStore is the source of truth after the one-time migration. While that migration is
+ * pending, legacy app-only favorites win locally and are exported instead of being erased.
+ */
+internal fun buildFavoriteReconcilePlan(
+    scanned: List<PhotoItemEntity>,
+    existingByKey: Map<String, DeviceMediaSyncRow>,
+    preserveLocalFavorites: Boolean
+): FavoriteReconcilePlan {
+    val trueIds = ArrayList<Long>()
+    val falseIds = ArrayList<Long>()
+    val exportCandidates = ArrayList<PhotoItemEntity>()
+
+    for (item in scanned) {
+        val key = item.mediaStoreKey ?: continue
+        val existing = existingByKey[key] ?: continue
+        if (preserveLocalFavorites && existing.isFavorite && !item.isFavorite) {
+            exportCandidates += item.copy(isFavorite = true)
+        } else if (existing.isFavorite != item.isFavorite) {
+            if (item.isFavorite) {
+                trueIds += existing.id
+            } else {
+                falseIds += existing.id
+            }
+        }
+    }
+
+    return FavoriteReconcilePlan(
+        favoriteTrueIds = trueIds,
+        favoriteFalseIds = falseIds,
+        legacyFavoriteExportCandidates = exportCandidates
+    )
 }

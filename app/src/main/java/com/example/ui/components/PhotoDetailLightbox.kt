@@ -287,6 +287,15 @@ private fun PhotoDetailLightboxContent(
         if (base.any { it.id == photo.id }) base else listOf(photo)
     }
     val sessionPhotos = remember { mutableStateListOf<PhotoItemEntity>().apply { addAll(initialList) } }
+    LaunchedEffect(photos) {
+        val sessionIndexById = sessionPhotos.mapIndexed { index, item -> item.id to index }.toMap()
+        photos.forEach { updated ->
+            val index = sessionIndexById[updated.id]
+            if (index != null && sessionPhotos[index] != updated) {
+                sessionPhotos[index] = updated
+            }
+        }
+    }
     val resolvedStartIndex = remember {
         if (initialIndex in initialList.indices && initialList[initialIndex].id == photo.id) {
             initialIndex
@@ -984,13 +993,18 @@ private fun LightboxBottomHud(
                                         )
                                     }
                                     if (onFavorite != null) {
-                                        // 收藏：金环小章；已收藏加外圈余辉（原型印钮纯美术字）
+                                        // 珍藏：金环小章；已珍藏加外圈余辉（原型印钮纯美术字）
                                         DecoSealOrb(
-                                            label = if (photo.isFavorite) "已藏" else "收藏",
+                                            label = "珍藏",
                                             orbSize = 54.dp,
                                             tone = if (photo.isFavorite) DecoOrbTone.GOLD_RING_HALO else DecoOrbTone.GOLD_RING,
                                             onClick = onFavorite,
-                                            testTag = "lightbox_favorite_button"
+                                            testTag = "lightbox_favorite_button",
+                                            accessibilityLabel = if (photo.isFavorite) {
+                                                "已珍藏，激活后移出珍藏"
+                                            } else {
+                                                "未珍藏，激活后收入珍藏"
+                                            }
                                         )
                                     }
                                     if (onKeep != null) {

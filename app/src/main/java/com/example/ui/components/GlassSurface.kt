@@ -847,7 +847,8 @@ fun DecoSealOrb(
     modifier: Modifier = Modifier,
     orbSize: Dp = 64.dp,
     tone: DecoOrbTone,
-    testTag: String? = null
+    testTag: String? = null,
+    accessibilityLabel: String? = null
 ) {
     val gold = DecoGold
     val verm = DecoVerm
@@ -899,6 +900,9 @@ fun DecoSealOrb(
                 .clip(CircleShape)
                 .background(fillColor)
                 .border(2.dp, ringColor, CircleShape)
+                .semantics {
+                    if (accessibilityLabel != null) contentDescription = accessibilityLabel
+                }
                 .clickable(
                     interactionSource = interactionSource,
                     indication = ripple(color = contentColor),

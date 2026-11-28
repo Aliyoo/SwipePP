@@ -134,6 +134,7 @@ data class MonthlyClusterSummary(
     val photoCount: Int,
     val videoCount: Int,
     val burstGroupCount: Int,
+    val favoriteCount: Int = 0,
     val totalBytes: Long,
     val firstGridIndex: Int,
     val isCleaned: Boolean
@@ -149,6 +150,9 @@ data class MonthlyClusterSummary(
             }
             if (videoCount > 0 && photoCount > 0) {
                 append(" · ${videoCount} 视频")
+            }
+            if (favoriteCount > 0) {
+                append(" · 珍藏 $favoriteCount")
             }
             append(" · ${formatStorageSize(totalBytes)}")
         }
@@ -225,6 +229,7 @@ fun buildTimelineClusterLayout(
         var photoCount = 0
         var videoCount = 0
         var burstGroupCount = 0
+        var favoriteCount = 0
         var totalBytes = 0L
 
         val startEntryIndex = index
@@ -234,12 +239,14 @@ fun buildTimelineClusterLayout(
             when (val e = entries[index]) {
                 is GalleryEntry.Single -> {
                     if (e.photo.isVideo) videoCount++ else photoCount++
+                    if (e.photo.isFavorite) favoriteCount++
                     totalBytes += e.photo.fileSizeBytes
                 }
                 is GalleryEntry.Burst -> {
                     burstGroupCount++
                     for (member in e.photos) {
                         if (member.isVideo) videoCount++ else photoCount++
+                        if (member.isFavorite) favoriteCount++
                         totalBytes += member.fileSizeBytes
                     }
                 }
@@ -256,6 +263,7 @@ fun buildTimelineClusterLayout(
             photoCount = photoCount,
             videoCount = videoCount,
             burstGroupCount = burstGroupCount,
+            favoriteCount = favoriteCount,
             totalBytes = totalBytes,
             firstGridIndex = firstGridIndex,
             isCleaned = monthStamps.containsKey(ymKey)

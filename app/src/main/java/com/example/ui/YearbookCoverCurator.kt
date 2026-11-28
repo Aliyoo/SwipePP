@@ -129,7 +129,10 @@ object YearbookCoverCurator {
         return visible
             .map { it to scoreCoverCandidate(it) }
             .sortedWith(
-                compareByDescending<Pair<PhotoItemEntity, Int>> { it.second }
+                compareByDescending<Pair<PhotoItemEntity, Int>> {
+                    it.first.isFavorite && !isLikelyScreenshotOrUtility(it.first)
+                }
+                    .thenByDescending { it.second }
                     .thenByDescending { it.first.takenAtMillis }
             )
             .map { it.first }
@@ -157,7 +160,10 @@ object YearbookCoverCurator {
         val scored = visible
             .map { it to scoreCoverCandidate(it) }
             .sortedWith(
-                compareByDescending<Pair<PhotoItemEntity, Int>> { it.second }
+                compareByDescending<Pair<PhotoItemEntity, Int>> {
+                    it.first.isFavorite && !isLikelyScreenshotOrUtility(it.first)
+                }
+                    .thenByDescending { it.second }
                     .thenByDescending { it.first.takenAtMillis }
             )
 

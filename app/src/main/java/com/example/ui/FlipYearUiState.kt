@@ -1,5 +1,6 @@
 package com.example.ui
 
+import android.app.PendingIntent
 import androidx.compose.runtime.Immutable
 import com.example.data.CleanupStatsEntity
 import com.example.data.CollageBackdropStyle
@@ -145,7 +146,14 @@ data class PhotoStateBackup(
     val previousLocationName: String? = null,
     val previousLatitude: Double? = null,
     val previousLongitude: Double? = null,
-    val previousGpsScanned: Boolean = false
+    val previousGpsScanned: Boolean = false,
+    val favoriteTouched: Boolean = false
+)
+
+data class PendingFavoriteConsent(
+    val pendingIntent: PendingIntent,
+    val onApproved: suspend () -> Unit,
+    val onCancelled: () -> Unit
 )
 
 @Immutable
@@ -167,7 +175,8 @@ sealed interface GalleryEntry {
     data class Burst(
         val groupId: String,
         val photos: List<PhotoItemEntity>,
-        val bestPhoto: PhotoItemEntity
+        val bestPhoto: PhotoItemEntity,
+        val preferredRepresentativePhotoId: Long? = null
     ) : GalleryEntry {
         override val stableKey: String = "gal_burst_$groupId"
         override val latestTimestamp: Long = photos.maxOf { it.takenAtMillis }
@@ -175,6 +184,38 @@ sealed interface GalleryEntry {
         val totalBytes: Long = photos.sumOf { it.fileSizeBytes }
         val nonBestBytes: Long = photos.filter { it.id != bestPhoto.id }.sumOf { it.fileSizeBytes }
         val spanSeconds: Long = ((photos.maxOf { it.takenAtMillis } - photos.minOf { it.takenAtMillis }) / 1000L).coerceAtLeast(1L)
+        val representativePhoto: PhotoItemEntity
+            get() {
+                preferredRepresentativePhotoId?.let { preferredId ->
+                    photos.firstOrNull { it.id == preferredId }?.let { return it }
+                }
+                val treasured = photos.filter { it.isFavorite }
+                if (treasured.isEmpty()) return bestPhoto
+                return treasured.firstOrNull { it.id == bestPhoto.id }
+                    ?: treasured.maxWithOrNull(
+                        compareBy<PhotoItemEntity> { it.qualityScore }.thenBy { it.takenAtMillis }
+                    )
+                    ?: bestPhoto
+            }
+    }
+}
+
+internal fun filterTreasuredGalleryEntries(entries: List<GalleryEntry>): List<GalleryEntry> {
+    return entries.mapNotNull { entry ->
+        when (entry) {
+            is GalleryEntry.Single -> entry.takeIf { it.photo.isFavorite }
+            is GalleryEntry.Burst -> {
+                val treasuredPhotos = entry.photos.filter { it.isFavorite }
+                if (treasuredPhotos.isEmpty()) {
+                    null
+                } else {
+                    entry.copy(
+                        photos = treasuredPhotos,
+                        bestPhoto = entry.bestPhoto.takeIf { it.isFavorite } ?: treasuredPhotos.first()
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -192,6 +233,7 @@ data class PrecomputedGalleryIndex(
     val sourceEntries: List<GalleryEntry> = emptyList(),
     val existingAlbums: List<String> = emptyList(),
     val burstEntries: List<GalleryEntry.Burst> = emptyList(),
+    val treasuredEntries: List<GalleryEntry> = emptyList(),
     val largePhotoEntries: List<GalleryEntry> = emptyList(),
     val missingLocationEntries: List<GalleryEntry> = emptyList(),
     val extractedKeywordTags: List<String> = emptyList(),
@@ -203,6 +245,19 @@ data class PrecomputedGalleryIndex(
         val EMPTY = PrecomputedGalleryIndex()
     }
 }
+
+@Immutable
+data class TreasureGalleryRequest(
+    val year: Int? = null,
+    val month: Int? = null,
+    val requestId: Long = 0L
+)
+
+@Immutable
+data class CleanerMutationRejection(
+    val cardKey: String,
+    val requestId: Long = 0L
+)
 
 @Immutable
 data class FlipYearUiState(
@@ -236,6 +291,8 @@ data class FlipYearUiState(
     val recentlyStampedMonthKey: String? = null,
     val vaultSessionFilterIds: Set<Long>? = null,
     val customCleanerSession: CustomCleanerSession? = null,
+    val pendingTreasureGalleryRequest: TreasureGalleryRequest? = null,
+    val pendingCleanerMutationRejection: CleanerMutationRejection? = null,
     val batchTaskMessage: String? = null,
     val batchTaskProcessed: Int = 0,
     val batchTaskTotal: Int = 0,

@@ -108,6 +108,7 @@ import com.example.ui.components.defaultGalleryZoomTier
 import com.example.ui.countDescriptiveTagMatches
 import com.example.ui.extractDescriptiveKeywordTags
 import com.example.ui.filterGalleryEntriesBySearch
+import com.example.ui.filterTreasuredGalleryEntries
 import com.example.ui.parseTimelineKeyword
 import com.example.ui.screens.gallery.BulkMoveDestinationSheet
 import com.example.ui.screens.gallery.FloatingBulkActionBar
@@ -249,11 +250,13 @@ internal fun filterGalleryEntriesBySmartAndAlbum(
     smartFilter: GallerySmartFilter,
     selectedAlbum: String?,
     burstEntries: List<GalleryEntry.Burst>? = null,
+    treasuredEntries: List<GalleryEntry>? = null,
     largePhotoEntries: List<GalleryEntry>? = null,
     missingLocationEntries: List<GalleryEntry>? = null
 ): List<GalleryEntry> {
     val base = when (smartFilter) {
         GallerySmartFilter.ALL -> allEntries
+        GallerySmartFilter.TREASURED -> treasuredEntries ?: filterTreasuredGalleryEntries(allEntries)
         GallerySmartFilter.BURSTS -> burstEntries ?: allEntries.filterIsInstance<GalleryEntry.Burst>()
         GallerySmartFilter.LARGE_PHOTOS -> largePhotoEntries ?: allEntries.filter { entry ->
             when (entry) {
@@ -313,6 +316,7 @@ fun GalleryScreen(
     onStartCustomCleanup: (title: String, photoIds: Set<Long>, includeReviewed: Boolean) -> Unit = { _, _, _ -> },
     onStartMonthCleanup: (year: Int, month: Int, includeReviewed: Boolean) -> Unit = { _, _, _ -> },
     onResetGlobalMediaFilter: () -> Unit = {},
+    onConsumeTreasureGalleryRequest: () -> Unit = {},
     galleryColumns: Int = 3,
     modifier: Modifier = Modifier
 ) {
@@ -350,6 +354,24 @@ fun GalleryScreen(
             delay(110L)
             searchQuery = searchQuery.copy(keyword = rawSearchKeyword)
         }
+    }
+
+    LaunchedEffect(uiState.pendingTreasureGalleryRequest) {
+        val request = uiState.pendingTreasureGalleryRequest ?: return@LaunchedEffect
+        explicitSelectionMode = false
+        selectedPhotoIds = emptySet()
+        smartFilter = GallerySmartFilter.TREASURED
+        selectedAlbumFilter = null
+        rawSearchKeyword = ""
+        searchQuery = if (request.year != null && request.month != null) {
+            TimelineSearchQuery(
+                dateRange = DateRangeFilter.monthPreset(request.year, request.month)
+            )
+        } else {
+            TimelineSearchQuery()
+        }
+        onResetGlobalMediaFilter()
+        onConsumeTreasureGalleryRequest()
     }
 
     val resetSearchAndFilters = remember {
@@ -450,6 +472,17 @@ fun GalleryScreen(
     val burstEntries = precomputed?.burstEntries ?: remember(allEntries) {
         allEntries.filterIsInstance<GalleryEntry.Burst>()
     }
+    val treasuredEntries = precomputed?.treasuredEntries ?: remember(allEntries) {
+        filterTreasuredGalleryEntries(allEntries)
+    }
+    val treasuredMediaCount = remember(treasuredEntries) {
+        treasuredEntries.sumOf { entry ->
+            when (entry) {
+                is GalleryEntry.Single -> 1
+                is GalleryEntry.Burst -> entry.photos.size
+            }
+        }
+    }
     val largePhotoEntries = precomputed?.largePhotoEntries ?: remember(allEntries) {
         allEntries.filter { entry ->
             when (entry) {
@@ -509,6 +542,7 @@ fun GalleryScreen(
             smartFilter = smartFilter,
             selectedAlbum = selectedAlbumFilter,
             burstEntries = burstEntries,
+            treasuredEntries = treasuredEntries,
             largePhotoEntries = largePhotoEntries,
             missingLocationEntries = missingLocationEntries
         )
@@ -849,6 +883,7 @@ fun GalleryScreen(
                                 // One-tap Quick Smart Filter Strip right below Search Bar
                                 val quickSmartChoices = remember(
                                     burstEntries.size,
+                                    treasuredMediaCount,
                                     largePhotoEntries.size,
                                     missingLocationEntries.size,
                                     livePhotoEntries.size,
@@ -858,6 +893,7 @@ fun GalleryScreen(
                                 ) {
                                     buildList {
                                         add(GallerySmartFilter.ALL to "全部")
+                                        add(GallerySmartFilter.TREASURED to if (treasuredMediaCount > 0) "珍藏 ($treasuredMediaCount)" else "珍藏")
                                         if (burstEntries.isNotEmpty()) add(GallerySmartFilter.BURSTS to "连拍组 (${burstEntries.size})")
                                         if (largePhotoEntries.isNotEmpty()) add(GallerySmartFilter.LARGE_PHOTOS to "大图 (${largePhotoEntries.size})")
                                         if (missingLocationEntries.isNotEmpty()) add(GallerySmartFilter.MISSING_LOCATION to "缺定位 (${missingLocationEntries.size})")
@@ -964,6 +1000,7 @@ fun GalleryScreen(
                                 DecoIcon(
                                     kind = when {
                                         searchQuery.isActive -> DecoIconKind.SEARCH
+                                        smartFilter == GallerySmartFilter.TREASURED -> DecoIconKind.FAVORITE
                                         smartFilter == GallerySmartFilter.BURSTS -> DecoIconKind.BURST
                                         smartFilter == GallerySmartFilter.LARGE_PHOTOS -> DecoIconKind.COMPRESS
                                         smartFilter == GallerySmartFilter.MISSING_LOCATION -> DecoIconKind.LOCATION_OFF
@@ -983,6 +1020,7 @@ fun GalleryScreen(
                             text = when {
                                 searchQuery.isActive -> "未找到匹配的照片与视频"
                                 selectedAlbumFilter != null -> "「$selectedAlbumFilter」相册暂无媒体"
+                                smartFilter == GallerySmartFilter.TREASURED -> "暂无珍藏媒体"
                                 smartFilter == GallerySmartFilter.BURSTS -> "当前没有待展开的连拍组"
                                 smartFilter == GallerySmartFilter.LARGE_PHOTOS -> "暂未发现大于 3 MB 的高体积照片"
                                 smartFilter == GallerySmartFilter.MISSING_LOCATION -> "全部媒体均已拥有定位"
@@ -1002,6 +1040,7 @@ fun GalleryScreen(
                             text = when {
                                 searchQuery.isActive -> "尝试调整搜索关键词、放宽日期范围，或清除部分地点与描述标签筛选。"
                                 selectedAlbumFilter != null -> "可以切换回全部媒体，或长按照片批量移动到此相册。"
+                                smartFilter == GallerySmartFilter.TREASURED -> "在清理或详情页收藏后，珍藏媒体会汇聚在这里。"
                                 smartFilter == GallerySmartFilter.BURSTS -> "所有连续拍摄组已整理完成，或切换至全部媒体查看。"
                                 smartFilter == GallerySmartFilter.LARGE_PHOTOS -> "当前相册照片体积都很精巧，可切回全部媒体继续整理。"
                                 smartFilter == GallerySmartFilter.MISSING_LOCATION -> "每张回忆都已标注好足迹地点，可前往足迹地图浏览。"
@@ -1237,6 +1276,7 @@ fun GalleryScreen(
                     smartFilter = draftSmart,
                     selectedAlbum = draftAlbum,
                     burstEntries = burstEntries,
+                    treasuredEntries = treasuredEntries,
                     largePhotoEntries = largePhotoEntries,
                     missingLocationEntries = missingLocationEntries
                 )
@@ -1265,6 +1305,7 @@ fun GalleryScreen(
             currentAlbum = selectedAlbumFilter,
             existingAlbums = existingAlbums,
             burstCount = burstEntries.size,
+            treasuredCount = treasuredMediaCount,
             largePhotoCount = largePhotoEntries.size,
             missingLocationCount = missingLocationEntries.size,
             livePhotoCount = livePhotoEntries.size,

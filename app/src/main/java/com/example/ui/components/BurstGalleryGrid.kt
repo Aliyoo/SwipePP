@@ -734,7 +734,7 @@ private fun SingleGalleryTile(
                     color = DecoPaperCream,
                     selected = true,
                     iconSize = 12.dp,
-                    contentDescription = "收藏"
+                    contentDescription = "珍藏"
                 )
             }
         }
@@ -999,8 +999,9 @@ private fun CollapsedBurstStackTile(
                     shape = TileShape
                 )
         ) {
+            val representativePhoto = burst.representativePhoto
             PhotoArtwork(
-                photo = burst.bestPhoto,
+                photo = representativePhoto,
                 contentDescription = "连拍组，共 ${burst.photos.size} 张，点击展开或长按多选",
                 showVideoBadge = false,
                 downsampleTier = ImageDownsampleTier.GRID_THUMB,
@@ -1041,15 +1042,15 @@ private fun CollapsedBurstStackTile(
                         .padding(6.dp)
                         .size(19.dp)
                         .clip(CircleShape)
-                        .background(deco.decoGold),
+                        .background(if (representativePhoto.isFavorite) deco.decoVerm else deco.decoGold),
                     contentAlignment = Alignment.Center
                 ) {
                     DecoIcon(
                         kind = DecoIconKind.STAR,
-                        color = deco.decoMat,
+                        color = if (representativePhoto.isFavorite) DecoPaperCream else deco.decoMat,
                         selected = true,
                         iconSize = 12.dp,
-                        contentDescription = "最佳连拍"
+                        contentDescription = if (representativePhoto.isFavorite) "珍藏代表帧" else "最佳连拍"
                     )
                 }
             }

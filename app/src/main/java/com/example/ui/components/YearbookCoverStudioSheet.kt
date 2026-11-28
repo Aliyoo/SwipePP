@@ -94,7 +94,7 @@ import kotlinx.coroutines.launch
 
 private enum class CoverPickerFilter(val label: String) {
     RECOMMENDED("智能推荐"),
-    FAVORITES("我的收藏"),
+    FAVORITES("珍藏精选"),
     ALL_CHRONOLOGICAL("全部时间轴")
 }
 
@@ -1307,7 +1307,7 @@ private fun SmartSlideCard(
 ) {
     val reasonTag = remember(photo) {
         when {
-            photo.isFavorite -> "收藏佳作"
+            photo.isFavorite -> "珍藏佳作"
             !photo.locationName.isNullOrBlank() -> photo.locationName
             photo.isBestInStack -> "连拍优选"
             photo.qualityScore >= 90 -> "高画质"

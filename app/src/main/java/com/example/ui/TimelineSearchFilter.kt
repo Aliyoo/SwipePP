@@ -110,11 +110,24 @@ data class DateRangeFilter(
             )
         }
 
+        fun monthPreset(year: Int, month: Int): DateRangeFilter = DateRangeFilter(
+            startDateKey = encodeDateKey(year, month, 1),
+            endDateKey = encodeDateKey(year, month, daysInMonth(year, month)),
+            presetLabel = "${year}年${month}月"
+        )
+
         fun yearPreset(year: Int): DateRangeFilter = DateRangeFilter(
             startDateKey = encodeDateKey(year, 1, 1),
             endDateKey = encodeDateKey(year, 12, 31),
             presetLabel = "${year}年"
         )
+
+        private fun daysInMonth(year: Int, month: Int): Int = when (month) {
+            1, 3, 5, 7, 8, 10, 12 -> 31
+            4, 6, 9, 11 -> 30
+            2 -> if (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) 29 else 28
+            else -> 31
+        }
     }
 }
 
@@ -129,7 +142,7 @@ enum class DescriptiveTag(
     val label: String,
     val searchAliases: List<String>
 ) {
-    FAVORITE("精选收藏", listOf("收藏", "精选", "精选收藏", "喜欢", "favorite", "star")),
+    FAVORITE("珍藏", listOf("珍藏", "收藏", "精选", "精选收藏", "喜欢", "favorite", "star")),
     VIDEO("视频", listOf("视频", "video", "mov", "mp4")),
     UHD_VIDEO("4K 视频", listOf("4k", "4k视频", "uhd", "超清视频")),
     LIVE_PHOTO("Live 图", listOf("live", "live图", "live photo", "实况", "实况照片", "动态照片", "motion photo")),
@@ -212,6 +225,7 @@ enum class DescriptiveTag(
             "未整理" to NEEDS_REVIEW,
             "连拍组" to BURST,
             "精选" to FAVORITE,
+            "珍藏" to FAVORITE,
             "收藏" to FAVORITE,
             "高清" to HIGH_QUALITY,
             "视频" to VIDEO,
@@ -790,8 +804,10 @@ fun filterGalleryEntriesBySearch(
             is GalleryEntry.Burst -> {
                 var bestPhotoMatch: PhotoItemEntity? = null
                 var bestScore = Float.NEGATIVE_INFINITY
+                val matchScores = HashMap<Long, Float>(entry.photos.size)
                 for (p in entry.photos) {
                     val s = scoreSinglePhoto(p) ?: continue
+                    matchScores[p.id] = s
                     if (bestPhotoMatch == null || s > bestScore ||
                         (s == bestScore && p.id == entry.bestPhoto.id)
                     ) {
@@ -805,7 +821,14 @@ fun filterGalleryEntriesBySearch(
                     } else {
                         entry.copy(bestPhoto = bestPhotoMatch)
                     }
-                    scored.add(surfaced to bestScore)
+                    val representativeMatches = matchScores.containsKey(surfaced.representativePhoto.id)
+                    scored.add(
+                        if (representativeMatches) {
+                            surfaced
+                        } else {
+                            surfaced.copy(preferredRepresentativePhotoId = bestPhotoMatch.id)
+                        } to bestScore
+                    )
                 }
             }
         }

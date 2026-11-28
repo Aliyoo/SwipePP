@@ -90,6 +90,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -282,6 +283,18 @@ fun FlipYearApp(
         }
     )
 
+    val systemFavoriteLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult(),
+        onResult = { result ->
+            viewModel.confirmPendingFavoriteConsent(result.resultCode == Activity.RESULT_OK)
+        }
+    )
+    val pendingFavoriteConsent by viewModel.pendingFavoriteConsent.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingFavoriteConsent) {
+        val request = pendingFavoriteConsent ?: return@LaunchedEffect
+        systemFavoriteLauncher.launch(IntentSenderRequest.Builder(request.pendingIntent.intentSender).build())
+    }
+
     val launchWriteIfNeeded: (PendingIntent?) -> Unit = { pendingIntent ->
         if (pendingIntent != null) {
             systemWriteLauncher.launch(IntentSenderRequest.Builder(pendingIntent.intentSender).build())
@@ -372,6 +385,22 @@ fun FlipYearApp(
                 restoreState = true
             }
         }
+    }
+
+    val navigateToTabDiscardingIntermediates: (String) -> Unit = { route ->
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = false
+            }
+            launchSingleTop = true
+            restoreState = false
+        }
+    }
+
+    val startCleanerSession: (String) -> Unit = { route ->
+        viewModel.resetCleanerSessionUndo()
+        navController.navigate(route)
     }
 
     BoxWithConstraints(
@@ -591,7 +620,7 @@ fun FlipYearApp(
                                     navController.navigate(FlipYearRoutes.flipbook(year))
                                 },
                                 onStartYearCleanup = { year, includeReviewed ->
-                                    navController.navigate(
+                                    startCleanerSession(
                                         FlipYearRoutes.cleanerForYear(
                                             year = year,
                                             includeReviewed = includeReviewed,
@@ -650,7 +679,7 @@ fun FlipYearApp(
                                             photoIds = photoIds,
                                             includeReviewed = includeRev
                                         )
-                                        navController.navigate(
+                                        startCleanerSession(
                                             FlipYearRoutes.cleanerForCustom(
                                                 includeReviewed = includeRev,
                                                 source = CleanerEntrySource.GALLERY
@@ -659,7 +688,7 @@ fun FlipYearApp(
                                     }
                                 },
                                 onStartMonthCleanup = { y, m, includeRev ->
-                                    navController.navigate(
+                                    startCleanerSession(
                                         FlipYearRoutes.cleanerForMonth(
                                             year = y,
                                             month = m,
@@ -669,7 +698,8 @@ fun FlipYearApp(
                                         )
                                     )
                                 },
-                                onResetGlobalMediaFilter = { viewModel.setMediaFilter(MediaFilter.ALL) }
+                                onResetGlobalMediaFilter = { viewModel.setMediaFilter(MediaFilter.ALL) },
+                                onConsumeTreasureGalleryRequest = viewModel::consumeTreasureGalleryRequest
                             )
                         }
 
@@ -677,7 +707,7 @@ fun FlipYearApp(
                             FootprintMapScreen(
                                 uiState = uiState,
                                 onCleanLocation = { locName, includeReviewed ->
-                                    navController.navigate(
+                                    startCleanerSession(
                                         FlipYearRoutes.cleanerForLocation(
                                             location = locName,
                                             includeReviewed = includeReviewed,
@@ -759,7 +789,7 @@ fun FlipYearApp(
                                 allPhotos = uiState.allPhotos,
                                 onBack = { navController.popBackStack() },
                                 onStartMonthCleanup = { y, m, includeReviewed, focusDay ->
-                                    navController.navigate(
+                                    startCleanerSession(
                                         FlipYearRoutes.cleanerForMonth(
                                             year = y,
                                             month = m,
@@ -815,10 +845,6 @@ fun FlipYearApp(
                             val isCustomSession = entry.arguments?.getBoolean("custom") ?: false
                             val customSession = if (isCustomSession) uiState.customCleanerSession else null
 
-                            LaunchedEffect(entry.id) {
-                                viewModel.resetCleanerSessionUndo()
-                            }
-
                             val queue = remember(
                                 yearArg,
                                 monthArg,
@@ -850,23 +876,29 @@ fun FlipYearApp(
                             ArcCleanerScreen(
                                 title = headerTitle,
                                 monthNumber = monthArg,
+                                yearNumber = yearArg,
                                 initialFocusDay = dayArg,
                                 includeReviewed = includeReviewed,
                                 entrySource = entrySource,
                                 timelineSortOrder = uiState.timelineSortOrder,
                                 queue = queue,
                                 undoStackDepth = uiState.cleanerSessionUndoDepth,
-                                onBack = { navController.popBackStack() },
-                                onOpenVaultForSession = { sessionTrashedIds ->
-                                    viewModel.setVaultSessionFilter(sessionTrashedIds)
-                                    navController.navigate(FlipYearRoutes.VAULT) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            saveState = true
-                                        }
-                                        launchSingleTop = true
-                                        restoreState = false
-                                    }
+                                onBack = {
+                                    if (isCustomSession) viewModel.clearCustomCleanerSession()
+                                    navController.popBackStack()
                                 },
+                                onOpenVaultForSession = { sessionTrashedIds ->
+                                    if (isCustomSession) viewModel.clearCustomCleanerSession()
+                                    viewModel.setVaultSessionFilter(sessionTrashedIds)
+                                    navigateToTabDiscardingIntermediates(FlipYearRoutes.VAULT)
+                                },
+                                onOpenTreasureGallery = { year, month ->
+                                    if (isCustomSession) viewModel.clearCustomCleanerSession()
+                                    viewModel.requestTreasureGalleryView(year, month)
+                                    navigateToTabDiscardingIntermediates(FlipYearRoutes.GALLERY)
+                                },
+                                cleanerMutationRejection = uiState.pendingCleanerMutationRejection,
+                                onConsumeCleanerMutationRejection = viewModel::consumeCleanerMutationRejection,
                                 onKeepPhoto = { photo, fav ->
                                     viewModel.keepPhoto(photo, fav, fromCleanerSession = true)
                                 },
@@ -949,6 +981,40 @@ fun FlipYearApp(
                 }
                 }
 
+                // Truly floating pill bar overlaid directly above full-bleed content (zero opaque dock background)
+                AnimatedVisibility(
+                    visible = showTopLevelNav && !useNavigationRail && !isGallerySelectionMode,
+                    enter = fadeIn(animationSpec = tween(220)) + slideInVertically(
+                        initialOffsetY = { it / 2 },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    ),
+                    exit = fadeOut(animationSpec = tween(160)) + slideOutVertically(
+                        targetOffsetY = { it / 2 },
+                        animationSpec = tween(160)
+                    ),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        // 画报底座：导航条区域以 DecoGroundDeep 纯色填充（不再透出滚动内容），
+                        // 与 dock 纵向渐变终点无缝衔接为一整块 footer
+                        .background(DecoGroundDeep)
+                        .navigationBarsPadding()
+                ) {
+                    FloatingGalleryDock(
+                        tabs = tabs,
+                        currentRoute = currentRoute,
+                        trashedCount = uiState.trashedPhotos.size,
+                        onSelectTab = navigateToTab,
+                        onTopEdgeMeasured = { dockTopYPx.value = it }
+                    )
+                }
+
+                // True full-screen edge-to-edge overlay layer (e.g. PhotoDetailLightbox) inside
+                // MainActivity's window so system bars, cutouts, and bottom docks never clip.
+                FullScreenOverlayLayer(host = fullScreenOverlayHost)
+
                 // Stage 1.4: Bottom Material 3 Snackbar positioned above the Floating Gallery Dock,
                 // carrying each message's own bound UndoSnapshot and explicit undo copy (>=4s).
                 val snackbarBottomPadding = when {
@@ -965,6 +1031,7 @@ fun FlipYearApp(
                         .navigationBarsPadding()
                         .padding(start = 16.dp, end = 16.dp, bottom = snackbarBottomPadding)
                         .widthIn(max = 460.dp)
+                        .zIndex(101f)
                         .testTag("bottom_feedback_snackbar")
                 ) {
                     uiState.snackbarMessage?.let { snack ->
@@ -1007,39 +1074,6 @@ fun FlipYearApp(
                     }
                 }
 
-                // Truly floating pill bar overlaid directly above full-bleed content (zero opaque dock background)
-                AnimatedVisibility(
-                    visible = showTopLevelNav && !useNavigationRail && !isGallerySelectionMode,
-                    enter = fadeIn(animationSpec = tween(220)) + slideInVertically(
-                        initialOffsetY = { it / 2 },
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioLowBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        )
-                    ),
-                    exit = fadeOut(animationSpec = tween(160)) + slideOutVertically(
-                        targetOffsetY = { it / 2 },
-                        animationSpec = tween(160)
-                    ),
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        // 画报底座：导航条区域以 DecoGroundDeep 纯色填充（不再透出滚动内容），
-                        // 与 dock 纵向渐变终点无缝衔接为一整块 footer
-                        .background(DecoGroundDeep)
-                        .navigationBarsPadding()
-                ) {
-                    FloatingGalleryDock(
-                        tabs = tabs,
-                        currentRoute = currentRoute,
-                        trashedCount = uiState.trashedPhotos.size,
-                        onSelectTab = navigateToTab,
-                        onTopEdgeMeasured = { dockTopYPx.value = it }
-                    )
-                }
-
-                // True full-screen edge-to-edge overlay layer (e.g. PhotoDetailLightbox) inside
-                // MainActivity's window so system bars, cutouts, and bottom docks never clip.
-                FullScreenOverlayLayer(host = fullScreenOverlayHost)
 
                 // Stage 4: One-time skippable gesture guide shown once on first launch
                 if (!hasSeenOnboarding && !uiState.isLoading) {

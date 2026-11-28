@@ -213,6 +213,9 @@ class LocalMediaScanner(private val context: Context) {
             add(MediaStore.Images.Media.WIDTH)
             add(MediaStore.Images.Media.HEIGHT)
             add(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                add(MediaStore.MediaColumns.IS_FAVORITE)
+            }
             @Suppress("DEPRECATION")
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
                 add(MediaStore.Images.Media.LATITUDE)
@@ -239,6 +242,11 @@ class LocalMediaScanner(private val context: Context) {
                 val widthCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.WIDTH)
                 val heightCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.HEIGHT)
                 val bucketCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+                val favoriteCol = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    cursor.getColumnIndex(MediaStore.MediaColumns.IS_FAVORITE)
+                } else {
+                    -1
+                }
                 @Suppress("DEPRECATION")
                 val latCol = cursor.getColumnIndex(MediaStore.Images.Media.LATITUDE)
                 @Suppress("DEPRECATION")
@@ -263,6 +271,7 @@ class LocalMediaScanner(private val context: Context) {
                     val width = cursor.getInt(widthCol).coerceAtLeast(0)
                     val height = cursor.getInt(heightCol).coerceAtLeast(0)
                     val bucket = cursor.getString(bucketCol)
+                    val systemFavorite = favoriteCol >= 0 && !cursor.isNull(favoriteCol) && cursor.getInt(favoriteCol) != 0
 
                     cal.timeInMillis = takenAt
 
@@ -317,7 +326,7 @@ class LocalMediaScanner(private val context: Context) {
                             drawableName = null,
                             contentUri = contentUri.toString(),
                             status = PhotoStatus.UNREVIEWED.name,
-                            isFavorite = false,
+                            isFavorite = systemFavorite,
                             burstGroupId = null,
                             qualityScore = quality,
                             isBestInStack = false,
@@ -351,6 +360,9 @@ class LocalMediaScanner(private val context: Context) {
             add(MediaStore.Video.Media.HEIGHT)
             add(MediaStore.Video.Media.DURATION)
             add(MediaStore.Video.Media.BUCKET_DISPLAY_NAME)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                add(MediaStore.MediaColumns.IS_FAVORITE)
+            }
             @Suppress("DEPRECATION")
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
                 add(MediaStore.Video.Media.LATITUDE)
@@ -378,6 +390,11 @@ class LocalMediaScanner(private val context: Context) {
                 val heightCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.HEIGHT)
                 val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
                 val bucketCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.BUCKET_DISPLAY_NAME)
+                val favoriteCol = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    cursor.getColumnIndex(MediaStore.MediaColumns.IS_FAVORITE)
+                } else {
+                    -1
+                }
                 @Suppress("DEPRECATION")
                 val latCol = cursor.getColumnIndex(MediaStore.Video.Media.LATITUDE)
                 @Suppress("DEPRECATION")
@@ -402,6 +419,7 @@ class LocalMediaScanner(private val context: Context) {
                     val height = cursor.getInt(heightCol).coerceAtLeast(0)
                     val duration = cursor.getLong(durationCol).coerceAtLeast(0L)
                     val bucket = cursor.getString(bucketCol)
+                    val systemFavorite = favoriteCol >= 0 && !cursor.isNull(favoriteCol) && cursor.getInt(favoriteCol) != 0
 
                     cal.timeInMillis = takenAt
 
@@ -448,7 +466,7 @@ class LocalMediaScanner(private val context: Context) {
                             drawableName = null,
                             contentUri = contentUri.toString(),
                             status = PhotoStatus.UNREVIEWED.name,
-                            isFavorite = false,
+                            isFavorite = systemFavorite,
                             burstGroupId = null,
                             qualityScore = 90,
                             isBestInStack = false,

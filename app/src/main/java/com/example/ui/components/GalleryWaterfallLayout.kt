@@ -203,6 +203,7 @@ fun buildWaterfallLayout(
         var photoCount = 0
         var videoCount = 0
         var burstGroupCount = 0
+        var favoriteCount = 0
         var totalBytes = 0L
 
         val monthStartIdx = index
@@ -212,12 +213,14 @@ fun buildWaterfallLayout(
             when (val e = entries[index]) {
                 is GalleryEntry.Single -> {
                     if (e.photo.isVideo) videoCount++ else photoCount++
+                    if (e.photo.isFavorite) favoriteCount++
                     totalBytes += e.photo.fileSizeBytes
                 }
                 is GalleryEntry.Burst -> {
                     burstGroupCount++
                     for (m in e.photos) {
                         if (m.isVideo) videoCount++ else photoCount++
+                        if (m.isFavorite) favoriteCount++
                         totalBytes += m.fileSizeBytes
                     }
                 }
@@ -235,6 +238,7 @@ fun buildWaterfallLayout(
                 photoCount = photoCount,
                 videoCount = videoCount,
                 burstGroupCount = burstGroupCount,
+                favoriteCount = favoriteCount,
                 totalBytes = totalBytes,
                 firstGridIndex = firstRowIndex,
                 isCleaned = monthStamps.containsKey(ymKey)
@@ -296,7 +300,7 @@ fun buildWaterfallLayout(
 
                 val ar = when (entry) {
                     is GalleryEntry.Single -> entry.photo.safeWaterfallAspectRatio()
-                    is GalleryEntry.Burst -> entry.bestPhoto.safeWaterfallAspectRatio().coerceIn(0.65f, 1.80f)
+                    is GalleryEntry.Burst -> entry.representativePhoto.safeWaterfallAspectRatio().coerceIn(0.65f, 1.80f)
                 }
 
                 if (singleColumnImmersive) {
@@ -715,7 +719,7 @@ private fun JustifiedWaterfallRow(
                                         color = DecoPaperCream,
                                         selected = true,
                                         iconSize = 13.dp,
-                                        contentDescription = "收藏"
+                                        contentDescription = "珍藏"
                                     )
                                 }
                             }
@@ -775,7 +779,7 @@ private fun JustifiedWaterfallRow(
                                 .testTag("burst_collapsed_tile_${entry.groupId}")
                         ) {
                             PhotoArtwork(
-                                photo = entry.bestPhoto,
+                                photo = entry.representativePhoto,
                                 contentDescription = "连拍组，共 ${entry.photos.size} 张，点击展开或长按多选",
                                 showVideoBadge = false,
                                 downsampleTier = decodeTier,
