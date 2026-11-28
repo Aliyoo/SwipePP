@@ -69,6 +69,8 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -962,6 +964,25 @@ private fun AnnualTreasureOverview(
     onPhotoClick: (PhotoItemEntity, List<PhotoItemEntity>) -> Unit
 ) {
     val totalCount = groups.sumOf { it.photos.size }
+    val continuousTreasurePhotos = remember(groups) { groups.flatMap { it.photos } }
+    val monthAnchorIndices = remember(groups) {
+        var nextIndex = 0
+        buildMap {
+            groups.forEach { group ->
+                put(group.month, nextIndex)
+                nextIndex += 1 + ((group.photos.size + 2) / 3)
+            }
+        }
+    }
+    val annualListState = rememberLazyListState()
+    val activeMonth by remember(groups, monthAnchorIndices) {
+        derivedStateOf {
+            val firstVisible = annualListState.firstVisibleItemIndex
+            groups.lastOrNull { (monthAnchorIndices[it.month] ?: Int.MAX_VALUE) <= firstVisible }?.month
+                ?: groups.firstOrNull()?.month
+        }
+    }
+    val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -1010,7 +1031,7 @@ private fun AnnualTreasureOverview(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "$totalCount 项 · ${groups.size} 个月 · 最近收入优先",
+                        text = "$totalCount 项 · ${groups.size} 个月 · 详情可连续滑动",
                         fontSize = 12.sp,
                         fontFamily = DecoDisplayFontFamily,
                         color = DecoInkOnGround.copy(alpha = 0.66f),
@@ -1020,7 +1041,50 @@ private fun AnnualTreasureOverview(
                 }
             }
 
+            if (groups.size > 1) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    groups.forEach { group ->
+                        val selected = activeMonth == group.month
+                        val chipShape = RoundedCornerShape(2.dp)
+                        Box(
+                            modifier = Modifier
+                                .clip(chipShape)
+                                .background(if (selected) DecoGold.copy(alpha = 0.16f) else Color.Transparent)
+                                .border(
+                                    0.8.dp,
+                                    if (selected) DecoGold.copy(alpha = 0.78f) else DecoGold.copy(alpha = 0.30f),
+                                    chipShape
+                                )
+                                .clickable {
+                                    scope.launch {
+                                        annualListState.animateScrollToItem(monthAnchorIndices[group.month] ?: 0)
+                                    }
+                                }
+                                .testTag("annual_treasure_month_jump_${group.month}")
+                        ) {
+                            Text(
+                                text = "${monthChineseName(group.month)} ${group.photos.size}",
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = 11.sp,
+                                letterSpacing = 0.6.sp,
+                                color = if (selected) DecoGold else DecoInkOnGround.copy(alpha = 0.62f),
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
+
             LazyColumn(
+                state = annualListState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -1072,7 +1136,7 @@ private fun AnnualTreasureOverview(
                                             .aspectRatio(1f)
                                             .clip(RoundedCornerShape(2.dp))
                                             .border(0.8.dp, DecoGold.copy(alpha = 0.30f), RoundedCornerShape(2.dp))
-                                            .clickable { onPhotoClick(photo, group.photos) }
+                                            .clickable { onPhotoClick(photo, continuousTreasurePhotos) }
                                             .testTag("annual_treasure_photo_${photo.id}")
                                     ) {
                                         PhotoArtwork(
