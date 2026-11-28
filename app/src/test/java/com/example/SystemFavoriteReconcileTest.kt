@@ -48,7 +48,8 @@ class SystemFavoriteReconcileTest {
         heightPx = 100,
         caption = "",
         bucketName = null,
-        isFavorite = favorite
+        isFavorite = favorite,
+        favoritedAtMillis = null
     )
 
     @Test

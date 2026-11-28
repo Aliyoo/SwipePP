@@ -83,6 +83,7 @@ class PhotoRepository(
     }
 
     suspend fun syncLocalDeviceMedia(preserveLocalFavorites: Boolean = false): MediaSyncResult = withContext(Dispatchers.IO) {
+        val scannedAtMillis = System.currentTimeMillis()
         val scanned = scanner.scanAllLocalPhotosAndVideos()
         val existingRows = dao.getAllDeviceMediaSyncRowsSync()
         val existingByKey = HashMap<String, DeviceMediaSyncRow>(existingRows.size * 2)
@@ -102,7 +103,13 @@ class PhotoRepository(
                 scannedKeys.add(key)
                 val existing = existingByKey[key]
                 if (existing == null) {
-                    newItems.add(item)
+                    newItems.add(
+                        if (item.isFavorite && item.favoritedAtMillis == null) {
+                            item.copy(favoritedAtMillis = scannedAtMillis)
+                        } else {
+                            item
+                        }
+                    )
                 } else if (deviceMediaMetadataDiffers(existing, item)) {
                     metadataUpdates.add(item)
                 }
@@ -136,7 +143,8 @@ class PhotoRepository(
                 deleteSamples = shouldDeleteSamples,
                 metadataUpdates = metadataUpdates,
                 favoriteTrueIds = favoritePlan.favoriteTrueIds,
-                favoriteFalseIds = favoritePlan.favoriteFalseIds
+                favoriteFalseIds = favoritePlan.favoriteFalseIds,
+                favoriteTrueAtMillis = scannedAtMillis
             )
         }
 
@@ -343,14 +351,14 @@ class PhotoRepository(
         ids.distinct().chunked(500).flatMap { dao.getPhotosByIds(it) }
     }
 
-    suspend fun toggleFavorite(photoId: Long, isFavorite: Boolean) {
-        dao.updatePhotoFavorite(photoId, isFavorite)
+    suspend fun toggleFavorite(photoId: Long, isFavorite: Boolean, favoritedAtMillis: Long?) {
+        dao.updatePhotoFavorite(photoId, isFavorite, favoritedAtMillis)
     }
 
-    suspend fun togglePhotosFavorite(ids: List<Long>, isFavorite: Boolean) {
+    suspend fun togglePhotosFavorite(ids: List<Long>, isFavorite: Boolean, favoritedAtMillis: Long?) {
         if (ids.isEmpty()) return
         ids.chunked(FlipYearDao.SQLITE_BIND_CHUNK).forEach { chunk ->
-            dao.updatePhotosFavorite(chunk, isFavorite)
+            dao.updatePhotosFavorite(chunk, isFavorite, favoritedAtMillis)
         }
     }
 

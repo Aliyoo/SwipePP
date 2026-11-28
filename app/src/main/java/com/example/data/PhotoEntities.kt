@@ -82,6 +82,7 @@ data class PhotoItemEntity(
     val contentUri: String? = null,
     val status: String = PhotoStatus.UNREVIEWED.name,
     val isFavorite: Boolean = false,
+    val favoritedAtMillis: Long? = null,
     val burstGroupId: String? = null,
     val qualityScore: Int = 85,
     val isBestInStack: Boolean = false,
@@ -188,7 +189,8 @@ data class DeviceMediaSyncRow(
     val heightPx: Int,
     val caption: String,
     val bucketName: String?,
-    val isFavorite: Boolean
+    val isFavorite: Boolean,
+    val favoritedAtMillis: Long?
 )
 
 data class LocationBatchUpdate(

@@ -141,6 +141,7 @@ data class PhotoStateBackup(
     val month: Int,
     val previousStatus: String,
     val previousFavorite: Boolean,
+    val previousFavoritedAtMillis: Long? = null,
     val previousBucketName: String? = null,
     val restoreLocation: Boolean = false,
     val previousLocationName: String? = null,

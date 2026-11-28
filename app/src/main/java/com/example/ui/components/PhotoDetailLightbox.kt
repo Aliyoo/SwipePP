@@ -372,6 +372,7 @@ private fun PhotoDetailLightboxContent(
                             if (idx >= 0) {
                                 sessionPhotos[idx] = sessionPhotos[idx].copy(
                                     isFavorite = nextFav,
+                                    favoritedAtMillis = if (nextFav) System.currentTimeMillis() else null,
                                     status = PhotoStatus.KEPT.name
                                 )
                             }

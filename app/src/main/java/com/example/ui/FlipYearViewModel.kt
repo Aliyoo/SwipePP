@@ -644,6 +644,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         afterFavoriteApplied: suspend () -> Unit = {}
     ) {
         val targets = photos.filter { it.isFavorite != newFavorite }
+        val operationAtMillis = System.currentTimeMillis()
         if (targets.isEmpty()) {
             pushUndo(snapshot, inCleanerSession = inCleanerSession)
             afterFavoriteApplied()
@@ -656,7 +657,11 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             photos = targets,
             newFavorite = newFavorite,
             onApplied = {
-                repository.togglePhotosFavorite(targets.map { it.id }, newFavorite)
+                repository.togglePhotosFavorite(
+                    ids = targets.map { it.id },
+                    isFavorite = newFavorite,
+                    favoritedAtMillis = if (newFavorite) operationAtMillis else null
+                )
                 pushUndo(snapshot, inCleanerSession = inCleanerSession)
                 afterFavoriteApplied()
                 if (showFeedback) {
@@ -1088,6 +1093,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     month = photo.month,
                     previousStatus = photo.status,
                     previousFavorite = photo.isFavorite,
+                    previousFavoritedAtMillis = photo.favoritedAtMillis,
                     previousBucketName = photo.bucketName
                 )
             ),
@@ -1122,6 +1128,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     month = photo.month,
                     previousStatus = photo.status,
                     previousFavorite = photo.isFavorite,
+                    previousFavoritedAtMillis = photo.favoritedAtMillis,
                     previousBucketName = photo.bucketName,
                     favoriteTouched = markFavorite && !photo.isFavorite
                 )
@@ -1168,6 +1175,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     month = photo.month,
                     previousStatus = photo.status,
                     previousFavorite = photo.isFavorite,
+                    previousFavoritedAtMillis = photo.favoritedAtMillis,
                     previousBucketName = photo.bucketName,
                     favoriteTouched = newFavorite != photo.isFavorite
                 )
@@ -1208,6 +1216,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     month = it.month,
                     previousStatus = it.status,
                     previousFavorite = it.isFavorite,
+                    previousFavoritedAtMillis = it.favoritedAtMillis,
                     previousBucketName = it.bucketName,
                     favoriteTouched = markFavorite && it.id == stack.bestPhoto.id && !it.isFavorite
                 )
@@ -1263,6 +1272,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     month = it.month,
                     previousStatus = it.status,
                     previousFavorite = it.isFavorite,
+                    previousFavoritedAtMillis = it.favoritedAtMillis,
                     previousBucketName = it.bucketName
                 )
             },
@@ -1312,6 +1322,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     month = it.month,
                     previousStatus = it.status,
                     previousFavorite = it.isFavorite,
+                    previousFavoritedAtMillis = it.favoritedAtMillis,
                     previousBucketName = it.bucketName
                 )
             },
@@ -1347,6 +1358,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     month = it.month,
                     previousStatus = it.status,
                     previousFavorite = it.isFavorite,
+                    previousFavoritedAtMillis = it.favoritedAtMillis,
                     previousBucketName = it.bucketName
                 )
             },
@@ -1383,6 +1395,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     month = it.month,
                     previousStatus = it.status,
                     previousFavorite = it.isFavorite,
+                    previousFavoritedAtMillis = it.favoritedAtMillis,
                     previousBucketName = it.bucketName,
                     favoriteTouched = markFavorite && !it.isFavorite
                 )
@@ -1440,6 +1453,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     month = it.month,
                     previousStatus = it.status,
                     previousFavorite = it.isFavorite,
+                    previousFavoritedAtMillis = it.favoritedAtMillis,
                     previousBucketName = it.bucketName
                 )
             },
@@ -1643,6 +1657,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     month = photo.month,
                     previousStatus = photo.status,
                     previousFavorite = photo.isFavorite,
+                    previousFavoritedAtMillis = photo.favoritedAtMillis,
                     previousBucketName = photo.bucketName,
                     restoreLocation = true,
                     previousLocationName = photo.locationName,
@@ -1787,6 +1802,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 status = targetStatus.name,
                 trashedAtMillis = if (targetStatus == PhotoStatus.TRASHED) System.currentTimeMillis() else null,
                 isFavorite = backup.previousFavorite,
+                favoritedAtMillis = backup.previousFavoritedAtMillis,
                 bucketName = backup.previousBucketName,
                 year = backup.year,
                 month = backup.month,
@@ -1816,6 +1832,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     month = photo.month,
                     previousStatus = PhotoStatus.TRASHED.name,
                     previousFavorite = photo.isFavorite,
+                    previousFavoritedAtMillis = photo.favoritedAtMillis,
                     previousBucketName = photo.bucketName
                 )
             ),
@@ -1842,6 +1859,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     month = photo.month,
                     previousStatus = PhotoStatus.TRASHED.name,
                     previousFavorite = photo.isFavorite,
+                    previousFavoritedAtMillis = photo.favoritedAtMillis,
                     previousBucketName = photo.bucketName
                 )
             },
