@@ -254,6 +254,12 @@ data class TreasureGalleryRequest(
 )
 
 @Immutable
+data class CleanerMutationRejection(
+    val cardKey: String,
+    val requestId: Long = 0L
+)
+
+@Immutable
 data class FlipYearUiState(
     val isLoading: Boolean = true,
     val isScanningDevice: Boolean = false,
@@ -286,6 +292,7 @@ data class FlipYearUiState(
     val vaultSessionFilterIds: Set<Long>? = null,
     val customCleanerSession: CustomCleanerSession? = null,
     val pendingTreasureGalleryRequest: TreasureGalleryRequest? = null,
+    val pendingCleanerMutationRejection: CleanerMutationRejection? = null,
     val batchTaskMessage: String? = null,
     val batchTaskProcessed: Int = 0,
     val batchTaskTotal: Int = 0,

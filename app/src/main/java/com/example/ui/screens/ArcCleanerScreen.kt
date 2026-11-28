@@ -86,6 +86,7 @@ import com.example.data.PhotoItemEntity
 import com.example.sensor.ShakeDetector
 import com.example.sensor.rememberHapticEngine
 import com.example.ui.CleanerEntrySource
+import com.example.ui.CleanerMutationRejection
 import com.example.ui.CleanupCardItem
 import com.example.ui.components.ArcTimeScaleScrubber
 import com.example.ui.components.DecoIcon
@@ -199,6 +200,8 @@ fun ArcCleanerScreen(
     onUndoSession: (Boolean) -> String?,
     onOpenVaultForSession: (Set<Long>) -> Unit = {},
     onOpenTreasureGallery: (year: Int, month: Int) -> Unit = { _, _ -> },
+    cleanerMutationRejection: CleanerMutationRejection? = null,
+    onConsumeCleanerMutationRejection: () -> Unit = {},
     includeReviewed: Boolean = false,
     entrySource: CleanerEntrySource = CleanerEntrySource.BOOKSHELF,
     initialFocusDay: Int? = null,
@@ -222,6 +225,15 @@ fun ArcCleanerScreen(
     fun recordDecision(record: SessionDecisionRecord) {
         processedCardKeys = processedCardKeys + record.cardKey
         sessionHistory = sessionHistory + record
+    }
+
+    LaunchedEffect(cleanerMutationRejection) {
+        val rejection = cleanerMutationRejection ?: return@LaunchedEffect
+        if (rejection.cardKey in processedCardKeys) {
+            processedCardKeys = processedCardKeys - rejection.cardKey
+            sessionHistory = sessionHistory.filterNot { it.cardKey == rejection.cardKey }
+        }
+        onConsumeCleanerMutationRejection()
     }
 
     var onlyFocusedDay by rememberSaveable(initialFocusDay) { mutableStateOf(false) }

@@ -134,6 +134,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
     private val customCleanerSession = MutableStateFlow<CustomCleanerSession?>(null)
     private val treasureGalleryRequest = MutableStateFlow<TreasureGalleryRequest?>(null)
     private var treasureGalleryRequestSerial = 0L
+    private val cleanerMutationRejection = MutableStateFlow<CleanerMutationRejection?>(null)
+    private var cleanerMutationRejectionSerial = 0L
     private var gpsBackfillJob: Job? = null
     private var smartTagJob: Job? = null
     @Volatile private var smartTagRerunRequested = false
@@ -219,7 +221,13 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         val recentStamp: String?,
         val vaultSessionFilter: Set<Long>?,
         val customSession: CustomCleanerSession?,
-        val treasureRequest: TreasureGalleryRequest?
+        val treasureRequest: TreasureGalleryRequest?,
+        val cleanerRejection: CleanerMutationRejection?
+    )
+
+    private data class CleanerSessionEvents(
+        val treasureRequest: TreasureGalleryRequest?,
+        val cleanerRejection: CleanerMutationRejection?
     )
 
     private data class DerivedLibraryData(
@@ -241,14 +249,21 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
         val pendingTrashBytes: Long
     )
 
+    private val cleanerSessionEventsFlow = combine(
+        treasureGalleryRequest,
+        cleanerMutationRejection
+    ) { treasureRequest, cleanerRejection ->
+        CleanerSessionEvents(treasureRequest, cleanerRejection)
+    }
+
     private val metaFlow = combine(
         combine(undoStack, cleanerSessionUndoStack) { global, session -> global.size to session.size },
         combine(mediaAccessLevel, hasMediaLocationPermission) { a, loc -> a to loc },
         combine(isScanningDevice, gpsIndexProgress, smartTagProgress, batchTaskProgress) { scan, gps, smartTag, batch ->
             listOf(scan, gps, smartTag, batch)
         },
-        combine(snackbarMessage, recentlyStampedMonthKey, vaultSessionFilterIds, customCleanerSession, treasureGalleryRequest) { snack, stamp, filterIds, custom, treasureRequest ->
-            listOf(snack, stamp, filterIds, custom, treasureRequest)
+        combine(snackbarMessage, recentlyStampedMonthKey, vaultSessionFilterIds, customCleanerSession, cleanerSessionEventsFlow) { snack, stamp, filterIds, custom, events ->
+            listOf(snack, stamp, filterIds, custom, events)
         }
     ) { undoPair, accessPair, workList, feedbackList ->
         @Suppress("UNCHECKED_CAST")
@@ -265,7 +280,8 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             recentStamp = feedbackList[1] as String?,
             vaultSessionFilter = feedbackList[2] as Set<Long>?,
             customSession = feedbackList[3] as CustomCleanerSession?,
-            treasureRequest = feedbackList[4] as TreasureGalleryRequest?
+            treasureRequest = (feedbackList[4] as CleanerSessionEvents).treasureRequest,
+            cleanerRejection = (feedbackList[4] as CleanerSessionEvents).cleanerRejection
         )
     }
 
@@ -407,6 +423,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             vaultSessionFilterIds = meta.vaultSessionFilter,
             customCleanerSession = meta.customSession,
             pendingTreasureGalleryRequest = meta.treasureRequest,
+            pendingCleanerMutationRejection = meta.cleanerRejection,
             batchTaskMessage = meta.batchProgress.message,
             batchTaskProcessed = meta.batchProgress.processed,
             batchTaskTotal = meta.batchProgress.total,
@@ -647,6 +664,15 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 }
             },
             onRejected = {
+                if (inCleanerSession) {
+                    snapshot.cardKey?.let { cardKey ->
+                        cleanerMutationRejectionSerial += 1L
+                        cleanerMutationRejection.value = CleanerMutationRejection(
+                            cardKey = cardKey,
+                            requestId = cleanerMutationRejectionSerial
+                        )
+                    }
+                }
                 showBanner("未获得系统授权，珍藏状态未变更")
             }
         )
@@ -1006,6 +1032,10 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
 
     fun consumeTreasureGalleryRequest() {
         treasureGalleryRequest.value = null
+    }
+
+    fun consumeCleanerMutationRejection() {
+        cleanerMutationRejection.value = null
     }
 
     fun setTimelineSortOrder(order: TimelineSortOrder) {

@@ -15,6 +15,7 @@ import com.example.data.CompressionPreset
 import com.example.data.PhotoItemEntity
 import com.example.data.PhotoStatus
 import com.example.ui.CleanerEntrySource
+import com.example.ui.CleanerMutationRejection
 import com.example.ui.CleanupCardItem
 import com.example.ui.GalleryEntry
 import com.example.ui.TimelineSearchQuery
@@ -187,6 +188,46 @@ class OverhaulVerificationTest {
         composeRule.onNodeWithTag("completion_open_treasures_button").performClick()
         composeRule.waitForIdle()
         assertEquals(2025 to 8, treasureTarget)
+    }
+
+    @Test
+    fun stage3_rejectedFavoriteConsentRestoresCleanupCard() {
+        val photo = samplePhoto(4L, 4_000L)
+        val queue = listOf(CleanupCardItem.SinglePhoto(photo))
+        var rejection by mutableStateOf<CleanerMutationRejection?>(null)
+
+        composeRule.setContent {
+            FlipYearTheme {
+                ArcCleanerScreen(
+                    title = "整理 2025年八月",
+                    monthNumber = 8,
+                    yearNumber = 2025,
+                    queue = queue,
+                    undoStackDepth = 0,
+                    onBack = {},
+                    onKeepPhoto = { _, _ -> },
+                    onTrashPhoto = {},
+                    onKeepEntireStack = { _, _ -> },
+                    onKeepBestInStack = { _, _ -> },
+                    onTrashEntireStack = {},
+                    onSelectBestInStack = { _, _ -> },
+                    onUndoSession = { null },
+                    cleanerMutationRejection = rejection,
+                    onConsumeCleanerMutationRejection = { rejection = null }
+                )
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("arc_favorite_button").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("completion_session_stats").assertIsDisplayed()
+
+        rejection = CleanerMutationRejection(cardKey = "single_4", requestId = 1L)
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("arc_favorite_button").assertIsDisplayed()
+        assertEquals(null, rejection)
     }
 
     @Test

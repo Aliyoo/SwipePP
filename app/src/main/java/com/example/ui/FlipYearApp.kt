@@ -886,6 +886,8 @@ fun FlipYearApp(
                                     viewModel.requestTreasureGalleryView(year, month)
                                     navigateToTab(FlipYearRoutes.GALLERY)
                                 },
+                                cleanerMutationRejection = uiState.pendingCleanerMutationRejection,
+                                onConsumeCleanerMutationRejection = viewModel::consumeCleanerMutationRejection,
                                 onKeepPhoto = { photo, fav ->
                                     viewModel.keepPhoto(photo, fav, fromCleanerSession = true)
                                 },
