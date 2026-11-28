@@ -737,7 +737,7 @@ fun TimelineSearchFilterSheet(
                 ) {
                     val smartChoices = buildList {
                         add(GallerySmartFilter.ALL to "全部")
-                        if (treasuredCount > 0) add(GallerySmartFilter.TREASURED to "珍藏 ($treasuredCount)")
+                        add(GallerySmartFilter.TREASURED to if (treasuredCount > 0) "珍藏 ($treasuredCount)" else "珍藏")
                         if (burstCount > 0) add(GallerySmartFilter.BURSTS to "连拍组 ($burstCount)")
                         if (largePhotoCount > 0) add(GallerySmartFilter.LARGE_PHOTOS to "大图省空间 ($largePhotoCount)")
                         if (missingLocationCount > 0) add(GallerySmartFilter.MISSING_LOCATION to "缺定位 ($missingLocationCount)")

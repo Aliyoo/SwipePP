@@ -456,6 +456,14 @@ fun GalleryScreen(
     val treasuredEntries = precomputed?.treasuredEntries ?: remember(allEntries) {
         filterTreasuredGalleryEntries(allEntries)
     }
+    val treasuredMediaCount = remember(treasuredEntries) {
+        treasuredEntries.sumOf { entry ->
+            when (entry) {
+                is GalleryEntry.Single -> 1
+                is GalleryEntry.Burst -> entry.photos.size
+            }
+        }
+    }
     val largePhotoEntries = precomputed?.largePhotoEntries ?: remember(allEntries) {
         allEntries.filter { entry ->
             when (entry) {
@@ -856,7 +864,7 @@ fun GalleryScreen(
                                 // One-tap Quick Smart Filter Strip right below Search Bar
                                 val quickSmartChoices = remember(
                                     burstEntries.size,
-                                    treasuredEntries.size,
+                                    treasuredMediaCount,
                                     largePhotoEntries.size,
                                     missingLocationEntries.size,
                                     livePhotoEntries.size,
@@ -866,7 +874,7 @@ fun GalleryScreen(
                                 ) {
                                     buildList {
                                         add(GallerySmartFilter.ALL to "全部")
-                                        if (treasuredEntries.isNotEmpty()) add(GallerySmartFilter.TREASURED to "珍藏 (${treasuredEntries.size})")
+                                        add(GallerySmartFilter.TREASURED to if (treasuredMediaCount > 0) "珍藏 ($treasuredMediaCount)" else "珍藏")
                                         if (burstEntries.isNotEmpty()) add(GallerySmartFilter.BURSTS to "连拍组 (${burstEntries.size})")
                                         if (largePhotoEntries.isNotEmpty()) add(GallerySmartFilter.LARGE_PHOTOS to "大图 (${largePhotoEntries.size})")
                                         if (missingLocationEntries.isNotEmpty()) add(GallerySmartFilter.MISSING_LOCATION to "缺定位 (${missingLocationEntries.size})")
@@ -1278,7 +1286,7 @@ fun GalleryScreen(
             currentAlbum = selectedAlbumFilter,
             existingAlbums = existingAlbums,
             burstCount = burstEntries.size,
-            treasuredCount = treasuredEntries.size,
+            treasuredCount = treasuredMediaCount,
             largePhotoCount = largePhotoEntries.size,
             missingLocationCount = missingLocationEntries.size,
             livePhotoCount = livePhotoEntries.size,
