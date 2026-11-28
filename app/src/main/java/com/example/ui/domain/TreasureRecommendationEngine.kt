@@ -1,5 +1,6 @@
 package com.example.ui.domain
 
+import com.example.data.MediaSubtype
 import com.example.data.PhotoItemEntity
 import com.example.data.PhotoStatus
 import com.example.data.smarttag.smartCategories
@@ -72,6 +73,7 @@ object TreasureRecommendationEngine {
             if (photo.isFavorite) continue
             if (photo.photoStatus == PhotoStatus.TRASHED || photo.photoStatus == PhotoStatus.PURGED) continue
             if (photo.qualityScore < MIN_QUALITY_SCORE) continue
+            if (photo.mediaSubtypeKind != MediaSubtype.STANDARD && photo.mediaSubtypeKind != MediaSubtype.CAMERA) continue
             if (YearbookCoverCurator.isLikelyScreenshotOrUtility(photo)) continue
             val burst = photo.burstGroupId
             if (!burst.isNullOrBlank() && !usedBursts.add(burst)) continue

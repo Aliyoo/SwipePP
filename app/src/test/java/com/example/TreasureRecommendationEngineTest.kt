@@ -1,5 +1,6 @@
 package com.example
 
+import com.example.data.MediaSubtype
 import com.example.data.PhotoItemEntity
 import com.example.data.PhotoStatus
 import com.example.ui.domain.TreasureRecommendationEngine
@@ -24,6 +25,7 @@ class TreasureRecommendationEngineTest {
         best: Boolean = false,
         bucket: String = "Camera",
         caption: String = "photo$id",
+        subtype: MediaSubtype = MediaSubtype.CAMERA,
         day: Int = id.toInt().coerceIn(1, 27)
     ) = PhotoItemEntity(
         id = id,
@@ -34,6 +36,7 @@ class TreasureRecommendationEngineTest {
         fileSizeBytes = 2_000_000L,
         widthPx = 3000,
         heightPx = 4000,
+        mediaSubtype = subtype.name,
         status = status.name,
         isFavorite = favorite,
         qualityScore = quality,
@@ -52,7 +55,9 @@ class TreasureRecommendationEngineTest {
             photo(2, status = PhotoStatus.TRASHED),
             photo(3, bucket = "Screenshots", caption = "Screenshot_20260603"),
             photo(4, quality = 40),
-            photo(5, quality = 91)
+            photo(5, quality = 91),
+            photo(6, quality = 95, subtype = MediaSubtype.DOCUMENT, day = 6),
+            photo(7, quality = 94, subtype = MediaSubtype.DOWNLOAD, day = 7)
         )
 
         val result = TreasureRecommendationEngine.recommend(2026, input)
