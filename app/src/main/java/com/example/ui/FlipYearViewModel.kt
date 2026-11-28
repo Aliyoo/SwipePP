@@ -1982,7 +1982,7 @@ internal fun buildPrecomputedGalleryIndex(
     }
     val albumCounts = HashMap<String, Int>(24)
     val bursts = ArrayList<GalleryEntry.Burst>()
-    val treasured = ArrayList<GalleryEntry>()
+    val treasured = filterTreasuredGalleryEntries(entries)
     val largePhotos = ArrayList<GalleryEntry>()
     val missingLocation = ArrayList<GalleryEntry>()
 
@@ -1994,7 +1994,6 @@ internal fun buildPrecomputedGalleryIndex(
                 if (!album.isNullOrEmpty()) {
                     albumCounts[album] = (albumCounts[album] ?: 0) + 1
                 }
-                if (photo.isFavorite) treasured.add(entry)
                 if (!photo.isVideo && photo.fileSizeBytes >= PRECOMPUTED_LARGE_PHOTO_THRESHOLD_BYTES) {
                     largePhotos.add(entry)
                 }
@@ -2004,7 +2003,6 @@ internal fun buildPrecomputedGalleryIndex(
             }
             is GalleryEntry.Burst -> {
                 bursts.add(entry)
-                var hasTreasured = false
                 var hasLarge = false
                 var hasMissingLoc = false
                 for (photo in entry.photos) {
@@ -2012,7 +2010,6 @@ internal fun buildPrecomputedGalleryIndex(
                     if (!album.isNullOrEmpty()) {
                         albumCounts[album] = (albumCounts[album] ?: 0) + 1
                     }
-                    if (photo.isFavorite) hasTreasured = true
                     if (!hasLarge && !photo.isVideo && photo.fileSizeBytes >= PRECOMPUTED_LARGE_PHOTO_THRESHOLD_BYTES) {
                         hasLarge = true
                     }
@@ -2020,7 +2017,6 @@ internal fun buildPrecomputedGalleryIndex(
                         hasMissingLoc = true
                     }
                 }
-                if (hasTreasured) treasured.add(entry)
                 if (hasLarge) largePhotos.add(entry)
                 if (hasMissingLoc) missingLocation.add(entry)
             }

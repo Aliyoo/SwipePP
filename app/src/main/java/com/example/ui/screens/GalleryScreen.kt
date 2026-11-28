@@ -108,6 +108,7 @@ import com.example.ui.components.defaultGalleryZoomTier
 import com.example.ui.countDescriptiveTagMatches
 import com.example.ui.extractDescriptiveKeywordTags
 import com.example.ui.filterGalleryEntriesBySearch
+import com.example.ui.filterTreasuredGalleryEntries
 import com.example.ui.parseTimelineKeyword
 import com.example.ui.screens.gallery.BulkMoveDestinationSheet
 import com.example.ui.screens.gallery.FloatingBulkActionBar
@@ -255,7 +256,7 @@ internal fun filterGalleryEntriesBySmartAndAlbum(
 ): List<GalleryEntry> {
     val base = when (smartFilter) {
         GallerySmartFilter.ALL -> allEntries
-        GallerySmartFilter.TREASURED -> treasuredEntries ?: allEntries.filter { entry -> entry.anyPhoto { it.isFavorite } }
+        GallerySmartFilter.TREASURED -> treasuredEntries ?: filterTreasuredGalleryEntries(allEntries)
         GallerySmartFilter.BURSTS -> burstEntries ?: allEntries.filterIsInstance<GalleryEntry.Burst>()
         GallerySmartFilter.LARGE_PHOTOS -> largePhotoEntries ?: allEntries.filter { entry ->
             when (entry) {
@@ -453,7 +454,7 @@ fun GalleryScreen(
         allEntries.filterIsInstance<GalleryEntry.Burst>()
     }
     val treasuredEntries = precomputed?.treasuredEntries ?: remember(allEntries) {
-        allEntries.filter { entry -> entry.anyPhoto { it.isFavorite } }
+        filterTreasuredGalleryEntries(allEntries)
     }
     val largePhotoEntries = precomputed?.largePhotoEntries ?: remember(allEntries) {
         allEntries.filter { entry ->

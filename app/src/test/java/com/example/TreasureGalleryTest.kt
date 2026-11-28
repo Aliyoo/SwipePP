@@ -41,7 +41,8 @@ class TreasureGalleryTest {
             selectedAlbum = null
         )
 
-        assertEquals(listOf(favoriteSingle, burst), filtered)
+        assertEquals(listOf(favoriteSingle, burst.copy(photos = listOf(burstFavorite), bestPhoto = burstFavorite)), filtered)
+        assertEquals(listOf(3L), (filtered[1] as GalleryEntry.Burst).photos.map { it.id })
     }
 
     @Test

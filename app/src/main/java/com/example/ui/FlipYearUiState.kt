@@ -186,6 +186,25 @@ sealed interface GalleryEntry {
     }
 }
 
+internal fun filterTreasuredGalleryEntries(entries: List<GalleryEntry>): List<GalleryEntry> {
+    return entries.mapNotNull { entry ->
+        when (entry) {
+            is GalleryEntry.Single -> entry.takeIf { it.photo.isFavorite }
+            is GalleryEntry.Burst -> {
+                val treasuredPhotos = entry.photos.filter { it.isFavorite }
+                if (treasuredPhotos.isEmpty()) {
+                    null
+                } else {
+                    entry.copy(
+                        photos = treasuredPhotos,
+                        bestPhoto = entry.bestPhoto.takeIf { it.isFavorite } ?: treasuredPhotos.first()
+                    )
+                }
+            }
+        }
+    }
+}
+
 const val UNLOCATED_LOCATION_KEY = "__UNLOCATED__"
 
 @Immutable
