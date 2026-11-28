@@ -884,6 +884,7 @@ fun FlipYearApp(
                                 },
                                 onOpenTreasureGallery = { year, month ->
                                     viewModel.requestTreasureGalleryView(year, month)
+                                    navController.popBackStack()
                                     navigateToTab(FlipYearRoutes.GALLERY)
                                 },
                                 cleanerMutationRejection = uiState.pendingCleanerMutationRejection,
