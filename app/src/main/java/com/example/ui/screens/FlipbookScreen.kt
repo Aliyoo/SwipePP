@@ -331,8 +331,15 @@ fun FlipbookScreen(
                 .navigationBarsPadding()
                 .widthIn(max = 640.dp)
                 .align(Alignment.TopCenter)
-                .focusProperties { canFocus = !showAnnualTreasure }
-                .focusGroup()
+                .then(
+                    if (showAnnualTreasure) {
+                        Modifier
+                            .focusProperties { canFocus = false }
+                            .focusGroup()
+                    } else {
+                        Modifier
+                    }
+                )
         ) {
             // 画报顶栏：方章返回 + 干支纪年副标 + 『月历/画廊』跳签（多选态整栏切换为选择顶栏）
             val cleanedMonthCount = remember(monthPages) { monthPages.count { it.isCleaned } }
