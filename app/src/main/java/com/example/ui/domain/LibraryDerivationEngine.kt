@@ -15,6 +15,7 @@ import com.example.ui.YearbookCoverCurator
 import com.example.ui.YearbookSummary
 import com.example.ui.theme.TimelineSortOrder
 import com.example.ui.theme.YearbookCoverStyle
+import java.util.Calendar
 
 /**
  * Pure, stateless O(N) domain derivation engine for FlipYear.
@@ -47,15 +48,38 @@ object LibraryDerivationEngine {
         var bestQualityCover: PhotoItemEntity = firstPhoto
     }
 
-    fun buildAnnualTreasureGroups(monthPages: List<MonthPageModel>): List<AnnualTreasureMonthGroup> {
-        return monthPages.mapNotNull { page ->
-            val treasured = page.photos
-                .filter { it.photoStatus != PhotoStatus.TRASHED && it.isFavorite }
-                .sortedWith(
-                    compareByDescending<PhotoItemEntity> { it.favoritedAtMillis ?: Long.MIN_VALUE }
-                        .thenByDescending { it.takenAtMillis }
-                )
-            if (treasured.isEmpty()) null else AnnualTreasureMonthGroup(page.month, treasured)
+    /**
+     * Annual treasure is grouped by the actual capture timestamp, not the scan-time year/month
+     * columns. Those columns are normally identical, but legacy rows, edited media, or imperfect
+     * scans can drift; `takenAtMillis` is the canonical timeline truth used by the detail page.
+     */
+    fun buildAnnualTreasureGroups(
+        year: Int,
+        allPhotos: List<PhotoItemEntity>,
+        sortOrder: TimelineSortOrder = TimelineSortOrder.NEWEST_FIRST
+    ): List<AnnualTreasureMonthGroup> {
+        val calendar = Calendar.getInstance()
+        val treasuredByMonth = HashMap<Int, ArrayList<PhotoItemEntity>>(16)
+        for (photo in allPhotos) {
+            if (photo.photoStatus == PhotoStatus.TRASHED || !photo.isFavorite) continue
+            calendar.timeInMillis = photo.takenAtMillis
+            if (calendar.get(Calendar.YEAR) != year) continue
+            val captureMonth = calendar.get(Calendar.MONTH) + 1
+            treasuredByMonth.getOrPut(captureMonth) { ArrayList() }.add(photo)
+        }
+        val monthSequence = if (sortOrder == TimelineSortOrder.NEWEST_FIRST) {
+            treasuredByMonth.keys.sortedDescending()
+        } else {
+            treasuredByMonth.keys.sorted()
+        }
+        return monthSequence.map { month ->
+            val monthPhotos = treasuredByMonth.getValue(month)
+            val photos = if (sortOrder == TimelineSortOrder.NEWEST_FIRST) {
+                monthPhotos.sortedByDescending { it.takenAtMillis }
+            } else {
+                monthPhotos.sortedBy { it.takenAtMillis }
+            }
+            AnnualTreasureMonthGroup(month, photos)
         }
     }
 

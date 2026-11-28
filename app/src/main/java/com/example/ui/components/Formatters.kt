@@ -76,6 +76,19 @@ fun formatPhotoDateTime(millis: Long): String {
     return sdf.format(Date(millis))
 }
 
+
+fun formatTreasurePickupStatus(favoritedAtMillis: Long?, nowMillis: Long = System.currentTimeMillis()): String {
+    if (favoritedAtMillis == null || favoritedAtMillis <= 0L) return "早期珍藏"
+    val favoriteCal = Calendar.getInstance().apply { timeInMillis = favoritedAtMillis }
+    val nowCal = Calendar.getInstance().apply { timeInMillis = nowMillis }
+    val pattern = if (favoriteCal.get(Calendar.YEAR) == nowCal.get(Calendar.YEAR)) {
+        "M月d日收入"
+    } else {
+        "yyyy年M月d日收入"
+    }
+    return SimpleDateFormat(pattern, Locale.CHINA).format(Date(favoritedAtMillis))
+}
+
 fun formatShortTime(millis: Long): String {
     val sdf = SimpleDateFormat("HH:mm:ss", Locale.US)
     return sdf.format(Date(millis))

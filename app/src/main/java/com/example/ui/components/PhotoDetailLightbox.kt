@@ -728,6 +728,35 @@ private fun PhotoDetailLightboxContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    if (currentPhoto.isFavorite) {
+                        Surface(
+                            shape = RoundedCornerShape(3.dp),
+                            color = DecoGold,
+                            border = BorderStroke(1.dp, DecoPaperCream.copy(alpha = 0.36f)),
+                            modifier = Modifier.testTag("lightbox_treasure_status_badge")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                DecoIcon(
+                                    kind = DecoIconKind.FAVORITE,
+                                    color = DecoGroundDeep,
+                                    iconSize = 13.dp
+                                )
+                                Text(
+                                    text = "已珍藏",
+                                    fontFamily = DecoDisplayFontFamily,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.8.sp,
+                                    color = DecoGroundDeep
+                                )
+                            }
+                        }
+                    }
+
                     if (currentPhoto.isLivePhoto) {
                         LivePhotoDetailBadge()
                     }
@@ -915,6 +944,19 @@ private fun LightboxBottomHud(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
+                        }
+                        if (photo.isFavorite) {
+                            Text(
+                                text = formatTreasurePickupStatus(photo.favoritedAtMillis),
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 0.8.sp,
+                                color = DecoGoldOnPhoto,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.testTag("lightbox_treasure_pickup_status")
+                            )
                         }
                     }
 

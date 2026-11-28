@@ -317,8 +317,12 @@ fun FlipbookScreen(
         }
     }
 
-    val annualTreasureGroups = remember(monthPages) {
-        com.example.ui.domain.LibraryDerivationEngine.buildAnnualTreasureGroups(monthPages)
+    val annualTreasureGroups = remember(year, allPhotos, timelineSortOrder) {
+        com.example.ui.domain.LibraryDerivationEngine.buildAnnualTreasureGroups(
+            year = year,
+            allPhotos = allPhotos,
+            sortOrder = timelineSortOrder
+        )
     }
     val annualTreasureCount = annualTreasureGroups.sumOf { it.photos.size }
     LaunchedEffect(annualTreasureCount) {
