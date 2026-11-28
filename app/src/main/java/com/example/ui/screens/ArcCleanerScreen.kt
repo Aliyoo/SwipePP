@@ -1106,7 +1106,16 @@ fun ArcCleanerScreen(
                     handleTrashSingle(target)
                 }
             },
-            onToggleFavorite = onToggleFavorite
+            onToggleFavorite = { target, newFavorite ->
+                val isActiveSingleCard = displayedQueue.any {
+                    it is CleanupCardItem.SinglePhoto && it.photo.id == target.id
+                }
+                if (!isFromBurstStack && newFavorite && isActiveSingleCard) {
+                    handleKeepSingle(target, true)
+                } else {
+                    onToggleFavorite(target, newFavorite)
+                }
+            }
         )
     }
 
