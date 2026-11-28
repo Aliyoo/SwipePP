@@ -541,7 +541,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
             newFavorite = true,
             onApplied = { markSystemFavoriteMigrationComplete() },
             onRejected = {
-                showBanner("已有收藏暂未同步到系统相册，下次启动会再次尝试")
+                showBanner("已有珍藏暂未同步到系统相册，下次启动会再次尝试")
             }
         )
     }
@@ -642,7 +642,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 }
             },
             onRejected = {
-                showBanner("未获得系统授权，收藏状态未变更")
+                showBanner("未获得系统授权，珍藏状态未变更")
             }
         )
     }
@@ -1094,7 +1094,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     snapshot = snapshot,
                     inCleanerSession = fromCleanerSession,
                     showFeedback = !fromCleanerSession,
-                    successText = "已收藏并保留 1 项",
+                    successText = "已收入珍藏并保留 1 项",
                     afterFavoriteApplied = { completeKeep() }
                 )
             } else {
@@ -1134,7 +1134,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                 snapshot = snapshot,
                 inCleanerSession = false,
                 showFeedback = true,
-                successText = if (newFavorite) "已加入收藏" else "已取消收藏",
+                successText = if (newFavorite) "已收入珍藏" else "已移出珍藏",
                 afterFavoriteApplied = {
                     val currentPhoto = repository.getPhotosByIds(listOf(photo.id)).firstOrNull() ?: photo
                     if (newFavorite && currentPhoto.photoStatus == PhotoStatus.UNREVIEWED) {
@@ -1363,7 +1363,7 @@ class FlipYearViewModel(application: Application) : AndroidViewModel(application
                     snapshot = snapshot,
                     inCleanerSession = false,
                     showFeedback = true,
-                    successText = "已收藏并保留 ${photos.size} 项媒体",
+                    successText = "已收入珍藏并保留 ${photos.size} 项媒体",
                     afterFavoriteApplied = { completeBulkKeep() }
                 )
             } else {
@@ -1982,6 +1982,7 @@ internal fun buildPrecomputedGalleryIndex(
     }
     val albumCounts = HashMap<String, Int>(24)
     val bursts = ArrayList<GalleryEntry.Burst>()
+    val treasured = ArrayList<GalleryEntry>()
     val largePhotos = ArrayList<GalleryEntry>()
     val missingLocation = ArrayList<GalleryEntry>()
 
@@ -1993,6 +1994,7 @@ internal fun buildPrecomputedGalleryIndex(
                 if (!album.isNullOrEmpty()) {
                     albumCounts[album] = (albumCounts[album] ?: 0) + 1
                 }
+                if (photo.isFavorite) treasured.add(entry)
                 if (!photo.isVideo && photo.fileSizeBytes >= PRECOMPUTED_LARGE_PHOTO_THRESHOLD_BYTES) {
                     largePhotos.add(entry)
                 }
@@ -2002,6 +2004,7 @@ internal fun buildPrecomputedGalleryIndex(
             }
             is GalleryEntry.Burst -> {
                 bursts.add(entry)
+                var hasTreasured = false
                 var hasLarge = false
                 var hasMissingLoc = false
                 for (photo in entry.photos) {
@@ -2009,6 +2012,7 @@ internal fun buildPrecomputedGalleryIndex(
                     if (!album.isNullOrEmpty()) {
                         albumCounts[album] = (albumCounts[album] ?: 0) + 1
                     }
+                    if (photo.isFavorite) hasTreasured = true
                     if (!hasLarge && !photo.isVideo && photo.fileSizeBytes >= PRECOMPUTED_LARGE_PHOTO_THRESHOLD_BYTES) {
                         hasLarge = true
                     }
@@ -2016,6 +2020,7 @@ internal fun buildPrecomputedGalleryIndex(
                         hasMissingLoc = true
                     }
                 }
+                if (hasTreasured) treasured.add(entry)
                 if (hasLarge) largePhotos.add(entry)
                 if (hasMissingLoc) missingLocation.add(entry)
             }
@@ -2032,6 +2037,7 @@ internal fun buildPrecomputedGalleryIndex(
         sourceEntries = entries,
         existingAlbums = existingAlbums,
         burstEntries = bursts,
+        treasuredEntries = treasured,
         largePhotoEntries = largePhotos,
         missingLocationEntries = missingLocation,
         extractedKeywordTags = keywordTags,

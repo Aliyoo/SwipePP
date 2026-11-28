@@ -83,6 +83,28 @@ class YearbookCoverCuratorTest {
     }
 
     @Test
+    fun coverRankingPrioritizesExplicitTreasureOverHeuristicQuality() {
+        val treasured = photo(
+            id = 1,
+            qualityScore = 55,
+            isFavorite = true,
+            status = PhotoStatus.KEPT,
+            locationName = null
+        )
+        val highQuality = photo(
+            id = 2,
+            qualityScore = 98,
+            isFavorite = false,
+            status = PhotoStatus.KEPT,
+            locationName = "京都"
+        )
+
+        val ranked = YearbookCoverCurator.rankPhotosForCoverPicker(listOf(highQuality, treasured))
+
+        assertEquals(1L, ranked.first().id)
+    }
+
+    @Test
     fun smartCuration_enforcesMonthDiversityAndBurstDeduplication() {
         val photos = listOf(
             // Burst stack in May — should pick at most 1

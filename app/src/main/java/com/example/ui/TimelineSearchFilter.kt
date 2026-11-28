@@ -129,7 +129,7 @@ enum class DescriptiveTag(
     val label: String,
     val searchAliases: List<String>
 ) {
-    FAVORITE("精选收藏", listOf("收藏", "精选", "精选收藏", "喜欢", "favorite", "star")),
+    FAVORITE("珍藏", listOf("珍藏", "收藏", "精选", "精选收藏", "喜欢", "favorite", "star")),
     VIDEO("视频", listOf("视频", "video", "mov", "mp4")),
     UHD_VIDEO("4K 视频", listOf("4k", "4k视频", "uhd", "超清视频")),
     LIVE_PHOTO("Live 图", listOf("live", "live图", "live photo", "实况", "实况照片", "动态照片", "motion photo")),
@@ -212,6 +212,7 @@ enum class DescriptiveTag(
             "未整理" to NEEDS_REVIEW,
             "连拍组" to BURST,
             "精选" to FAVORITE,
+            "珍藏" to FAVORITE,
             "收藏" to FAVORITE,
             "高清" to HIGH_QUALITY,
             "视频" to VIDEO,

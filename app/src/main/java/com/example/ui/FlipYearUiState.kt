@@ -200,6 +200,7 @@ data class PrecomputedGalleryIndex(
     val sourceEntries: List<GalleryEntry> = emptyList(),
     val existingAlbums: List<String> = emptyList(),
     val burstEntries: List<GalleryEntry.Burst> = emptyList(),
+    val treasuredEntries: List<GalleryEntry> = emptyList(),
     val largePhotoEntries: List<GalleryEntry> = emptyList(),
     val missingLocationEntries: List<GalleryEntry> = emptyList(),
     val extractedKeywordTags: List<String> = emptyList(),

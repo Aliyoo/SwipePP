@@ -203,6 +203,7 @@ fun buildWaterfallLayout(
         var photoCount = 0
         var videoCount = 0
         var burstGroupCount = 0
+        var favoriteCount = 0
         var totalBytes = 0L
 
         val monthStartIdx = index
@@ -212,12 +213,14 @@ fun buildWaterfallLayout(
             when (val e = entries[index]) {
                 is GalleryEntry.Single -> {
                     if (e.photo.isVideo) videoCount++ else photoCount++
+                    if (e.photo.isFavorite) favoriteCount++
                     totalBytes += e.photo.fileSizeBytes
                 }
                 is GalleryEntry.Burst -> {
                     burstGroupCount++
                     for (m in e.photos) {
                         if (m.isVideo) videoCount++ else photoCount++
+                        if (m.isFavorite) favoriteCount++
                         totalBytes += m.fileSizeBytes
                     }
                 }
@@ -235,6 +238,7 @@ fun buildWaterfallLayout(
                 photoCount = photoCount,
                 videoCount = videoCount,
                 burstGroupCount = burstGroupCount,
+                favoriteCount = favoriteCount,
                 totalBytes = totalBytes,
                 firstGridIndex = firstRowIndex,
                 isCleaned = monthStamps.containsKey(ymKey)
