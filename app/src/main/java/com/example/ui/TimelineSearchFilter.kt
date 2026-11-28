@@ -110,11 +110,24 @@ data class DateRangeFilter(
             )
         }
 
+        fun monthPreset(year: Int, month: Int): DateRangeFilter = DateRangeFilter(
+            startDateKey = encodeDateKey(year, month, 1),
+            endDateKey = encodeDateKey(year, month, daysInMonth(year, month)),
+            presetLabel = "${year}年${month}月"
+        )
+
         fun yearPreset(year: Int): DateRangeFilter = DateRangeFilter(
             startDateKey = encodeDateKey(year, 1, 1),
             endDateKey = encodeDateKey(year, 12, 31),
             presetLabel = "${year}年"
         )
+
+        private fun daysInMonth(year: Int, month: Int): Int = when (month) {
+            1, 3, 5, 7, 8, 10, 12 -> 31
+            4, 6, 9, 11 -> 30
+            2 -> if (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) 29 else 28
+            else -> 31
+        }
     }
 }
 

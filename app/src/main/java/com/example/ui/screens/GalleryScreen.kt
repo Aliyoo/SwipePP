@@ -365,11 +365,7 @@ fun GalleryScreen(
         rawSearchKeyword = ""
         searchQuery = if (request.year != null && request.month != null) {
             TimelineSearchQuery(
-                dateRange = DateRangeFilter(
-                    startDateKey = DateRangeFilter.encodeDateKey(request.year, request.month, 1),
-                    endDateKey = DateRangeFilter.encodeDateKey(request.year, request.month, 31),
-                    presetLabel = "${request.year}年${request.month}月"
-                )
+                dateRange = DateRangeFilter.monthPreset(request.year, request.month)
             )
         } else {
             TimelineSearchQuery()

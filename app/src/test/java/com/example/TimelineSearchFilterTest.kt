@@ -273,4 +273,17 @@ class TimelineSearchFilterTest {
         val utc = DateRangeFilter.dateKeyToUtcMillis(key)
         assertEquals(key, DateRangeFilter.utcMillisToDateKey(utc))
     }
+
+    @Test
+    fun monthPresetUsesRealLastDayAndRoundTripsInDatePicker() {
+        val february = DateRangeFilter.monthPreset(2026, 2)
+
+        assertEquals(DateRangeFilter.encodeDateKey(2026, 2, 28), february.endDateKey)
+        assertEquals(
+            february.endDateKey,
+            DateRangeFilter.utcMillisToDateKey(DateRangeFilter.dateKeyToUtcMillis(february.endDateKey!!))
+        )
+        assertTrue(february.matches(2026, 2, 28))
+        assertFalse(february.matches(2026, 3, 1))
+    }
 }
