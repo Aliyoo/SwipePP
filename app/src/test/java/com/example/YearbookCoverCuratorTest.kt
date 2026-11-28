@@ -153,6 +153,54 @@ class YearbookCoverCuratorTest {
     }
 
     @Test
+    fun smartCurationExhaustsTreasurePoolBeforeNonTreasureDiversity() {
+        val treasured = (1..6).map { index ->
+            photo(
+                id = index.toLong(),
+                month = if (index <= 3) 4 else 9,
+                day = index,
+                qualityScore = 80 + index,
+                isFavorite = true,
+                status = PhotoStatus.KEPT,
+                bucketName = "Camera"
+            )
+        }
+        val diverseNonTreasures = listOf(
+            photo(id = 101, month = 1, qualityScore = 99, status = PhotoStatus.KEPT, locationName = "北海道"),
+            photo(id = 102, month = 2, qualityScore = 98, status = PhotoStatus.KEPT, locationName = "青岛"),
+            photo(id = 103, month = 3, qualityScore = 97, status = PhotoStatus.KEPT, locationName = "京都"),
+            photo(id = 104, month = 5, qualityScore = 96, status = PhotoStatus.KEPT, locationName = "厦门")
+        )
+
+        val slides = YearbookCoverCurator.curateSmartCoverSlides(treasured + diverseNonTreasures)
+
+        assertEquals(6, slides.size)
+        assertEquals(treasured.map { it.id }.toSet(), slides.map { it.id }.toSet())
+        assertTrue(slides.all { it.isFavorite })
+    }
+
+    @Test
+    fun smartCurationBackfillsNonTreasuresOnlyWhenTreasurePoolIsInsufficient() {
+        val treasured = listOf(
+            photo(id = 1, month = 4, day = 1, qualityScore = 88, isFavorite = true, status = PhotoStatus.KEPT),
+            photo(id = 2, month = 9, day = 2, qualityScore = 86, isFavorite = true, status = PhotoStatus.KEPT)
+        )
+        val nonTreasures = listOf(
+            photo(id = 101, month = 1, qualityScore = 99, status = PhotoStatus.KEPT, locationName = "北海道"),
+            photo(id = 102, month = 2, qualityScore = 98, status = PhotoStatus.KEPT, locationName = "青岛"),
+            photo(id = 103, month = 3, qualityScore = 97, status = PhotoStatus.KEPT, locationName = "京都"),
+            photo(id = 104, month = 5, qualityScore = 96, status = PhotoStatus.KEPT, locationName = "厦门")
+        )
+
+        val slides = YearbookCoverCurator.curateSmartCoverSlides(treasured + nonTreasures, maxSlides = 4)
+
+        assertEquals(4, slides.size)
+        assertEquals(listOf(1L, 2L), slides.take(2).map { it.id })
+        assertEquals(2, slides.count { it.isFavorite })
+        assertEquals(setOf(4, 9), slides.filter { it.isFavorite }.map { it.month }.toSet())
+    }
+
+    @Test
     fun resolveCover_respectsSingleCustomAndFallsBackWhenTrashed() {
         val p1 = photo(id = 10, month = 3, qualityScore = 95, isFavorite = true)
         val p2 = photo(id = 20, month = 7, qualityScore = 82)

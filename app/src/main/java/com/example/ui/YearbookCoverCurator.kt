@@ -188,43 +188,42 @@ object YearbookCoverCurator {
             usedMonthDays.add(photo.month * 100 + photo.day)
         }
 
-        // Pass 1: Best non-utility photo per distinct month (seasonally balanced highlights)
-        for ((photo, _) in scored) {
-            if (selected.size >= maxSlides) break
-            if (!canUse(photo)) continue
-            if (photo.month in usedMonths) continue
-            if (isLikelyScreenshotOrUtility(photo)) continue
-            pick(photo)
-        }
-
-        // Pass 2: Best non-utility photo per distinct day to fill remaining slots
-        if (selected.size < maxSlides) {
-            for ((photo, _) in scored) {
+        fun fillTier(
+            candidates: List<Pair<PhotoItemEntity, Int>>,
+            requireUnusedMonth: Boolean,
+            requireUnusedMonthDay: Boolean,
+            excludeUtilities: Boolean = true
+        ) {
+            for ((photo, _) in candidates) {
                 if (selected.size >= maxSlides) break
                 if (!canUse(photo)) continue
-                if ((photo.month * 100 + photo.day) in usedMonthDays) continue
-                if (isLikelyScreenshotOrUtility(photo)) continue
+                if (requireUnusedMonth && photo.month in usedMonths) continue
+                if (requireUnusedMonthDay && (photo.month * 100 + photo.day) in usedMonthDays) continue
+                if (excludeUtilities && isLikelyScreenshotOrUtility(photo)) continue
                 pick(photo)
             }
         }
 
-        // Pass 3: Remaining top non-utility photos (still deduplicating burst groups)
-        if (selected.size < maxSlides) {
-            for ((photo, _) in scored) {
-                if (selected.size >= maxSlides) break
-                if (!canUse(photo)) continue
-                if (isLikelyScreenshotOrUtility(photo)) continue
-                pick(photo)
-            }
+        // Explicit user curation outranks inferred diversity: exhaust the treasured pool first,
+        // then backfill with the best non-treasured photography only when treasures are insufficient.
+        val nonUtilityScored = scored.filterNot { isLikelyScreenshotOrUtility(it.first) }
+        val treasuredTier = nonUtilityScored.filter { it.first.isFavorite }
+        val fallbackTier = nonUtilityScored.filterNot { it.first.isFavorite }
+
+        for (tier in listOf(treasuredTier, fallbackTier)) {
+            fillTier(tier, requireUnusedMonth = true, requireUnusedMonthDay = false)
+            fillTier(tier, requireUnusedMonth = false, requireUnusedMonthDay = true)
+            fillTier(tier, requireUnusedMonth = false, requireUnusedMonthDay = false)
         }
 
-        // Pass 4: Fallback if the entire year only contains screenshots/utilities
+        // Final fallback if the entire year only contains screenshots/utilities.
         if (selected.isEmpty()) {
-            for ((photo, _) in scored) {
-                if (selected.size >= maxSlides) break
-                if (!canUse(photo)) continue
-                pick(photo)
-            }
+            fillTier(
+                scored,
+                requireUnusedMonth = false,
+                requireUnusedMonthDay = false,
+                excludeUtilities = false
+            )
         }
 
         return selected
