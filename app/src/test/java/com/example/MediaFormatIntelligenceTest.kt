@@ -118,6 +118,14 @@ class MediaFormatIntelligenceTest {
             MediaSubtype.DOCUMENT,
             classifyMediaSubtype("Camera", "scan_0003.jpg", 1200, 900, false)
         )
+        assertEquals(
+            MediaSubtype.DOCUMENT,
+            classifyMediaSubtype("Scans", "IMG_0004.jpg", 1200, 900, false)
+        )
+        assertEquals(
+            MediaSubtype.STANDARD,
+            classifyMediaSubtype("Tuscans", "IMG_0005.jpg", 1200, 900, false)
+        )
     }
 
     @Test

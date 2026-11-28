@@ -69,7 +69,7 @@ fun classifyMediaSubtype(
         if (keyword == "scan") {
             // Keep short English tokens word-ish: "scan_01"/"scan01" are documents,
             // but travel buckets such as "Tuscany" must not match the embedded "scan".
-            Regex("(^|[^a-z])scan($|[^a-z])").containsMatchIn(haystack)
+            Regex("(^|[^a-z])scan(s|ner|ned)?($|[^a-z])").containsMatchIn(haystack)
         } else {
             keyword in haystack
         }
