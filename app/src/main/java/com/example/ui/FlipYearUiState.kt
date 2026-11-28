@@ -175,7 +175,8 @@ sealed interface GalleryEntry {
     data class Burst(
         val groupId: String,
         val photos: List<PhotoItemEntity>,
-        val bestPhoto: PhotoItemEntity
+        val bestPhoto: PhotoItemEntity,
+        val preferredRepresentativePhotoId: Long? = null
     ) : GalleryEntry {
         override val stableKey: String = "gal_burst_$groupId"
         override val latestTimestamp: Long = photos.maxOf { it.takenAtMillis }
@@ -185,6 +186,9 @@ sealed interface GalleryEntry {
         val spanSeconds: Long = ((photos.maxOf { it.takenAtMillis } - photos.minOf { it.takenAtMillis }) / 1000L).coerceAtLeast(1L)
         val representativePhoto: PhotoItemEntity
             get() {
+                preferredRepresentativePhotoId?.let { preferredId ->
+                    photos.firstOrNull { it.id == preferredId }?.let { return it }
+                }
                 val treasured = photos.filter { it.isFavorite }
                 if (treasured.isEmpty()) return bestPhoto
                 return treasured.firstOrNull { it.id == bestPhoto.id }

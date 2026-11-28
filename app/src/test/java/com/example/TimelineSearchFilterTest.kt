@@ -241,6 +241,39 @@ class TimelineSearchFilterTest {
         assertEquals(1, burstMatch.size)
         val burst = burstMatch[0] as GalleryEntry.Burst
         assertEquals(2L, burst.bestPhoto.id)
+        assertEquals(2L, burst.representativePhoto.id)
+    }
+
+    @Test
+    fun searchKeepsRepresentativeOnMatchingFrameWhenTreasuredFrameDoesNotMatch() {
+        val unreviewedBest = PhotoItemEntity(
+            id = 10L,
+            year = 2026, month = 6, day = 1,
+            takenAtMillis = 1_780_000_000_000L,
+            fileSizeBytes = 1_000_000L, widthPx = 4000, heightPx = 3000,
+            status = PhotoStatus.UNREVIEWED.name,
+            qualityScore = 90, isBestInStack = true,
+            caption = "最佳帧",
+            burstGroupId = "burst_review"
+        )
+        val treasuredKeptFrame = unreviewedBest.copy(
+            id = 11L,
+            status = PhotoStatus.KEPT.name,
+            isFavorite = true,
+            isBestInStack = false,
+            caption = "珍藏帧"
+        )
+        val burst = GalleryEntry.Burst("burst_review", listOf(unreviewedBest, treasuredKeptFrame), unreviewedBest)
+
+        val result = filterGalleryEntriesBySearch(
+            listOf(burst),
+            TimelineSearchQuery(keyword = "待整理")
+        )
+
+        assertEquals(1, result.size)
+        val surfaced = result[0] as GalleryEntry.Burst
+        assertEquals(10L, surfaced.bestPhoto.id)
+        assertEquals(10L, surfaced.representativePhoto.id)
     }
 
     @Test

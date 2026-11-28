@@ -804,8 +804,10 @@ fun filterGalleryEntriesBySearch(
             is GalleryEntry.Burst -> {
                 var bestPhotoMatch: PhotoItemEntity? = null
                 var bestScore = Float.NEGATIVE_INFINITY
+                val matchScores = HashMap<Long, Float>(entry.photos.size)
                 for (p in entry.photos) {
                     val s = scoreSinglePhoto(p) ?: continue
+                    matchScores[p.id] = s
                     if (bestPhotoMatch == null || s > bestScore ||
                         (s == bestScore && p.id == entry.bestPhoto.id)
                     ) {
@@ -819,7 +821,14 @@ fun filterGalleryEntriesBySearch(
                     } else {
                         entry.copy(bestPhoto = bestPhotoMatch)
                     }
-                    scored.add(surfaced to bestScore)
+                    val representativeMatches = matchScores.containsKey(surfaced.representativePhoto.id)
+                    scored.add(
+                        if (representativeMatches) {
+                            surfaced
+                        } else {
+                            surfaced.copy(preferredRepresentativePhotoId = bestPhotoMatch.id)
+                        } to bestScore
+                    )
                 }
             }
         }
