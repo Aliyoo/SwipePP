@@ -65,7 +65,15 @@ fun classifyMediaSubtype(
     val haystack = "$bucket/$name"
     val ratio = if (widthPx > 0 && heightPx > 0) widthPx.toFloat() / heightPx.toFloat() else 1f
 
-    fun containsAny(keywords: List<String>) = keywords.any { it in haystack }
+    fun containsAny(keywords: List<String>) = keywords.any { keyword ->
+        if (keyword == "scan") {
+            // Keep short English tokens word-ish: "scan_01"/"scan01" are documents,
+            // but travel buckets such as "Tuscany" must not match the embedded "scan".
+            Regex("(^|[^a-z])scan($|[^a-z])").containsMatchIn(haystack)
+        } else {
+            keyword in haystack
+        }
+    }
 
     return when {
         isVideo && containsAny(listOf("screen_record", "screenrecord", "录屏")) -> MediaSubtype.SCREEN_RECORD
@@ -73,7 +81,7 @@ fun classifyMediaSubtype(
         containsAny(listOf("screenshot", "screenshots", "截屏", "截图")) -> MediaSubtype.SCREENSHOT
         containsAny(
             listOf(
-                "document", "documents", "scan", "scanner", "office", "receipt", "invoice",
+                "document", "documents", "scan", "scanner", "scanned", "office", "receipt", "invoice",
                 "发票", "票据", "文档", "扫描", "二维码", "qrcode"
             )
         ) -> MediaSubtype.DOCUMENT
