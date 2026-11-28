@@ -1040,7 +1040,7 @@ private fun LightboxBottomHud(
                                         DecoSealOrb(
                                             label = "珍藏",
                                             orbSize = 54.dp,
-                                            tone = if (photo.isFavorite) DecoOrbTone.GOLD_RING_HALO else DecoOrbTone.GOLD_RING,
+                                            tone = if (photo.isFavorite) DecoOrbTone.GOLD_SOLID else DecoOrbTone.GOLD_RING,
                                             onClick = onFavorite,
                                             testTag = "lightbox_favorite_button",
                                             accessibilityLabel = if (photo.isFavorite) {
