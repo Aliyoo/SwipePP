@@ -45,6 +45,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -765,7 +767,8 @@ fun DecoSealButton(
     size: Dp = 38.dp,
     fontSize: TextUnit = 15.sp,
     testTag: String? = null,
-    contentDescriptionText: String? = null
+    contentDescriptionText: String? = null,
+    focusRequester: FocusRequester? = null
 ) {
     val gold = DecoGold
     val ground = DecoGround
@@ -788,6 +791,7 @@ fun DecoSealButton(
                 scaleY = pressScale
             }
             .clip(RoundedCornerShape(4.dp))
+            .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
             .clickable(
                 interactionSource = interactionSource,
                 indication = ripple(color = gold),

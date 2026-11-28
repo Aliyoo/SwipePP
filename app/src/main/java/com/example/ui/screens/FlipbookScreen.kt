@@ -69,6 +69,7 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -79,6 +80,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -197,6 +199,7 @@ fun FlipbookScreen(
 ) {
     val scope = rememberCoroutineScope()
     val haptics = rememberHapticEngine()
+    val focusManager = LocalFocusManager.current
     var showGalleryMode by remember(year, defaultShowGalleryMode) { mutableStateOf(defaultShowGalleryMode) }
     var expandedBurstIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var lightboxPhoto by remember { mutableStateOf<PhotoItemEntity?>(null) }
@@ -445,6 +448,7 @@ fun FlipbookScreen(
                                 labelBottom = "藏",
                                 onClick = {
                                     haptics.pageFlipLift()
+                                    focusManager.clearFocus(force = true)
                                     showAnnualTreasure = true
                                 },
                                 testTag = "annual_treasure_button",
@@ -966,11 +970,7 @@ private fun AnnualTreasureOverview(
         modifier = Modifier
             .fillMaxSize()
             .background(DecoGround)
-            .focusRequester(focusRequester)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) {}
+            .pointerInput(Unit) { detectTapGestures {} }
             .statusBarsPadding()
             .navigationBarsPadding()
             .testTag("annual_treasure_overview")
@@ -995,7 +995,8 @@ private fun AnnualTreasureOverview(
                     testTag = "annual_treasure_back_button",
                     contentDescriptionText = stringResource(R.string.cd_back),
                     size = 40.dp,
-                    fontSize = 14.sp
+                    fontSize = 14.sp,
+                    focusRequester = focusRequester
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(

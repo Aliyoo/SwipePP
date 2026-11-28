@@ -41,7 +41,7 @@
     <string name="action_select_all">全选</string>
     <string name="action_deselect_all">取消全选</string>
     <string name="action_bulk_move">移动</string>
-    <string name="action_bulk_favorite">收藏</string>
+    <string name="action_bulk_favorite">珍藏</string>
     <string name="action_bulk_keep">保留</string>
     <string name="action_bulk_delete">移入回收站</string>
     <string name="cd_exit_selection">退出多选模式</string>
