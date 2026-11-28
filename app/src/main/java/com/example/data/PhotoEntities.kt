@@ -136,6 +136,14 @@ data class PhotoItemEntity(
         }
 }
 
+@Entity(tableName = "device_favorite_timestamps")
+data class DeviceFavoriteTimestampEntity(
+    @PrimaryKey val mediaStoreKey: String,
+    val favoritedAtMillis: Long,
+    val takenAtMillis: Long,
+    val fileSizeBytes: Long
+)
+
 @Entity(tableName = "photo_embeddings")
 data class PhotoEmbeddingEntity(
     @PrimaryKey val photoId: Long,
@@ -184,6 +192,7 @@ data class DeviceMediaSyncRow(
     val motionVideoOffset: Long?,
     val motionVideoLength: Long?,
     val pairedMediaStoreKey: String?,
+    val takenAtMillis: Long,
     val fileSizeBytes: Long,
     val widthPx: Int,
     val heightPx: Int,

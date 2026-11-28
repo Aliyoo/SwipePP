@@ -43,6 +43,7 @@ class SystemFavoriteReconcileTest {
         motionVideoOffset = null,
         motionVideoLength = null,
         pairedMediaStoreKey = null,
+        takenAtMillis = 1_000L,
         fileSizeBytes = 10L,
         widthPx = 100,
         heightPx = 100,

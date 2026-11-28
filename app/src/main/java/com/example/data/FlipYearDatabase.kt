@@ -10,6 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 @Database(
     entities = [
         PhotoItemEntity::class,
+        DeviceFavoriteTimestampEntity::class,
         PhotoEmbeddingEntity::class,
         MonthStampEntity::class,
         CleanupStatsEntity::class,
@@ -96,6 +97,14 @@ abstract class FlipYearDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Existing favorites predate this timestamp field; keep null rather than inventing a migration time.
                 db.execSQL("ALTER TABLE photos ADD COLUMN favoritedAtMillis INTEGER")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `device_favorite_timestamps` (" +
+                        "`mediaStoreKey` TEXT NOT NULL, " +
+                        "`favoritedAtMillis` INTEGER NOT NULL, " +
+                        "`takenAtMillis` INTEGER NOT NULL, " +
+                        "`fileSizeBytes` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`mediaStoreKey`))"
+                )
             }
         }
 

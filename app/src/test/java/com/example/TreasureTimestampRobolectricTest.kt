@@ -2,7 +2,9 @@ package com.example
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.example.data.DeviceFavoriteTimestampEntity
 import com.example.data.FlipYearDatabase
+import com.example.data.favoriteTimestampForScannedItem
 import com.example.data.PhotoItemEntity
 import com.example.data.PhotoRestoreSpec
 import com.example.data.PhotoStatus
@@ -103,5 +105,30 @@ class TreasureTimestampRobolectricTest {
 
         assertEquals(true, restored.isFavorite)
         assertNull(restored.favoritedAtMillis)
+    }
+    @Test
+    fun matchingFavoriteTombstonePreservesOriginalTimestamp() {
+        val item = photo(1L).copy(isFavorite = true, favoritedAtMillis = null)
+        val tombstone = DeviceFavoriteTimestampEntity(
+            mediaStoreKey = "img_1",
+            favoritedAtMillis = 42L,
+            takenAtMillis = item.takenAtMillis,
+            fileSizeBytes = item.fileSizeBytes
+        )
+
+        assertEquals(42L, favoriteTimestampForScannedItem(item, tombstone, 999L))
+    }
+
+    @Test
+    fun mismatchedFavoriteTombstoneFallsBackToScanTimestamp() {
+        val item = photo(1L).copy(isFavorite = true, favoritedAtMillis = null)
+        val tombstone = DeviceFavoriteTimestampEntity(
+            mediaStoreKey = "img_1",
+            favoritedAtMillis = 42L,
+            takenAtMillis = item.takenAtMillis,
+            fileSizeBytes = item.fileSizeBytes + 1
+        )
+
+        assertEquals(999L, favoriteTimestampForScannedItem(item, tombstone, 999L))
     }
 }

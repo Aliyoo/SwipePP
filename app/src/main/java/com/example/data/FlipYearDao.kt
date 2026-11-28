@@ -40,7 +40,7 @@ interface FlipYearDao {
     @Query(
         "SELECT id, mediaStoreKey, durationMs, mimeType, imageFormat, mediaSubtype, isAnimated, " +
             "motionPhotoType, motionVideoUri, motionVideoDurationMs, motionVideoOffset, motionVideoLength, " +
-            "pairedMediaStoreKey, fileSizeBytes, widthPx, heightPx, caption, bucketName, isFavorite, favoritedAtMillis " +
+            "pairedMediaStoreKey, takenAtMillis, fileSizeBytes, widthPx, heightPx, caption, bucketName, isFavorite, favoritedAtMillis " +
             "FROM photos WHERE isSample = 0"
     )
     suspend fun getAllDeviceMediaSyncRowsSync(): List<DeviceMediaSyncRow>
@@ -213,6 +213,15 @@ interface FlipYearDao {
     @Query("UPDATE photos SET isFavorite = :isFavorite, favoritedAtMillis = :favoritedAtMillis WHERE id IN (:ids)")
     suspend fun updatePhotosFavorite(ids: List<Long>, isFavorite: Boolean, favoritedAtMillis: Long?)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertFavoriteTimestampTombstones(rows: List<DeviceFavoriteTimestampEntity>)
+
+    @Query("SELECT * FROM device_favorite_timestamps")
+    suspend fun getFavoriteTimestampTombstones(): List<DeviceFavoriteTimestampEntity>
+
+    @Query("DELETE FROM device_favorite_timestamps WHERE mediaStoreKey IN (:keys)")
+    suspend fun deleteFavoriteTimestampTombstones(keys: List<String>)
+
     @Query("UPDATE photos SET bucketName = :bucketName WHERE id IN (:ids)")
     suspend fun updatePhotosAlbum(ids: List<Long>, bucketName: String?)
 
@@ -332,8 +341,16 @@ interface FlipYearDao {
         metadataUpdates: List<PhotoItemEntity> = emptyList(),
         favoriteTrueIds: List<Long> = emptyList(),
         favoriteFalseIds: List<Long> = emptyList(),
-        favoriteTrueAtMillis: Long? = null
+        favoriteTrueAtMillis: Long? = null,
+        favoriteTimestampTombstones: List<DeviceFavoriteTimestampEntity> = emptyList(),
+        scannedMediaKeys: List<String> = emptyList()
     ) {
+        if (favoriteTimestampTombstones.isNotEmpty()) {
+            upsertFavoriteTimestampTombstones(favoriteTimestampTombstones)
+        }
+        scannedMediaKeys.chunked(SQLITE_BIND_CHUNK).forEach { chunk ->
+            deleteFavoriteTimestampTombstones(chunk)
+        }
         favoriteTrueIds.chunked(SQLITE_BIND_CHUNK).forEach { chunk ->
             updatePhotosFavorite(chunk, true, favoriteTrueAtMillis)
         }
